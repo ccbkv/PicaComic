@@ -1,0 +1,10 @@
+{
+  "module": {
+    "name": "flutter_file_dialog",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet"
+    ]
+  }
+}

@@ -30,27 +30,66 @@ dependencies:
   flutter:
     sdk: flutter
   dio: 5.4.1
-  shared_preferences: ^2.0.16
+  shared_preferences:
+    #git:
+      #url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+      path: "deps/shared_preferences/shared_preferences"
   dynamic_color: ^1.6.9
   crypto: any
   pointycastle: ^3.7.3
   uuid: ^3.0.7
   photo_view:
-    git:
+   git:
       url: https://github.com/wgh136/photo_view
       ref: 94724a0b
-  url_launcher: ^6.1.8
-  path_provider: ^2.0.12
-  file_selector: ^1.0.1
-  image_picker: ^1.0.2
+  url_launcher:
+    #git:
+     #url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+     path: "deps/url_launcher/url_launcher"
+  url_launcher_ohos:
+    #git:
+    #url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+    path: "deps/url_launcher/url_launcher_ohos"
+  #path_provider:
+      #git:
+        #url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+        #path: "deps/path_provider/path_provider"
+  file_selector:
+   #git:
+      #url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+      path: "deps/file_selector/file_selector"
+  image_picker:
+    #git:
+     #url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+     path: "deps/image_picker/image_picker"
+  image_picker_ohos:
+    #git:
+    #url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+    path: "deps/image_picker/image_picker_ohos"
+
   image_gallery_saver:
-    git:
-      url: https://github.com/wgh136/image_gallery_saver
-      ref: master
+   #git:
+      #url: "https://gitcode.com/openharmony-sig/flutter_image_gallery_saver.git"
+    path: "deps/flutter_image_gallery_saver"
   flutter_file_dialog: 3.0.1
-  flutter_local_notifications: ^17.2.2
-  share_plus: ^7.0.0
-  local_auth: ^2.3.0
+    #git:
+      #url: "https://gitcode.com/yymeteor/flutter_plugins.git"
+      #path: "deps/flutter_file_dialog"
+      #ref: main
+  flutter_local_notifications:
+    #git:
+     #url: "https://gitcode.com/openharmony-sig/fluttertpc_flutter_local_notifications.git"
+     path: "deps/fluttertpc_flutter_local_notifications-br_flutter_local_notifications-v17.2.4_ohos/flutter_local_notifications"
+     #ref: "edcc7f28b6d540c83ee8cf6c93b5b78dba0ecb1e"
+  share_plus:
+   # git:
+     # url: "https://gitcode.com/openharmony-sig/flutter_plus_plugins.git"
+      path: "deps/share_plus/share_plus"
+      #ref: "d25224cbafdee9089e5bc31faa6b58f6b2e8875f"
+  local_auth:
+    #git:
+      #url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+      path: "deps/local_auth/local_auth"
   html: any
   dio_cookie_manager: any
   image: 4.1.0
@@ -64,27 +103,44 @@ dependencies:
     sdk: flutter
   intl: any
   flutter_displaymode: 0.6.0
-  app_links: 3.4.3
+  #app_links: ^6.4.0
+  app_links: ^3.4.3
+  #app_links_ohos:
+    #git:
+      #url: https://gitcode.com/openharmony-sig/fluttertpc_app_links.git
+      #path: app_links/ohos
+  app_links_ohos:
+    path: deps/fluttertpc_app_links/app_links/ohos
   flutter_reorderable_grid_view: 5.0.1
   webdav_client:
     git:
       url: https://github.com/wgh136/webdav_client
       ref: main
   dio_http2_adapter: 2.3.1+1
-  sqlite3: 2.1.0
-  sqlite3_flutter_libs: any
+  sqlite3:
+    git:
+      url: https://github.com/SageMik/sqlite3-ohos.dart
+      path: sqlite3
+      ref: sqlite3-2.4.7-ohos
+  sqlite3_flutter_libs:
+    #git:
+      #url: https://github.com/SageMik/sqlite3-ohos.dart
+      path: deps\sqlite3-ohos.dart\sqlite3_flutter_libs
+      #ref: sqlite3_flutter_libs-0.5.25-ohos
   zip_flutter:
     git:
       url: https://github.com/wgh136/zip_flutter
       ref: 92b7309e
   collection: ^1.18.0
   window_manager:
-  flutter_inappwebview: 6.0.0
+  flutter_inappwebview:
+      #git:
+        #url: https://gitcode.com/openharmony-sig/flutter_inappwebview.git
+        path: "deps/flutter_inappwebview/flutter_inappwebview"
   pdf: ^3.10.8
-  flutter_qjs:
-    git:
-      url: https://github.com/wgh136/flutter_qjs
-      ref: ade0b9d
+  flutter_js_ohos: #^0.6.8
+    path: "deps/flutter_js_ohos"
+  #flutter_js: ^0.7.2
   sliver_tools: ^0.2.12
   mime: ^1.0.5
   desktop_webview_window:
@@ -92,12 +148,6 @@ dependencies:
       url: https://github.com/wgh136/flutter_desktop_webview
       path: packages/desktop_webview_window
 
-dependency_overrides:
-  flutter_inappwebview_android:
-    git:
-      url: https://github.com/holzgeist/flutter_inappwebview
-      path: flutter_inappwebview_android
-      ref: d89b1d32638b49dfc58c4b7c84153be0c269d057
 
 dev_dependencies:
   flutter_test:
@@ -170,3 +220,13 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
+dependency_overrides:
+    intl: 0.19.0
+    path_provider:
+     #git:
+     # url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
+      path: "deps/path_provider/path_provider"
+    #path_provider_ohos:
+      #git:
+        #url: "https://gitcode.com/openharmony-sig/flutter_packages.git"
+        #path: "packages/path_provider/path_provider_ohos"

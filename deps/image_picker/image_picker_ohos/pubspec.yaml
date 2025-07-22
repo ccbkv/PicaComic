@@ -1,0 +1,31 @@
+name: image_picker_ohos
+description: Ohos implementation of the image_picker plugin.
+repository: https://gitee.com/openharmony-sig/flutter_packages/tree/master/packages/image_picker/image_picker_ohos
+issue_tracker: https://gitee.com/openharmony-sig/flutter_packages/issues
+
+version: 0.8.7+4
+homepage: https://gitee.com/she-taotao/flutter_packages/tree/br_image_picker-v1.1.2_ohos/packages/image_picker/image_picker_ohos
+
+environment:
+  sdk: ">=2.18.0 <4.0.0"
+  flutter: ">=3.3.0"
+
+flutter:
+  plugin:
+    implements: image_picker
+    platforms:
+      ohos:
+        package: io.flutter.plugins.imagepicker
+        pluginClass: ImagePickerPlugin
+        dartPluginClass: ImagePickerOhos
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_plugin_android_lifecycle: ^2.0.1
+  image_picker_platform_interface: ^2.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  pigeon: ^9.2.5

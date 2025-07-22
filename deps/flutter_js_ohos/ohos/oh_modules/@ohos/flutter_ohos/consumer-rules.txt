@@ -1,0 +1,4 @@
+# flutter_ohos 在混淆时需要保留的代码
+-keep-property-name
+flutter
+native*

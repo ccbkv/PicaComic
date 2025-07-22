@@ -1,0 +1,14 @@
+{
+  "license": "",
+  "devDependencies": {},
+  "author": "",
+  "name": "entry",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "version": "1.0.0",
+  "dependencies": {
+    "@ohos/flutter_ohos": "file:../har/flutter.har",
+    "integration_test": "file:../har/integration_test.har",
+    "shared_preferences_ohos": "file:../har/shared_preferences_ohos.har"
+  }
+}

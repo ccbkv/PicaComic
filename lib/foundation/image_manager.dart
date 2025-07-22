@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_qjs/flutter_qjs.dart';
+//import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:html/parser.dart';
 import 'package:pica_comic/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
@@ -24,6 +24,40 @@ import '../network/hitomi_network/image.dart';
 import '../network/jm_network/jm_network.dart';
 import '../network/jm_network/headers.dart';
 import '../network/res.dart';
+
+import 'package:flutter_js_ohos/extensions/fetch.dart';
+import 'package:flutter_js_ohos/extensions/handle_promises.dart';
+import 'package:flutter_js_ohos/extensions/xhr.dart';
+import 'package:flutter_js_ohos/flutter_js.dart';
+import 'package:flutter_js_ohos/javascript_runtime.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_base.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_context_ref.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_object_ref.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_string_ref.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_typed_array.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_value_ref.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/jsc_ffi.dart';
+import 'package:flutter_js_ohos/javascriptcore/flutter_jscore.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_class.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_context.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_context_group.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_object.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_property_name_accumulator.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_property_name_array.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_string.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_value.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore_bindings.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore_runtime.dart';
+import 'package:flutter_js_ohos/js_eval_result.dart';
+import 'package:flutter_js_ohos/quickjs-sync-server/quickjs_oasis_jsbridge.dart';
+import 'package:flutter_js_ohos/quickjs/ffi.dart';
+//import 'package:flutter_js_ohos/quickjs/isolate.dart';
+//import 'package:flutter_js_ohos/quickjs/object.dart';
+import 'package:flutter_js_ohos/quickjs/qjs_typedefs.dart';
+import 'package:flutter_js_ohos/quickjs/quickjs_runtime.dart';
+import 'package:flutter_js_ohos/quickjs/quickjs_runtime2.dart';
+import 'package:flutter_js_ohos/quickjs/utf8_null_terminated.dart';
+//import 'package:flutter_js_ohos/quickjs/wrapper.dart';
 
 class BadRequestException {
   final String message;
@@ -98,7 +132,7 @@ class ImageManager {
       }
       var dioRes = await dio.get<ResponseBody>(realUrl,
           options:
-              Options(responseType: ResponseType.stream, headers: headers));
+          Options(responseType: ResponseType.stream, headers: headers));
       if (dioRes.data == null) {
         throw Exception("Empty Data");
       }
@@ -237,7 +271,7 @@ class ImageManager {
 
       await getShowKey();
       assert(
-          gallery.auth?["showKey"] != null || gallery.auth?["mpvKey"] != null);
+      gallery.auth?["showKey"] != null || gallery.auth?["mpvKey"] != null);
 
       yield DownloadProgress(0, 100, cacheKey, savePath);
 
@@ -272,7 +306,7 @@ class ImageManager {
             res = await dio.get<ResponseBody>(image,
                 options: Options(responseType: ResponseType.stream));
             if (res.data!.headers["Content-Type"]?[0] ==
-                    "text/html; charset=UTF-8" ||
+                "text/html; charset=UTF-8" ||
                 res.data!.headers["content-type"]?[0] ==
                     "text/html; charset=UTF-8") {
               throw ImageExceedError();
@@ -326,17 +360,17 @@ class ImageManager {
           } else {
             var document = parse(res.data);
             var image =
-                document.querySelector("div#i3 > a > img")?.attributes["src"];
+            document.querySelector("div#i3 > a > img")?.attributes["src"];
             var nl = document
                 .querySelector("div#i6 > div > a#loadfail")
                 ?.attributes["onclick"]
                 ?.split('\'')
                 .firstWhereOrNull((element) => element.contains('-'));
             var originImage = document
-                    .querySelectorAll("div#i6 > div > a")
-                    .firstWhereOrNull(
-                        (element) => element.text.contains("original"))
-                    ?.attributes["href"] ??
+                .querySelectorAll("div#i6 > div > a")
+                .firstWhereOrNull(
+                    (element) => element.text.contains("original"))
+                ?.attributes["href"] ??
                 "";
             return (image ?? "", originImage, nl);
           }
@@ -372,7 +406,7 @@ class ImageManager {
             res = await dio.get<ResponseBody>(image,
                 options: Options(responseType: ResponseType.stream));
             if (res.data!.headers["Content-Type"]?[0] ==
-                    "text/html; charset=UTF-8" ||
+                "text/html; charset=UTF-8" ||
                 res.data!.headers["content-type"]?[0] ==
                     "text/html; charset=UTF-8") {
               throw ImageExceedError();
@@ -535,8 +569,8 @@ class ImageManager {
   ///获取禁漫图片, 如果缓存中没有, 则尝试下载
   Stream<DownloadProgress> getJmImage(String url, Map<String, String>? headers,
       {required String epsId,
-      required String scrambleId,
-      required String bookId}) async* {
+        required String scrambleId,
+        required String bookId}) async* {
     bookId = bookId.replaceAll(RegExp(r"\..+"), "");
     final urlWithoutParam = url.replaceAll(RegExp(r"\?.+"), "");
     await wait(urlWithoutParam);
@@ -686,8 +720,7 @@ class ImageManager {
       Uint8List? result;
 
       if (shouldModifyData) {
-        var data = (config['onResponse']
-            as JSInvokable)(Uint8List.fromList(imageData));
+        var data = config['onResponse'](Uint8List.fromList(imageData));
         imageData.clear();
         if (data is! Uint8List) {
           throw "Invalid Config: onImageLoad.onResponse return invalid type\n"
@@ -737,8 +770,8 @@ class ImageManager {
     });
   }
 
-  Stream<DownloadProgress> getCustomThumbnail(
-      String url, String sourceKey, [Map<String, String>? headers]) async* {
+  Stream<DownloadProgress> getCustomThumbnail(String url, String sourceKey,
+      [Map<String, String>? headers]) async* {
     var cacheKey = "$sourceKey$url";
     await wait(cacheKey);
     loadingItems[cacheKey] = DownloadProgress(0, 1, cacheKey, "");
@@ -799,8 +832,8 @@ class ImageManager {
       Uint8List? result;
 
       if (shouldModifyData) {
-        var data = (config['onResponse']
-            as JSInvokable)(Uint8List.fromList(imageData));
+        var data = config['onResponse'](Uint8List.fromList(imageData));
+
         imageData.clear();
         if (data is! Uint8List) {
           throw "Invalid Config: onImageLoad.onResponse return invalid type\n"
@@ -853,7 +886,7 @@ class ImageManager {
     String? ext;
     var url = res.realUri.toString();
     var contentType =
-        (res.headers["Content-Type"] ?? res.headers["content-type"])?[0];
+    (res.headers["Content-Type"] ?? res.headers["content-type"])?[0];
     if (contentType != null) {
       ext = switch (contentType) {
         "image/jpeg" => "jpg",

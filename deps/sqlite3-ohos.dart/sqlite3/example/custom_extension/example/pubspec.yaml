@@ -1,0 +1,36 @@
+name: uuid_example
+description: "Demonstrates how to use the uuid plugin."
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.3 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  uuid:
+    path: ../
+
+  cupertino_icons: ^1.0.6
+  sqlite3: ^2.4.6
+  sqlite3_flutter_libs: ^0.5.24
+  path: ^1.9.0
+  path_provider: ^2.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+
+dependency_overrides:
+  sqlite3:
+    path: ../../../
+  sqlite3_flutter_libs:
+    path: ../../../../sqlite3_flutter_libs
+
+flutter:
+  uses-material-design: true

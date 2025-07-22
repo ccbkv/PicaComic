@@ -1,0 +1,28 @@
+{
+	"app": {
+		"bundleName": "com.example.config",
+		"debug": false,
+		"versionCode": 1000000,
+		"versionName": "1.0.0",
+		"minAPIVersion": 50000012,
+		"targetAPIVersion": 50101019,
+		"apiReleaseType": "Beta1",
+		"compileSdkVersion": "5.1.1.66",
+		"compileSdkType": "HarmonyOS",
+		"appEnvironments": [],
+		"bundleType": "app",
+		"buildMode": "release"
+	},
+	"module": {
+		"name": "flutter",
+		"type": "har",
+		"deviceTypes": [
+			"default"
+		],
+		"packageName": "@ohos/flutter_ohos",
+		"installationFree": false,
+		"virtualMachine": "ark12.0.2.0",
+		"compileMode": "esmodule",
+		"dependencies": []
+	}
+}

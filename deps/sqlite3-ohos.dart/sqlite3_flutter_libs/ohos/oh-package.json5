@@ -1,0 +1,12 @@
+{
+  "name": "sqlite3_flutter_libs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ets",
+  "author": "SageMik",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@ohos/flutter_ohos": "file:./har/flutter.har",
+    "sqlite3-native-library": "^3.46.0+1"
+  }
+}

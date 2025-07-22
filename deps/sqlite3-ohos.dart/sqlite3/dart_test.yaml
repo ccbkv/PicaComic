@@ -1,0 +1,42 @@
+tags:
+  ffi:
+    test_on: vm
+  wasm:
+    test_on: browser
+  ci_only:
+    skip: "This test requires special setup and only runs in the GitHub CI action"
+
+platforms: [vm]
+
+override_platforms:
+  firefox:
+    settings:
+      arguments: "-headless"
+  chrome:
+    settings:
+      arguments: "--enable-features=SharedArrayBuffer"
+  edge:
+    settings:
+      arguments: "--enable-features=SharedArrayBuffer"
+
+presets:
+  full:
+    platforms: [vm, chrome, firefox]
+    on_os:
+      windows:
+        platforms: [vm, chrome, firefox, edge]
+  web:
+    platforms: [chrome, firefox]
+    on_os:
+      windows:
+        platforms: [chrome, firefox, edge]
+  wasm-only:
+    add_presets: [web]
+    compilers: [dart2wasm]
+  web-full:
+    add_presets: [web]
+    compilers: [dart2js, dart2wasm]
+  ci:
+    tags:
+      ci_only:
+        skip: false

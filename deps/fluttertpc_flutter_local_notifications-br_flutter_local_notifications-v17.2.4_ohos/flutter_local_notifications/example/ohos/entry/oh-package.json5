@@ -1,0 +1,14 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "integration_test": "file:../har/integration_test.har",
+    "flutter_local_notifications": "file:../har/flutter_local_notifications.har",
+    "path_provider_ohos": "file:../har/path_provider_ohos.har",
+    "device_info_plus": "file:../har/device_info_plus.har"
+  }
+}

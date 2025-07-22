@@ -1,0 +1,47 @@
+name: flutter_local_notifications_example
+description: Demonstrates how to use the flutter_local_notifications plugin.
+publish_to: none
+
+dependencies:
+  cupertino_icons: ^1.0.2
+  device_info_plus:
+    git:
+      url: "https://gitcode.com/openharmony-sig/flutter_plus_plugins.git"
+      path: "packages/device_info_plus/device_info_plus"
+  flutter:
+    sdk: flutter
+  flutter_local_notifications:
+    path: ../
+  flutter_timezone: ^1.0.4
+  http: ^0.13.4
+  image: ^3.0.8
+  path_provider:
+    git:
+      url: "https://gitcode.com/openharmony-sig/flutter_packages.git"
+      path: "packages/path_provider/path_provider"
+
+dev_dependencies:
+  flutter_driver:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+# The following overrides exist to ensure the example app builds with the latest code
+# of these packages as part of CI
+dependency_overrides:
+  flutter_local_notifications_linux:
+    path: ../../flutter_local_notifications_linux
+  flutter_local_notifications_platform_interface:
+    path: ../../flutter_local_notifications_platform_interface
+
+flutter:
+  uses-material-design: true
+  assets:
+    - icons/
+    - sound/
+
+environment:
+  sdk: ">=2.15.0 <3.0.0"
+  flutter: ">=2.8.0"

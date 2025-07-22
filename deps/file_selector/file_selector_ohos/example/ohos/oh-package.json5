@@ -1,0 +1,17 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "apptemplate",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "@ohos/hypium": "1.0.6"
+  },
+  "overrides": {
+    "@ohos/flutter_ohos": "file:./har/flutter.har",
+    "file_selector_ohos": "file:./har/file_selector_ohos.har",
+    "@ohos/flutter_module": "file:./entry"
+  }
+}

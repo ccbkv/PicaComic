@@ -1,0 +1,23 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "flutter_local_notifications_example",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "@ohos/flutter_ohos": "file:./har/flutter.har"
+  },
+  "devDependencies": {
+    "@ohos/hypium": "1.0.6"
+  },
+  "overrides": {
+    "integration_test": "file:./har/integration_test.har",
+    "flutter_local_notifications": "file:./har/flutter_local_notifications.har",
+    "path_provider_ohos": "file:./har/path_provider_ohos.har",
+    "device_info_plus": "file:./har/device_info_plus.har",
+    "@ohos/flutter_module": "file:./entry",
+    "@ohos/flutter_ohos": "file:./har/flutter.har"
+  }
+}

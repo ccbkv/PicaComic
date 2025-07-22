@@ -1,0 +1,13 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "@ohos/flutter_ohos": "file:../har/flutter.har",
+    "integration_test": "file:../har/integration_test.har",
+    "path_provider_ohos": "file:../har/path_provider_ohos.har"
+  }
+}

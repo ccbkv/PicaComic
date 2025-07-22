@@ -1,0 +1,46 @@
+# Copyright (c) 2023 Hunan OpenValley Digital Industry Development Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: shared_preferences_ohos
+description: Ohos implementation of the shared_preferences plugin
+repository: https://gitee.com/openharmony-sig/flutter_packages/tree/master/packages/shared_preferences/shared_preferences_ohos
+issue_tracker: https://gitee.com/openharmony-sig/flutter_packages/issues
+version: 2.3.1
+
+environment:
+  sdk: ^3.4.0
+  flutter: ">=3.19.0"
+
+flutter:
+  plugin:
+    implements: shared_preferences
+    platforms:
+      ohos:
+        package: io.flutter.plugins.sharedpreferences
+        pluginClass: SharedPreferencesPlugin
+        dartPluginClass: SharedPreferencesOhos
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences_platform_interface: ^2.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  pigeon: ^16.0.4
+
+topics:
+  - persistence
+  - shared-preferences
+  - storage

@@ -1,0 +1,40 @@
+
+
+{
+  "apiType": "stageMode",
+  "buildOption": {
+    "sourceOption": {
+      "workers": [
+        "./src/main/ets/embedding/engine/workers/PlatformChannelWorker.ets"
+      ]
+    },
+    "nativeLib": {
+      "debugSymbol": {
+        "strip": false,
+        "exclude": []
+      }
+    }
+  },
+  "buildOptionSet": [
+    {
+      "name": "release",
+      "arkOptions": {
+        "obfuscation": {
+          "ruleOptions": {
+            "enable": false,
+            "files": [
+              "./obfuscation-rules.txt"
+            ]
+          },
+          "consumerFiles": ["./consumer-rules.txt"]
+        }
+      }
+    },
+  ],
+  "targets": [
+    {
+      "name": "default",
+      "runtimeOS": "HarmonyOS"
+    }
+  ]
+}

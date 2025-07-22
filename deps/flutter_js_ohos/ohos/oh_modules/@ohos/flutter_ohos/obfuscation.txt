@@ -1,0 +1,3 @@
+-keep-property-name
+flutter
+native*

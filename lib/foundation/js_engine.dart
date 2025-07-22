@@ -14,7 +14,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:pica_comic/network/cloudflare.dart';
 import 'package:pica_comic/network/cookie_jar.dart';
 import 'package:pica_comic/tools/extensions.dart';
-import 'package:flutter_qjs/flutter_qjs.dart';
+//import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:pointycastle/api.dart';
 import 'package:pointycastle/asn1/asn1_parser.dart';
 import 'package:pointycastle/asn1/primitives/asn1_integer.dart';
@@ -28,6 +28,39 @@ import 'package:pointycastle/block/modes/cfb.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:pointycastle/block/modes/ofb.dart';
 
+import 'package:flutter_js_ohos/extensions/fetch.dart';
+import 'package:flutter_js_ohos/extensions/handle_promises.dart';
+import 'package:flutter_js_ohos/extensions/xhr.dart';
+import 'package:flutter_js_ohos/flutter_js.dart';
+import 'package:flutter_js_ohos/javascript_runtime.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_base.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_context_ref.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_object_ref.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_string_ref.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_typed_array.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/js_value_ref.dart';
+import 'package:flutter_js_ohos/javascriptcore/binding/jsc_ffi.dart';
+import 'package:flutter_js_ohos/javascriptcore/flutter_jscore.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_class.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_context.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_context_group.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_object.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_property_name_accumulator.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_property_name_array.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_string.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore/js_value.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore_bindings.dart';
+import 'package:flutter_js_ohos/javascriptcore/jscore_runtime.dart';
+import 'package:flutter_js_ohos/js_eval_result.dart';
+import 'package:flutter_js_ohos/quickjs-sync-server/quickjs_oasis_jsbridge.dart';
+import 'package:flutter_js_ohos/quickjs/ffi.dart';
+//import 'package:flutter_js_ohos/quickjs/isolate.dart';
+//import 'package:flutter_js_ohos/quickjs/object.dart';
+import 'package:flutter_js_ohos/quickjs/qjs_typedefs.dart';
+import 'package:flutter_js_ohos/quickjs/quickjs_runtime.dart';
+import 'package:flutter_js_ohos/quickjs/quickjs_runtime2.dart';
+import 'package:flutter_js_ohos/quickjs/utf8_null_terminated.dart';
+//import 'package:flutter_js_ohos/quickjs/wrapper.dart';
 
 class JavaScriptRuntimeException implements Exception {
   final String message;
@@ -40,26 +73,26 @@ class JavaScriptRuntimeException implements Exception {
   }
 }
 
-class JsEngine with _JSEngineApi{
+class JsEngine with _JSEngineApi {
   factory JsEngine() => _cache ?? (_cache = JsEngine._create());
 
   static JsEngine? _cache;
 
   JsEngine._create();
 
-  FlutterQjs? _engine;
+  JavascriptRuntime? _engine;
 
   bool _closed = true;
 
   Dio? _dio;
 
-  static void reset(){
+  static void reset() {
     _cache = null;
     _cache?.dispose();
     JsEngine().init();
   }
 
-  Future<void> init() async{
+  Future<void> init() async {
     if (!_closed) {
       return;
     }
@@ -70,16 +103,14 @@ class JsEngine with _JSEngineApi{
       _dio!.interceptors.add(CookieManagerSql(_cookieJar!));
       _dio!.interceptors.add(CloudflareInterceptor());
       _closed = false;
-      _engine = FlutterQjs();
-      _engine!.dispatch();
-      var setGlobalFunc = _engine!.evaluate(
-          "(key, value) => { this[key] = value; }");
-      (setGlobalFunc as JSInvokable)(["sendMessage", _messageReceiver]);
-      setGlobalFunc.free();
+      _engine = getJavascriptRuntime();
+      _engine!.onMessage('sendMessage', (args) => _messageReceiver(args));
       var jsInit = await rootBundle.load("assets/init.js");
-      _engine!.evaluate(utf8.decode(jsInit.buffer.asUint8List()), name: "<init>");
-    }
-    catch(e, s){
+      var res = await _engine!
+          .evaluateAsync(utf8.decode(jsInit.buffer.asUint8List()));
+      _engine!.executePendingJob();
+      await _engine!.handlePromise(res);
+    } catch (e, s) {
       log('JS Engine Init Error:\n$e\n$s', 'JS Engine', LogLevel.error);
     }
   }
@@ -151,37 +182,41 @@ class JsEngine with _JSEngineApi{
             }
         }
       }
-    }
-    catch(e, s){
-      log("Failed to handle message: $message\n$e\n$s", "JsEngine", LogLevel.error);
+    } catch (e, s) {
+      log("Failed to handle message: $message\n$e\n$s", "JsEngine",
+          LogLevel.error);
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> _http(Map<String, dynamic> req) async{
+  Future<Map<String, dynamic>> _http(Map<String, dynamic> req) async {
     Response? response;
     String? error;
 
     try {
       var headers = Map<String, dynamic>.from(req["headers"] ?? {});
-      if(headers["user-agent"] == null && headers["User-Agent"] == null){
+      if (headers["user-agent"] == null && headers["User-Agent"] == null) {
         headers["User-Agent"] = webUA;
       }
-      response = await _dio!.request(req["url"], data: req["data"], options: Options(
-        method: req['http_method'],
-        responseType: req["bytes"] == true ? ResponseType.bytes : ResponseType.plain,
-        headers: headers
-      ));
+      response = await _dio!.request(req["url"],
+          data: req["data"],
+          options: Options(
+              method: req['http_method'],
+              responseType: req["bytes"] == true
+                  ? ResponseType.bytes
+                  : ResponseType.plain,
+              headers: headers));
     } catch (e) {
       error = e.toString();
     }
 
     Map<String, String> headers = {};
 
-    response?.headers.forEach((name, values) => headers[name] = values.join(','));
+    response?.headers
+        .forEach((name, values) => headers[name] = values.join(','));
 
     dynamic body = response?.data;
-    if(body is! Uint8List && body is List<int>) {
+    if (body is! Uint8List && body is List<int>) {
       body = Uint8List.fromList(body);
     }
 
@@ -193,19 +228,20 @@ class JsEngine with _JSEngineApi{
     };
   }
 
-  dynamic runCode(String js, [String? name]) {
-    return _engine!.evaluate(js, name: name);
+  Future<JsEvalResult> runCode(String js, [String? name]) async {
+    var res = await _engine!.evaluateAsync(js);
+    _engine!.executePendingJob();
+    return await _engine!.handlePromise(res);
   }
 
   void dispose() {
     _cache = null;
     _closed = true;
-    _engine?.close();
-    _engine?.port.close();
+    _engine?.dispose();
   }
 }
 
-mixin class _JSEngineApi{
+mixin class _JSEngineApi {
   final Map<int, dom.Document> _documents = {};
   final Map<int, dom.Element> _elements = {};
   CookieJarSql? _cookieJar;
@@ -217,13 +253,13 @@ mixin class _JSEngineApi{
         return null;
       case "querySelector":
         var res = _documents[data["key"]]!.querySelector(data["query"]);
-        if(res == null) return null;
+        if (res == null) return null;
         _elements[_elements.length] = res;
         return _elements.length - 1;
       case "querySelectorAll":
         var res = _documents[data["key"]]!.querySelectorAll(data["query"]);
         var keys = <int>[];
-        for(var element in res){
+        for (var element in res) {
           _elements[_elements.length] = element;
           keys.add(_elements.length - 1);
         }
@@ -234,13 +270,13 @@ mixin class _JSEngineApi{
         return _elements[data["key"]]!.attributes;
       case "dom_querySelector":
         var res = _elements[data["key"]]!.querySelector(data["query"]);
-        if(res == null) return null;
+        if (res == null) return null;
         _elements[_elements.length] = res;
         return _elements.length - 1;
       case "dom_querySelectorAll":
         var res = _elements[data["key"]]!.querySelectorAll(data["query"]);
         var keys = <int>[];
-        for(var element in res){
+        for (var element in res) {
           _elements[_elements.length] = element;
           keys.add(_elements.length - 1);
         }
@@ -263,7 +299,7 @@ mixin class _JSEngineApi{
             Uri.parse(data["url"]),
             (data["cookies"] as List).map((e) {
               var c = Cookie(e["name"], e["value"]);
-              if(e['domain'] != null){
+              if (e['domain'] != null) {
                 c.domain = e['domain'];
               }
               return c;
@@ -271,7 +307,8 @@ mixin class _JSEngineApi{
         return null;
       case "get":
         var cookies = _cookieJar!.loadForRequest(Uri.parse(data["url"]));
-        return cookies.map((e) => {
+        return cookies
+            .map((e) => {
           "name": e.name,
           "value": e.value,
           "domain": e.domain,
@@ -281,22 +318,23 @@ mixin class _JSEngineApi{
           "secure": e.secure,
           "httpOnly": e.httpOnly,
           "session": e.expires == null,
-        }).toList();
+        })
+            .toList();
       case "delete":
         clearCookies([data["url"]]);
         return null;
     }
   }
 
-  void clear(){
+  void clear() {
     _documents.clear();
     _elements.clear();
   }
 
-  void clearCookies(List<String> domains) async{
-    for(var domain in domains){
+  void clearCookies(List<String> domains) async {
+    for (var domain in domains) {
       var uri = Uri.tryParse(domain);
-      if(uri == null) continue;
+      if (uri == null) continue;
       _cookieJar!.deleteUri(uri);
     }
   }
@@ -308,12 +346,10 @@ mixin class _JSEngineApi{
     try {
       switch (type) {
         case "base64":
-          if(value is String){
+          if (value is String) {
             value = utf8.encode(value);
           }
-          return isEncode
-              ? base64Encode(value)
-              : base64Decode(value);
+          return isEncode ? base64Encode(value) : base64Decode(value);
         case "md5":
           return Uint8List.fromList(md5.convert(value).bytes);
         case "sha1":
@@ -323,7 +359,7 @@ mixin class _JSEngineApi{
         case "sha512":
           return Uint8List.fromList(sha512.convert(value).bytes);
         case "aes-ecb":
-          if(!isEncode){
+          if (!isEncode) {
             var key = data["key"];
             var cipher = ECBBlockCipher(AESEngine());
             cipher.init(false, KeyParameter(key));
@@ -331,7 +367,7 @@ mixin class _JSEngineApi{
           }
           return null;
         case "aes-cbc":
-          if(!isEncode){
+          if (!isEncode) {
             var key = data["key"];
             var iv = data["iv"];
             var cipher = CBCBlockCipher(AESEngine());
@@ -340,7 +376,7 @@ mixin class _JSEngineApi{
           }
           return null;
         case "aes-cfb":
-          if(!isEncode){
+          if (!isEncode) {
             var key = data["key"];
             var blockSize = data["blockSize"];
             var cipher = CFBBlockCipher(AESEngine(), blockSize);
@@ -349,7 +385,7 @@ mixin class _JSEngineApi{
           }
           return null;
         case "aes-ofb":
-          if(!isEncode){
+          if (!isEncode) {
             var key = data["key"];
             var blockSize = data["blockSize"];
             var cipher = OFBBlockCipher(AESEngine(), blockSize);
@@ -358,19 +394,18 @@ mixin class _JSEngineApi{
           }
           return null;
         case "rsa":
-          if(!isEncode){
+          if (!isEncode) {
             var key = data["key"];
             final cipher = PKCS1Encoding(RSAEngine());
-            cipher.init(
-                false, PrivateKeyParameter<RSAPrivateKey>(_parsePrivateKey(key)));
+            cipher.init(false,
+                PrivateKeyParameter<RSAPrivateKey>(_parsePrivateKey(key)));
             return _processInBlocks(cipher, value);
           }
           return null;
         default:
           return value;
       }
-    }
-    catch(e) {
+    } catch (e) {
       Log.error("JS Engine", "Failed to convert $type: $e");
       return null;
     }
@@ -390,11 +425,11 @@ mixin class _JSEngineApi{
     final p = pkSeq.elements![4] as ASN1Integer;
     final q = pkSeq.elements![5] as ASN1Integer;
 
-    return RSAPrivateKey(modulus.integer!, privateExponent.integer!, p.integer!, q.integer!);
+    return RSAPrivateKey(
+        modulus.integer!, privateExponent.integer!, p.integer!, q.integer!);
   }
 
-  Uint8List _processInBlocks(
-      AsymmetricBlockCipher engine, Uint8List input) {
+  Uint8List _processInBlocks(AsymmetricBlockCipher engine, Uint8List input) {
     final numBlocks = input.length ~/ engine.inputBlockSize +
         ((input.length % engine.inputBlockSize != 0) ? 1 : 0);
 

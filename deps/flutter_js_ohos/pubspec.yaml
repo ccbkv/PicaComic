@@ -1,0 +1,43 @@
+name: flutter_js_ohos
+description: A Javascript engine to use with flutter.
+  It uses Quickjs on Android/Windows/MacOS/OpenHarmony and JavascriptCore on IOS.
+version: 0.6.8
+homepage: https://github.com/yeliulee/flutter_js/tree/ohos
+repository: https://github.com/yeliulee/flutter_js
+
+environment:
+  sdk: ">=2.17.0 <3.0.0"
+  flutter: ">=3.0.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.0.0
+  http: ^0.13.4
+  sync_http: ^0.3.0
+  flutter_platform_utils: ^1.0.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: io.abner.flutter_js
+        pluginClass: FlutterJsPlugin
+      ios:
+        pluginClass: FlutterJsPlugin
+      linux:
+        #default_package: flutter_js_linux_win
+        pluginClass: FlutterJsPlugin
+      macos:
+        pluginClass: FlutterJsPlugin
+      # windows:
+      #   default_package: flutter_js_linux_windows
+      windows:
+        pluginClass: FlutterJsPlugin
+      ohos:
+        pluginClass: FlutterJsPlugin
+
+  assets:
+    - assets/js/

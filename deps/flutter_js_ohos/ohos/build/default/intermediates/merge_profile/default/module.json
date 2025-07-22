@@ -1,0 +1,26 @@
+{
+	"app": {
+		"bundleName": "com.github.pacalini.pica_comic",
+		"debug": false,
+		"versionCode": 424,
+		"versionName": "4.2.4",
+		"minAPIVersion": 50001013,
+		"targetAPIVersion": 50101019,
+		"apiReleaseType": "Release",
+		"compileSdkVersion": "5.1.1.202",
+		"compileSdkType": "HarmonyOS",
+		"appEnvironments": [],
+		"bundleType": "app",
+		"buildMode": "release"
+	},
+	"module": {
+		"name": "flutter_js_ohos",
+		"type": "har",
+		"deviceTypes": [
+			"default",
+			"tablet"
+		],
+		"packageName": "flutter_js_ohos",
+		"installationFree": false
+	}
+}

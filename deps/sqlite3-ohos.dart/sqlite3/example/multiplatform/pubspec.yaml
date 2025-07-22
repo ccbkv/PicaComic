@@ -1,0 +1,16 @@
+name: sqlite3_multiplatform_example
+description: Uses common interface to `sqlite3` on web and native platforms.
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ">=2.12.0 <4.0.0"
+
+dependencies:
+  path: ^1.8.3
+  path_provider: ^2.1.1
+  sqlite3: ^2.1.0
+  sqlite3_flutter_libs: ^0.5.17
+
+dev_dependencies:
+  lints: ^3.0.0

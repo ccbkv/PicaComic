@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="scaffolded-by" content="https://github.com/dart-lang/sdk">
+    <title>sqlite on the web</title>
+    <script defer src="main.dart.js"></script>
+</head>
+
+<body>
+
+<h1>sqlite3 web demo</h1>
+
+This demo can be used to open databases in different storage implementations and
+access modes (e.g. through shared or dedicated workers).
+
+To open a database, open the consule and run <code>await open('name', 'storage', 'access')</code>.
+Supported values for <code>storage</code> are:
+<ul>
+    <li><code>opfs</code>: Uses the <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system">Origin private file system</a></li>
+    <li><code>indexedDb</code>: Uses a virtualized file system implemented by storing chunks in IndexedDB</li>
+    <li><code>inMemory</code>: Only stores files in memory without persistence.</li>
+</ul>
+
+Supported values for <code>access</code> are:
+
+<ul>
+    <li><code>throughSharedWorker</code>: Open the database in a shared worker. Different tabs will use the same sqlite3 connection</li>
+    <li><code>throughDedicatedWorker</code>: Open the database in a dedicated worker. Requires shared array buffers when used with OPFS, and there is no synchronization for IndexedDB in dedicated workers.</li>
+    <li><code>inCurrentContext</code>: Open the database in the current context, without a worker</li>
+</ul>
+
+After opening a database, you can use <code>execute</code> in the console to run
+SQL on it, e.g:
+
+<code>
+<pre>
+let db = await open('test', 'inMemory', 'throughSharedWorker');
+await execute(db, 'create table foo (bar);');
+</pre>
+</code>
+
+</body>
+</html>

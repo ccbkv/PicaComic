@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/comic_source/comic_source.dart';
@@ -144,6 +147,17 @@ extension ReadComic on DownloadedItem {
 }
 
 class DownloadPageLogic extends StateController {
+  _CustomTextEditingController? searchController;
+
+  // 初始化搜索控制器
+  void initSearchController() {
+    searchController = _CustomTextEditingController();
+  }
+
+  // 释放资源
+  void disposeSearchController() {
+    searchController?.dispose();
+  }
   ///是否正在加载
   bool loading = true;
 
@@ -162,11 +176,40 @@ class DownloadPageLogic extends StateController {
   var baseComics = <DownloadedItem>[];
 
   bool searchMode = false;
+  bool tagSearchMode = false;
 
   bool searchInit = false;
 
+  ///搜索框的焦点节点
+  FocusNode? searchFocusNode;
+
   String keyword = "";
   String keyword_ = "";
+  String tagKeyword = "";
+  String tagKeyword_ = "";
+
+  /// 普通搜索防抖计时器
+  Timer? _searchDebounceTimer;
+  /// 标签搜索防抖计时器
+  Timer? _tagDebounceTimer;
+  /// 防抖延迟时间（毫秒）
+  final int _debounceDelay = 300;
+
+  ///分页相关
+  int currentPage = 1;
+  int pageSize = 20;
+  //int pageSize = 4;
+  int maxPage = 1;
+  String _lastTagKeyword = "";
+
+  ///获取当前显示模式（连续或分页）
+  bool get isPaginationMode => appdata.settings[25] == "1";
+
+  ///重置分页
+  void resetPagination() {
+    currentPage = 1;
+    maxPage = 1;
+  }
 
   void change() {
     loading = !loading;
@@ -177,23 +220,123 @@ class DownloadPageLogic extends StateController {
     }
   }
 
+  void searchByTag() {
+    // 添加调试日志
+    print('开始执行标签搜索: tagKeyword = $tagKeyword');
+    print('搜索前漫画总数: ${baseComics.length}');
+    
+    List<DownloadedItem> filteredComics;
+    if (tagKeyword.isEmpty) {
+      print('标签关键词为空，显示所有漫画');
+      filteredComics = List.from(baseComics);
+    } else {
+      filteredComics = baseComics
+          .where((comic) => comic.tags.any((t) =>
+              t.toLowerCase().contains(tagKeyword.toLowerCase()) ||
+              t.translateTagsToCN.toLowerCase().contains(tagKeyword.toLowerCase()))) // 支持中英文标签搜索
+          .toList();
+      print('找到 ${filteredComics.length} 个匹配的漫画');
+    }
+    
+    // 处理分页
+    if (isPaginationMode) {
+      if (tagKeyword != _lastTagKeyword) {
+        resetPagination();
+        _lastTagKeyword = tagKeyword;
+      }
+      maxPage = (filteredComics.length / pageSize).ceil();
+      int startIndex = (currentPage - 1) * pageSize;
+      int endIndex = startIndex + pageSize;
+      if (endIndex > filteredComics.length) {
+        endIndex = filteredComics.length;
+      }
+      comics = filteredComics.sublist(startIndex, endIndex);
+    } else {
+      comics = filteredComics;
+    }
+    
+    // 同步selected数组长度
+    resetSelected(comics.length);
+    
+    print('重置分页，更新UI');
+    update();
+  }
+
+  void onTagSearchSubmitted(String value) {
+    tagKeyword = value;
+    searchByTag();
+  }
+
+  /// 普通搜索防抖方法
+  void _debounceUpdateKeyword(String value) {
+    // 如果已有计时器，先取消
+    _searchDebounceTimer?.cancel();
+    
+    // 创建新的计时器
+    _searchDebounceTimer = Timer(Duration(milliseconds: _debounceDelay), () {
+      keyword = value;
+      find();
+    });
+  }
+
+  /// 标签搜索防抖方法
+  void _debounceUpdateTagKeyword(String value) {
+    // 如果已有计时器，先取消
+    _tagDebounceTimer?.cancel();
+    
+    // 创建新的计时器
+    _tagDebounceTimer = Timer(Duration(milliseconds: _debounceDelay), () {
+      tagKeyword = value;
+      searchByTag();
+    });
+  }
+
   void find() {
+    // 只有在搜索模式下才执行查找
+    if (!searchMode) return;
+    
+    // 保存旧关键词用于比较
+    String oldKeyword = keyword_;
+    
     if (keyword == keyword_) {
       return;
     }
     keyword_ = keyword;
     comics.clear();
+    List<DownloadedItem> filteredComics;
+    
     if (keyword == "") {
-      comics.addAll(baseComics);
+      filteredComics = baseComics;
     } else {
+      filteredComics = [];
       for (var element in baseComics) {
         if (element.name.toLowerCase().contains(keyword) ||
             element.subTitle.toLowerCase().contains(keyword)) {
-          comics.add(element);
+          filteredComics.add(element);
         }
       }
     }
+    
+    // 处理分页
+    if (isPaginationMode) {
+      if (keyword != oldKeyword) {
+        resetPagination();
+      }
+      maxPage = (filteredComics.length / pageSize).ceil();
+      int startIndex = (currentPage - 1) * pageSize;
+      int endIndex = startIndex + pageSize;
+      if (endIndex > filteredComics.length) {
+        endIndex = filteredComics.length;
+      }
+      comics = filteredComics.sublist(startIndex, endIndex);
+    } else {
+      comics = filteredComics;
+    }
+    
     resetSelected(comics.length);
+    
+    // 更新UI
+    update();
   }
 
   @override
@@ -201,8 +344,12 @@ class DownloadPageLogic extends StateController {
     searchMode = false;
     selecting = false;
     selectedNum = 0;
-    selected.clear();
     comics.clear();
+    resetPagination();
+    
+    // 重新初始化selected数组
+    resetSelected(comics.length);
+    
     change();
   }
 
@@ -212,13 +359,46 @@ class DownloadPageLogic extends StateController {
   }
 }
 
-class DownloadPage extends StatelessWidget {
+// 自定义文本编辑控制器，用于检测IME输入状态
+class _CustomTextEditingController extends TextEditingController {
+  bool isComposing = false;
+
+  @override
+  set value(TextEditingValue newValue) {
+    // 检查是否处于 composing 状态
+    isComposing = newValue.composing.isValid &&
+        newValue.composing.start < newValue.composing.end;
+    super.value = newValue;
+  }
+}
+
+class DownloadPage extends StatefulWidget {
   const DownloadPage({Key? key}) : super(key: key);
+
+  @override
+  _DownloadPageState createState() => _DownloadPageState();
+}
+
+class _DownloadPageState extends State<DownloadPage> {
+  late final DownloadPageLogic logic;
+
+  @override
+  void initState() {
+    super.initState();
+    logic = DownloadPageLogic();
+    logic.initSearchController();
+  }
+
+  @override
+  void dispose() {
+    logic.disposeSearchController();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return StateBuilder<DownloadPageLogic>(
-        init: DownloadPageLogic(),
+        init: logic,
         builder: (logic) {
           if (logic.loading) {
             Future.wait([
@@ -239,7 +419,191 @@ class DownloadPage extends StatelessWidget {
               body: SmoothCustomScrollView(
                 slivers: [
                   buildAppbar(context, logic),
-                  buildComics(context, logic)
+                  if (logic.isPaginationMode)
+                    SliverToBoxAdapter(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8, top: 8),
+                          child: SizedBox(
+                            width: 300,
+                            height: 42,
+                            child: Row(
+                              children: [
+                                const SizedBox(
+                                  width: 16,
+                                ),
+                                FilledButton.tonal(
+                                    onPressed: logic.currentPage > 1
+                                        ? () {
+                                            logic.currentPage--;
+                                            getComics(logic).then((_) {
+                                              logic.resetSelected(logic.comics.length);
+                                              logic.update();
+                                            });
+                                          }
+                                        : null,
+                                    child: Text("上一页".tl)),
+                                const Spacer(),
+                                ActionChip(
+                                  label: Text(
+                                      "${"页面".tl}: ${logic.currentPage}/${logic.maxPage}"),
+                                  onPressed: () async {
+                                    int? page = await showDialog<int>(
+                                      context: context,
+                                      builder: (context) {
+                                        TextEditingController controller = TextEditingController(
+                                            text: logic.currentPage.toString());
+                                        return AlertDialog(
+                                          title: Text("输入页码".tl),
+                                          content: TextField(
+                                            controller: controller,
+                                            keyboardType: TextInputType.number,
+                                            decoration: InputDecoration(
+                                              hintText: "1-${logic.maxPage}",
+                                            ),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: Text("取消".tl),
+                                            ),
+                                            TextButton(
+                                              onPressed: () {
+                                                int? p = int.tryParse(controller.text);
+                                                if (p != null && p >= 1 && p <= logic.maxPage) {
+                                                  Navigator.pop(context, p);
+                                                } else {
+                                                  showToast(message: "页码无效".tl);
+                                                }
+                                              },
+                                              child: Text("确认".tl),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                    if (page != null) {
+                                      logic.currentPage = page;
+                                      getComics(logic).then((_) {
+                                        logic.resetSelected(logic.comics.length);
+                                        logic.update();
+                                      });
+                                    }
+                                  },
+                                  elevation: 1,
+                                  side: BorderSide.none,
+                                ),
+                                const Spacer(),
+                                FilledButton.tonal(
+                                    onPressed: logic.currentPage < logic.maxPage
+                                        ? () {
+                                            logic.currentPage++;
+                                            getComics(logic).then((_) {
+                                              logic.resetSelected(logic.comics.length);
+                                              logic.update();
+                                            });
+                                          }
+                                        : null,
+                                    child: Text("下一页".tl)),
+                                const SizedBox(
+                                  width: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  buildComicsSliver(context, logic),
+                  if (logic.isPaginationMode)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 16),
+                            FilledButton.tonal(
+                              onPressed: logic.currentPage > 1
+                                  ? () {
+                                      logic.currentPage--;
+                                      getComics(logic).then((_) {
+                                        logic.resetSelected(logic.comics.length);
+                                        logic.update();
+                                      });
+                                    }
+                                  : null,
+                              child: Text("上一页".tl),
+                            ),
+                            const Spacer(),
+                            ActionChip(
+                              label: Text(
+                                  "${"页面".tl}: ${logic.currentPage}/${logic.maxPage}"),
+                              onPressed: () async {
+                                // 实现页码选择逻辑
+                                int? page = await showDialog<int>(
+                                  context: context,
+                                  builder: (context) {
+                                    TextEditingController controller = TextEditingController(
+                                        text: logic.currentPage.toString());
+                                    return AlertDialog(
+                                      title: Text("输入页码".tl),
+                                      content: TextField(
+                                        controller: controller,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          hintText: "1-${logic.maxPage}",
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: Text("取消".tl),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            int? p = int.tryParse(controller.text);
+                                            if (p != null && p >= 1 && p <= logic.maxPage) {
+                                              Navigator.pop(context, p);
+                                            } else {
+                                              showToast(message: "页码无效".tl);
+                                            }
+                                          },
+                                          child: Text("确认".tl),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                if (page != null) {
+                                  logic.currentPage = page;
+                                  getComics(logic).then((_) {
+                                    logic.resetSelected(logic.comics.length);
+                                    logic.update();
+                                  });
+                                }
+                              },
+                              elevation: 1,
+                              side: BorderSide.none,
+                            ),
+                            const Spacer(),
+                            FilledButton.tonal(
+                              onPressed: logic.currentPage < logic.maxPage
+                                  ? () {
+                                      logic.currentPage++;
+                                      getComics(logic).then((_) {
+                                        logic.resetSelected(logic.comics.length);
+                                        logic.update();
+                                      });
+                                    }
+                                  : null,
+                              child: Text("下一页".tl),
+                            ),
+                            const SizedBox(width: 16),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             );
@@ -247,15 +611,18 @@ class DownloadPage extends StatelessWidget {
         });
   }
 
-  Widget buildComics(BuildContext context, DownloadPageLogic logic) {
+  Widget buildComicsSliver(BuildContext context, DownloadPageLogic logic) {
     logic.find();
     final comics = logic.comics;
+    
     return SliverGrid(
-      delegate: SliverChildBuilderDelegate(childCount: comics.length,
-          (context, index) {
-        return buildItem(context, logic, index);
-      }),
       gridDelegate: SliverGridDelegateWithComics(),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          return buildItem(context, logic, index);
+        },
+        childCount: comics.length,
+      ),
     );
   }
 
@@ -276,8 +643,62 @@ class DownloadPage extends StatelessWidget {
     if (appdata.settings[26][1] == "1") {
       direction = 'asc';
     }
-    logic.comics = DownloadManager().getAll(order, direction);
-    logic.baseComics = logic.comics.toList();
+    logic.baseComics = DownloadManager().getAll(order, direction);
+    
+    // 处理分页
+    if (logic.isPaginationMode) {
+      // 使用完整的搜索结果计算分页
+      List<DownloadedItem> fullResultComics;
+      if (logic.tagSearchMode) {
+        // 标签搜索模式下使用标签搜索结果
+        if (logic.tagKeyword.isEmpty) {
+          fullResultComics = logic.baseComics;
+        } else {
+          fullResultComics = logic.baseComics
+              .where((comic) => comic.tags.any((t) =>
+                  t.toLowerCase().contains(logic.tagKeyword.toLowerCase()) ||
+                  t.translateTagsToCN.toLowerCase().contains(logic.tagKeyword.toLowerCase()))) // 支持中英文标签搜索
+              .toList();
+        }
+      } else if (logic.searchMode) {
+        // 普通搜索模式下使用普通搜索结果
+        if (logic.keyword.isEmpty) {
+          fullResultComics = logic.baseComics;
+        } else {
+          fullResultComics = logic.baseComics
+              .where((comic) =>
+                  comic.name.toLowerCase().contains(logic.keyword.toLowerCase()) ||
+                  comic.subTitle.toLowerCase().contains(logic.keyword.toLowerCase()))
+              .toList();
+        }
+      } else {
+        // 默认使用所有漫画
+        fullResultComics = logic.baseComics;
+      }
+      
+      // 计算最大页数
+      logic.maxPage = (fullResultComics.length / logic.pageSize).ceil();
+      
+      // 确保当前页码不超出范围
+      if (logic.currentPage > logic.maxPage) {
+        logic.currentPage = logic.maxPage > 0 ? logic.maxPage : 1;
+      }
+      
+      // 计算当前页数据范围
+      int startIndex = (logic.currentPage - 1) * logic.pageSize;
+      int endIndex = startIndex + logic.pageSize;
+      if (endIndex > fullResultComics.length) {
+        endIndex = fullResultComics.length;
+      }
+      
+      // 更新当前页数据
+      logic.comics = fullResultComics.sublist(startIndex, endIndex);
+    } else {
+      logic.comics = logic.baseComics.toList();
+    }
+    
+    // 重新初始化selected数组，确保其长度与当前显示的comics数组长度一致
+    logic.resetSelected(logic.comics.length);
   }
 
   Future<void> export(DownloadPageLogic logic) async {
@@ -373,6 +794,12 @@ class DownloadPage extends StatelessWidget {
   }
 
   Widget buildItem(BuildContext context, DownloadPageLogic logic, int index) {
+    // 添加边界检查以防止越界访问
+    if (index < 0 || index >= logic.selected.length || index >= logic.comics.length) {
+      // 如果索引越界，返回一个空的容器
+      return const SizedBox.shrink();
+    }
+    
     bool selected = logic.selected[index];
     var type = logic.comics[index].type.name;
     if (logic.comics[index].type == DownloadType.other) {
@@ -393,18 +820,29 @@ class DownloadPage extends StatelessWidget {
           type: type,
           tag: logic.comics[index].tags,
           onTap: () async {
+            // 再次检查边界，防止在异步操作期间数组发生变化
+            if (index < 0 || index >= logic.selected.length || index >= logic.comics.length) {
+              return;
+            }
+            
             if (logic.selecting) {
               logic.selected[index] = !logic.selected[index];
               logic.selected[index] ? logic.selectedNum++ : logic.selectedNum--;
               if (logic.selectedNum == 0) {
                 logic.selecting = false;
               }
-              logic.update();
+              // 所有分支中已包含UI更新，无需重复调用
+              // logic.update();
             } else {
               showInfo(index, logic, context);
             }
           },
           size: () {
+            // 添加边界检查
+            if (index < 0 || index >= logic.comics.length) {
+              return "未知大小".tl;
+            }
+            
             if (logic.comics[index].comicSize != null) {
               return logic.comics[index].comicSize!.toStringAsFixed(2);
             } else {
@@ -412,6 +850,11 @@ class DownloadPage extends StatelessWidget {
             }
           }.call(),
           onLongTap: () {
+            // 添加边界检查
+            if (index < 0 || index >= logic.selected.length || index >= logic.comics.length) {
+              return;
+            }
+            
             if (logic.selecting) return;
             logic.selected[index] = true;
             logic.selectedNum++;
@@ -419,6 +862,11 @@ class DownloadPage extends StatelessWidget {
             logic.update();
           },
           onSecondaryTap: (details) {
+            // 添加边界检查
+            if (index < 0 || index >= logic.selected.length || index >= logic.comics.length) {
+              return;
+            }
+            
             showDesktopMenu(App.globalContext!,
                 Offset(details.globalPosition.dx, details.globalPosition.dy), [
               DesktopMenuEntry(
@@ -580,18 +1028,54 @@ class DownloadPage extends StatelessWidget {
       );
 
   Widget buildTitle(BuildContext context, DownloadPageLogic logic) {
-    if (logic.searchMode && !logic.selecting) {
-      final FocusNode focusNode = FocusNode();
-      focusNode.requestFocus();
-      bool focus = logic.searchInit;
-      logic.searchInit = false;
+    if ((logic.searchMode || logic.tagSearchMode) && !logic.selecting) {
+      // 使用一个持久化的focusNode，避免每次build都创建新的
+      // 控制器已经在State初始化时创建
+      
+      // 同步控制器文本内容
+      final currentText = logic.searchMode ? logic.keyword : logic.tagKeyword;
+      if (logic.searchController?.text != currentText) {
+        logic.searchController?.text = currentText;
+        logic.searchController?.selection = TextSelection.fromPosition(
+          TextPosition(offset: currentText.length),
+        );
+      }
+      
+      if (logic.searchFocusNode == null) {
+        logic.searchFocusNode = FocusNode();
+      }
+      // 只在初始进入搜索模式时请求焦点
+      if (logic.searchInit) {
+        logic.searchFocusNode?.requestFocus();
+        logic.searchInit = false;
+      }
       return TextField(
-        focusNode: focus ? focusNode : null,
-        decoration:
-        InputDecoration(border: InputBorder.none, hintText: "搜索".tl),
+        focusNode: logic.searchFocusNode,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: logic.searchMode ? "搜索漫画名".tl : "搜索标签".tl,
+        ),
+        controller: logic.searchController,
         onChanged: (s) {
-          logic.keyword = s.toLowerCase();
-          logic.update();
+        // 只有当输入完成（非 composing 状态）时才更新关键词
+        if (!logic.searchController!.isComposing) {
+          if (logic.searchMode) {
+            logic._debounceUpdateKeyword(s);
+          } else {
+            print('标签搜索模式下更新关键词: $s');
+            logic._debounceUpdateTagKeyword(s);
+          }
+        }
+      },
+        onSubmitted: (s) {
+          if (logic.searchMode) {
+            logic.keyword = s;
+            logic.find();
+          } else {
+            print('标签搜索模式下提交搜索: $s');
+            logic.tagKeyword = s;
+            logic.searchByTag();
+          }
         },
       );
     } else {
@@ -627,8 +1111,11 @@ class DownloadPage extends StatelessWidget {
   }
 
   List<Widget> buildActions(BuildContext context, DownloadPageLogic logic) {
-    return [
-      if (!logic.selecting && !logic.searchMode)
+    List<Widget> actions = [];
+    
+    // 添加排序和下载管理器按钮
+    if (!logic.selecting && !logic.searchMode) {
+      actions.add(
         Tooltip(
           message: "排序".tl,
           child: IconButton(
@@ -690,7 +1177,8 @@ class DownloadPage extends StatelessWidget {
             },
           ),
         ),
-      if (!logic.selecting && !logic.searchMode)
+      );
+      actions.add(
         Tooltip(
           message: "下载管理器".tl,
           child: IconButton(
@@ -702,8 +1190,11 @@ class DownloadPage extends StatelessWidget {
               );
             },
           ),
-        )
-      else if (logic.selecting)
+        ),
+      );
+    } else if (logic.selecting) {
+      // 添加选择状态下的更多按钮
+      actions.add(
         Tooltip(
           message: "更多".tl,
           child: IconButton(
@@ -762,22 +1253,101 @@ class DownloadPage extends StatelessWidget {
             },
           ),
         ),
-      if (!logic.selecting)
+      );
+    }
+    
+    // 添加标签搜索和普通搜索按钮
+    if (!logic.selecting) {
+      actions.add(
         Tooltip(
-          message: "搜索".tl,
+          message: "标签搜索".tl,
+          child: IconButton(
+            icon: const Icon(Icons.tag_rounded),
+            onPressed: () {
+              if (!logic.tagSearchMode) {
+                // 切换到标签搜索模式
+                logic.tagSearchMode = true;
+                logic.searchMode = false;
+                logic.searchInit = true;
+                // 同步标签关键词到搜索控制器
+                logic.searchController?.text = logic.tagKeyword;
+                logic.searchController?.selection = TextSelection.fromPosition(
+                  TextPosition(offset: logic.tagKeyword.length),
+                );
+                // 执行标签搜索
+                logic.searchByTag();
+              } else {
+                // 退出标签搜索模式
+                logic.tagSearchMode = false;
+                logic.searchMode = false;
+                // 保留当前页面，不重置为第一页
+                // logic.currentPage = 1;
+                logic.selected = List.generate(logic.comics.length, (index) => false);
+                logic.selectedNum = 0;
+                logic.searchController?.text = '';
+                // 退出搜索模式时保留当前页面，不调用会重置分页的refresh()
+                // 只更新UI而不重置分页信息
+                logic.update();
+              }
+            },
+          ),
+        ),
+      );
+      // 始终显示搜索按钮，根据模式执行不同的搜索逻辑
+      actions.add(
+        Tooltip(
+          message: logic.tagSearchMode ? "标签搜索".tl : "搜索".tl,
           child: IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              logic.searchMode = !logic.searchMode;
-              logic.searchInit = true;
-              if (!logic.searchMode) {
-                logic.keyword = "";
+              if (logic.tagSearchMode) {
+                // 从标签搜索模式切换到普通搜索模式
+                logic.tagSearchMode = false;
+                logic.searchMode = true;
+                logic.searchInit = true;
+                // 同步普通关键词到搜索控制器
+                logic.searchController?.text = logic.keyword;
+                logic.searchController?.selection = TextSelection.fromPosition(
+                  TextPosition(offset: logic.keyword.length),
+                );
+                // 执行普通搜索
+                logic.find();
+                // 确保UI更新
+                logic.update();
+              } else if (logic.searchMode) {
+                // 普通搜索模式下退出搜索
+                logic.searchMode = false;
+                logic.searchInit = false;
+                // 清空搜索控制器
+                logic.searchController?.clear();
+                // 重置搜索关键词
+                logic.keyword = '';
+                // 退出搜索模式时保留当前页面，不调用会重置分页的refresh()
+                // 只更新UI而不重置分页信息
+                logic.update();
+              } else {
+                // 主界面下进入普通搜索模式
+                logic.searchMode = true;
+                logic.searchInit = true;
+                // 同步普通关键词到搜索控制器
+                logic.searchController?.text = logic.keyword;
+                logic.searchController?.selection = TextSelection.fromPosition(
+                  TextPosition(offset: logic.keyword.length),
+                );
+                // 执行普通搜索
+                logic.find();
+                // 确保UI更新
+                logic.update();
               }
-              logic.update();
+              // 所有分支中已包含UI更新，无需重复调用
+              // logic.update();
             },
           ),
-        )
-    ];
+        ),
+      );
+    }
+    
+    return actions;
   }
 
   void exportSelectedComic(BuildContext context, DownloadPageLogic logic) {

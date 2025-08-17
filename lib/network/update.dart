@@ -7,7 +7,7 @@ String? _updateInfo;
 Future<String> getLatestVersion() async {
   var dio = logDio();
   var res = await dio
-      .get("https://api.github.com/repos/Pacalini/PicaComic/releases/latest");
+      .get("https://api.github.com/repos/ccbkv/PicaComic/releases/latest");
   _updateInfo = res.data["body"];
   return (res.data["tag_name"] as String).replaceFirst("v", "");
 }
@@ -72,5 +72,5 @@ Future<String?> getUpdatesInfo() async {
 }
 
 Future<String> getDownloadUrl() async {
-  return "https://github.com/Pacalini/PicaComic/releases/latest";
+  return "https://github.com/ccbkv/PicaComic/releases/latest";
 }

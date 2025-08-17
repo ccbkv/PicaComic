@@ -158,6 +158,7 @@ class DownloadPageLogic extends StateController {
   void disposeSearchController() {
     searchController?.dispose();
   }
+
   ///是否正在加载
   bool loading = true;
 
@@ -190,8 +191,10 @@ class DownloadPageLogic extends StateController {
 
   /// 普通搜索防抖计时器
   Timer? _searchDebounceTimer;
+
   /// 标签搜索防抖计时器
   Timer? _tagDebounceTimer;
+
   /// 防抖延迟时间（毫秒）
   final int _debounceDelay = 300;
 
@@ -224,7 +227,7 @@ class DownloadPageLogic extends StateController {
     // 添加调试日志
     print('开始执行标签搜索: tagKeyword = $tagKeyword');
     print('搜索前漫画总数: ${baseComics.length}');
-    
+
     List<DownloadedItem> filteredComics;
     if (tagKeyword.isEmpty) {
       print('标签关键词为空，显示所有漫画');
@@ -233,11 +236,13 @@ class DownloadPageLogic extends StateController {
       filteredComics = baseComics
           .where((comic) => comic.tags.any((t) =>
               t.toLowerCase().contains(tagKeyword.toLowerCase()) ||
-              t.translateTagsToCN.toLowerCase().contains(tagKeyword.toLowerCase()))) // 支持中英文标签搜索
+              t.translateTagsToCN
+                  .toLowerCase()
+                  .contains(tagKeyword.toLowerCase()))) // 支持中英文标签搜索
           .toList();
       print('找到 ${filteredComics.length} 个匹配的漫画');
     }
-    
+
     // 处理分页
     if (isPaginationMode) {
       if (tagKeyword != _lastTagKeyword) {
@@ -254,10 +259,10 @@ class DownloadPageLogic extends StateController {
     } else {
       comics = filteredComics;
     }
-    
+
     // 同步selected数组长度
     resetSelected(comics.length);
-    
+
     print('重置分页，更新UI');
     update();
   }
@@ -271,7 +276,7 @@ class DownloadPageLogic extends StateController {
   void _debounceUpdateKeyword(String value) {
     // 如果已有计时器，先取消
     _searchDebounceTimer?.cancel();
-    
+
     // 创建新的计时器
     _searchDebounceTimer = Timer(Duration(milliseconds: _debounceDelay), () {
       keyword = value;
@@ -283,7 +288,7 @@ class DownloadPageLogic extends StateController {
   void _debounceUpdateTagKeyword(String value) {
     // 如果已有计时器，先取消
     _tagDebounceTimer?.cancel();
-    
+
     // 创建新的计时器
     _tagDebounceTimer = Timer(Duration(milliseconds: _debounceDelay), () {
       tagKeyword = value;
@@ -294,17 +299,17 @@ class DownloadPageLogic extends StateController {
   void find() {
     // 只有在搜索模式下才执行查找
     if (!searchMode) return;
-    
+
     // 保存旧关键词用于比较
     String oldKeyword = keyword_;
-    
+
     if (keyword == keyword_) {
       return;
     }
     keyword_ = keyword;
     comics.clear();
     List<DownloadedItem> filteredComics;
-    
+
     if (keyword == "") {
       filteredComics = baseComics;
     } else {
@@ -316,7 +321,7 @@ class DownloadPageLogic extends StateController {
         }
       }
     }
-    
+
     // 处理分页
     if (isPaginationMode) {
       if (keyword != oldKeyword) {
@@ -332,9 +337,9 @@ class DownloadPageLogic extends StateController {
     } else {
       comics = filteredComics;
     }
-    
+
     resetSelected(comics.length);
-    
+
     // 更新UI
     update();
   }
@@ -346,10 +351,10 @@ class DownloadPageLogic extends StateController {
     selectedNum = 0;
     comics.clear();
     resetPagination();
-    
+
     // 重新初始化selected数组
     resetSelected(comics.length);
-    
+
     change();
   }
 
@@ -369,6 +374,27 @@ class _CustomTextEditingController extends TextEditingController {
     isComposing = newValue.composing.isValid &&
         newValue.composing.start < newValue.composing.end;
     super.value = newValue;
+  }
+}
+
+class LowercaseEnglishInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    String newText = newValue.text.split('').map((char) {
+      int code = char.codeUnitAt(0);
+      if (code >= 65 && code <= 90) {
+        // A-Z
+        return String.fromCharCode(code + 32);
+      }
+      return char;
+    }).join('');
+
+    return newValue.copyWith(
+      text: newText,
+      selection: newValue.selection,
+      composing: newValue.composing,
+    );
   }
 }
 
@@ -438,7 +464,8 @@ class _DownloadPageState extends State<DownloadPage> {
                                         ? () {
                                             logic.currentPage--;
                                             getComics(logic).then((_) {
-                                              logic.resetSelected(logic.comics.length);
+                                              logic.resetSelected(
+                                                  logic.comics.length);
                                               logic.update();
                                             });
                                           }
@@ -452,8 +479,10 @@ class _DownloadPageState extends State<DownloadPage> {
                                     int? page = await showDialog<int>(
                                       context: context,
                                       builder: (context) {
-                                        TextEditingController controller = TextEditingController(
-                                            text: logic.currentPage.toString());
+                                        TextEditingController controller =
+                                            TextEditingController(
+                                                text: logic.currentPage
+                                                    .toString());
                                         return AlertDialog(
                                           title: Text("输入页码".tl),
                                           content: TextField(
@@ -465,13 +494,17 @@ class _DownloadPageState extends State<DownloadPage> {
                                           ),
                                           actions: [
                                             TextButton(
-                                              onPressed: () => Navigator.pop(context),
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
                                               child: Text("取消".tl),
                                             ),
                                             TextButton(
                                               onPressed: () {
-                                                int? p = int.tryParse(controller.text);
-                                                if (p != null && p >= 1 && p <= logic.maxPage) {
+                                                int? p = int.tryParse(
+                                                    controller.text);
+                                                if (p != null &&
+                                                    p >= 1 &&
+                                                    p <= logic.maxPage) {
                                                   Navigator.pop(context, p);
                                                 } else {
                                                   showToast(message: "页码无效".tl);
@@ -486,7 +519,8 @@ class _DownloadPageState extends State<DownloadPage> {
                                     if (page != null) {
                                       logic.currentPage = page;
                                       getComics(logic).then((_) {
-                                        logic.resetSelected(logic.comics.length);
+                                        logic
+                                            .resetSelected(logic.comics.length);
                                         logic.update();
                                       });
                                     }
@@ -500,7 +534,8 @@ class _DownloadPageState extends State<DownloadPage> {
                                         ? () {
                                             logic.currentPage++;
                                             getComics(logic).then((_) {
-                                              logic.resetSelected(logic.comics.length);
+                                              logic.resetSelected(
+                                                  logic.comics.length);
                                               logic.update();
                                             });
                                           }
@@ -528,7 +563,8 @@ class _DownloadPageState extends State<DownloadPage> {
                                   ? () {
                                       logic.currentPage--;
                                       getComics(logic).then((_) {
-                                        logic.resetSelected(logic.comics.length);
+                                        logic
+                                            .resetSelected(logic.comics.length);
                                         logic.update();
                                       });
                                     }
@@ -544,8 +580,9 @@ class _DownloadPageState extends State<DownloadPage> {
                                 int? page = await showDialog<int>(
                                   context: context,
                                   builder: (context) {
-                                    TextEditingController controller = TextEditingController(
-                                        text: logic.currentPage.toString());
+                                    TextEditingController controller =
+                                        TextEditingController(
+                                            text: logic.currentPage.toString());
                                     return AlertDialog(
                                       title: Text("输入页码".tl),
                                       content: TextField(
@@ -557,13 +594,17 @@ class _DownloadPageState extends State<DownloadPage> {
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
                                           child: Text("取消".tl),
                                         ),
                                         TextButton(
                                           onPressed: () {
-                                            int? p = int.tryParse(controller.text);
-                                            if (p != null && p >= 1 && p <= logic.maxPage) {
+                                            int? p =
+                                                int.tryParse(controller.text);
+                                            if (p != null &&
+                                                p >= 1 &&
+                                                p <= logic.maxPage) {
                                               Navigator.pop(context, p);
                                             } else {
                                               showToast(message: "页码无效".tl);
@@ -592,7 +633,8 @@ class _DownloadPageState extends State<DownloadPage> {
                                   ? () {
                                       logic.currentPage++;
                                       getComics(logic).then((_) {
-                                        logic.resetSelected(logic.comics.length);
+                                        logic
+                                            .resetSelected(logic.comics.length);
                                         logic.update();
                                       });
                                     }
@@ -614,7 +656,7 @@ class _DownloadPageState extends State<DownloadPage> {
   Widget buildComicsSliver(BuildContext context, DownloadPageLogic logic) {
     logic.find();
     final comics = logic.comics;
-    
+
     return SliverGrid(
       gridDelegate: SliverGridDelegateWithComics(),
       delegate: SliverChildBuilderDelegate(
@@ -644,7 +686,7 @@ class _DownloadPageState extends State<DownloadPage> {
       direction = 'asc';
     }
     logic.baseComics = DownloadManager().getAll(order, direction);
-    
+
     // 处理分页
     if (logic.isPaginationMode) {
       // 使用完整的搜索结果计算分页
@@ -657,7 +699,9 @@ class _DownloadPageState extends State<DownloadPage> {
           fullResultComics = logic.baseComics
               .where((comic) => comic.tags.any((t) =>
                   t.toLowerCase().contains(logic.tagKeyword.toLowerCase()) ||
-                  t.translateTagsToCN.toLowerCase().contains(logic.tagKeyword.toLowerCase()))) // 支持中英文标签搜索
+                  t.translateTagsToCN
+                      .toLowerCase()
+                      .contains(logic.tagKeyword.toLowerCase()))) // 支持中英文标签搜索
               .toList();
         }
       } else if (logic.searchMode) {
@@ -667,36 +711,40 @@ class _DownloadPageState extends State<DownloadPage> {
         } else {
           fullResultComics = logic.baseComics
               .where((comic) =>
-                  comic.name.toLowerCase().contains(logic.keyword.toLowerCase()) ||
-                  comic.subTitle.toLowerCase().contains(logic.keyword.toLowerCase()))
+                  comic.name
+                      .toLowerCase()
+                      .contains(logic.keyword.toLowerCase()) ||
+                  comic.subTitle
+                      .toLowerCase()
+                      .contains(logic.keyword.toLowerCase()))
               .toList();
         }
       } else {
         // 默认使用所有漫画
         fullResultComics = logic.baseComics;
       }
-      
+
       // 计算最大页数
       logic.maxPage = (fullResultComics.length / logic.pageSize).ceil();
-      
+
       // 确保当前页码不超出范围
       if (logic.currentPage > logic.maxPage) {
         logic.currentPage = logic.maxPage > 0 ? logic.maxPage : 1;
       }
-      
+
       // 计算当前页数据范围
       int startIndex = (logic.currentPage - 1) * logic.pageSize;
       int endIndex = startIndex + logic.pageSize;
       if (endIndex > fullResultComics.length) {
         endIndex = fullResultComics.length;
       }
-      
+
       // 更新当前页数据
       logic.comics = fullResultComics.sublist(startIndex, endIndex);
     } else {
       logic.comics = logic.baseComics.toList();
     }
-    
+
     // 重新初始化selected数组，确保其长度与当前显示的comics数组长度一致
     logic.resetSelected(logic.comics.length);
   }
@@ -782,7 +830,8 @@ class _DownloadPageState extends State<DownloadPage> {
       fileName = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '');
       await createPdfFromComicWithIsolate(
           title: comic.name,
-          comicPath: "${downloadManager.path}/${downloadManager.getDirectory(comic.id)}",
+          comicPath:
+              "${downloadManager.path}/${downloadManager.getDirectory(comic.id)}",
           savePath: "${App.cachePath}/$fileName",
           chapters: comic.eps,
           chapterIndexes: comic.downloadedEps);
@@ -795,11 +844,13 @@ class _DownloadPageState extends State<DownloadPage> {
 
   Widget buildItem(BuildContext context, DownloadPageLogic logic, int index) {
     // 添加边界检查以防止越界访问
-    if (index < 0 || index >= logic.selected.length || index >= logic.comics.length) {
+    if (index < 0 ||
+        index >= logic.selected.length ||
+        index >= logic.comics.length) {
       // 如果索引越界，返回一个空的容器
       return const SizedBox.shrink();
     }
-    
+
     bool selected = logic.selected[index];
     var type = logic.comics[index].type.name;
     if (logic.comics[index].type == DownloadType.other) {
@@ -821,10 +872,12 @@ class _DownloadPageState extends State<DownloadPage> {
           tag: logic.comics[index].tags,
           onTap: () async {
             // 再次检查边界，防止在异步操作期间数组发生变化
-            if (index < 0 || index >= logic.selected.length || index >= logic.comics.length) {
+            if (index < 0 ||
+                index >= logic.selected.length ||
+                index >= logic.comics.length) {
               return;
             }
-            
+
             if (logic.selecting) {
               logic.selected[index] = !logic.selected[index];
               logic.selected[index] ? logic.selectedNum++ : logic.selectedNum--;
@@ -842,7 +895,7 @@ class _DownloadPageState extends State<DownloadPage> {
             if (index < 0 || index >= logic.comics.length) {
               return "未知大小".tl;
             }
-            
+
             if (logic.comics[index].comicSize != null) {
               return logic.comics[index].comicSize!.toStringAsFixed(2);
             } else {
@@ -851,10 +904,12 @@ class _DownloadPageState extends State<DownloadPage> {
           }.call(),
           onLongTap: () {
             // 添加边界检查
-            if (index < 0 || index >= logic.selected.length || index >= logic.comics.length) {
+            if (index < 0 ||
+                index >= logic.selected.length ||
+                index >= logic.comics.length) {
               return;
             }
-            
+
             if (logic.selecting) return;
             logic.selected[index] = true;
             logic.selectedNum++;
@@ -863,10 +918,12 @@ class _DownloadPageState extends State<DownloadPage> {
           },
           onSecondaryTap: (details) {
             // 添加边界检查
-            if (index < 0 || index >= logic.selected.length || index >= logic.comics.length) {
+            if (index < 0 ||
+                index >= logic.selected.length ||
+                index >= logic.comics.length) {
               return;
             }
-            
+
             showDesktopMenu(App.globalContext!,
                 Offset(details.globalPosition.dx, details.globalPosition.dy), [
               DesktopMenuEntry(
@@ -1031,7 +1088,7 @@ class _DownloadPageState extends State<DownloadPage> {
     if ((logic.searchMode || logic.tagSearchMode) && !logic.selecting) {
       // 使用一个持久化的focusNode，避免每次build都创建新的
       // 控制器已经在State初始化时创建
-      
+
       // 同步控制器文本内容
       final currentText = logic.searchMode ? logic.keyword : logic.tagKeyword;
       if (logic.searchController?.text != currentText) {
@@ -1040,7 +1097,7 @@ class _DownloadPageState extends State<DownloadPage> {
           TextPosition(offset: currentText.length),
         );
       }
-      
+
       if (logic.searchFocusNode == null) {
         logic.searchFocusNode = FocusNode();
       }
@@ -1056,17 +1113,18 @@ class _DownloadPageState extends State<DownloadPage> {
           hintText: logic.searchMode ? "搜索漫画名".tl : "搜索标签".tl,
         ),
         controller: logic.searchController,
+        inputFormatters: [LowercaseEnglishInputFormatter()],
         onChanged: (s) {
-        // 只有当输入完成（非 composing 状态）时才更新关键词
-        if (!logic.searchController!.isComposing) {
-          if (logic.searchMode) {
-            logic._debounceUpdateKeyword(s);
-          } else {
-            print('标签搜索模式下更新关键词: $s');
-            logic._debounceUpdateTagKeyword(s);
+          // 只有当输入完成（非 composing 状态）时才更新关键词
+          if (!logic.searchController!.isComposing) {
+            if (logic.searchMode) {
+              logic._debounceUpdateKeyword(s);
+            } else {
+              print('标签搜索模式下更新关键词: $s');
+              logic._debounceUpdateTagKeyword(s);
+            }
           }
-        }
-      },
+        },
         onSubmitted: (s) {
           if (logic.searchMode) {
             logic.keyword = s;
@@ -1089,22 +1147,22 @@ class _DownloadPageState extends State<DownloadPage> {
     return SliverAppbar(
       radius: UiMode.m1(context) ? 0 : 16,
       color: logic.selecting
-        ? Theme.of(context).colorScheme.primaryContainer
-        : null,
+          ? Theme.of(context).colorScheme.primaryContainer
+          : null,
       leading: logic.selecting
           ? IconButton(
-          onPressed: () {
-            logic.selecting = false;
-            logic.selectedNum = 0;
-            for (int i = 0; i < logic.selected.length; i++) {
-              logic.selected[i] = false;
-            }
-            logic.update();
-          },
-          icon: const Icon(Icons.close))
+              onPressed: () {
+                logic.selecting = false;
+                logic.selectedNum = 0;
+                for (int i = 0; i < logic.selected.length; i++) {
+                  logic.selected[i] = false;
+                }
+                logic.update();
+              },
+              icon: const Icon(Icons.close))
           : IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back)),
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back)),
       title: buildTitle(context, logic),
       actions: buildActions(context, logic),
     );
@@ -1112,7 +1170,7 @@ class _DownloadPageState extends State<DownloadPage> {
 
   List<Widget> buildActions(BuildContext context, DownloadPageLogic logic) {
     List<Widget> actions = [];
-    
+
     // 添加排序和下载管理器按钮
     if (!logic.selecting && !logic.searchMode) {
       actions.add(
@@ -1125,52 +1183,52 @@ class _DownloadPageState extends State<DownloadPage> {
               await showDialog(
                   context: context,
                   builder: (context) => SimpleDialog(
-                    title: Text("漫画排序模式".tl),
-                    children: [
-                      SizedBox(
-                        width: 400,
-                        child: Column(
-                          children: [
-                            ListTile(
-                              title: Text("漫画排序模式".tl),
-                              trailing: Select(
-                                initialValue:
-                                int.parse(appdata.settings[26][0]),
-                                onChange: (i) {
-                                  appdata.settings[26] = appdata
-                                      .settings[26]
-                                      .setValueAt(i.toString(), 0);
-                                  appdata.updateSettings();
-                                  changed = true;
-                                },
-                                values: ["时间", "漫画名", "作者名", "大小"].tl,
-                              ),
+                        title: Text("漫画排序模式".tl),
+                        children: [
+                          SizedBox(
+                            width: 400,
+                            child: Column(
+                              children: [
+                                ListTile(
+                                  title: Text("漫画排序模式".tl),
+                                  trailing: Select(
+                                    initialValue:
+                                        int.parse(appdata.settings[26][0]),
+                                    onChange: (i) {
+                                      appdata.settings[26] = appdata
+                                          .settings[26]
+                                          .setValueAt(i.toString(), 0);
+                                      appdata.updateSettings();
+                                      changed = true;
+                                    },
+                                    values: ["时间", "漫画名", "作者名", "大小"].tl,
+                                  ),
+                                ),
+                                ListTile(
+                                  title: Text("倒序".tl),
+                                  trailing: StatefulSwitch(
+                                    initialValue:
+                                        appdata.settings[26][1] == "1",
+                                    onChanged: (b) {
+                                      if (b) {
+                                        appdata.settings[26] = appdata
+                                            .settings[26]
+                                            .setValueAt("1", 1);
+                                      } else {
+                                        appdata.settings[26] = appdata
+                                            .settings[26]
+                                            .setValueAt("0", 1);
+                                      }
+                                      appdata.updateSettings();
+                                      changed = true;
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
-                            ListTile(
-                              title: Text("倒序".tl),
-                              trailing: StatefulSwitch(
-                                initialValue:
-                                appdata.settings[26][1] == "1",
-                                onChanged: (b) {
-                                  if (b) {
-                                    appdata.settings[26] = appdata
-                                        .settings[26]
-                                        .setValueAt("1", 1);
-                                  } else {
-                                    appdata.settings[26] = appdata
-                                        .settings[26]
-                                        .setValueAt("0", 1);
-                                  }
-                                  appdata.updateSettings();
-                                  changed = true;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    ],
-                  ));
+                          )
+                        ],
+                      ));
               if (changed) {
                 logic.refresh();
               }
@@ -1228,8 +1286,8 @@ class _DownloadPageState extends State<DownloadPage> {
                     ),
                     PopupMenuItem(
                       child: Text("查看漫画详情".tl),
-                      onTap: () => Future.delayed(
-                          const Duration(milliseconds: 200), () {
+                      onTap: () =>
+                          Future.delayed(const Duration(milliseconds: 200), () {
                         if (logic.selectedNum != 1) {
                           showToast(message: "请选择一个漫画".tl);
                         } else {
@@ -1245,8 +1303,8 @@ class _DownloadPageState extends State<DownloadPage> {
                       child: Text("添加至本地收藏".tl),
                       onTap: () => Future.delayed(
                         const Duration(milliseconds: 200),
-                            () => addToLocalFavoriteFolder(
-                            App.globalContext!, logic),
+                        () =>
+                            addToLocalFavoriteFolder(App.globalContext!, logic),
                       ),
                     ),
                   ]);
@@ -1255,7 +1313,7 @@ class _DownloadPageState extends State<DownloadPage> {
         ),
       );
     }
-    
+
     // 添加标签搜索和普通搜索按钮
     if (!logic.selecting) {
       actions.add(
@@ -1282,7 +1340,8 @@ class _DownloadPageState extends State<DownloadPage> {
                 logic.searchMode = false;
                 // 保留当前页面，不重置为第一页
                 // logic.currentPage = 1;
-                logic.selected = List.generate(logic.comics.length, (index) => false);
+                logic.selected =
+                    List.generate(logic.comics.length, (index) => false);
                 logic.selectedNum = 0;
                 logic.searchController?.text = '';
                 // 退出搜索模式时保留当前页面，不调用会重置分页的refresh()
@@ -1346,7 +1405,7 @@ class _DownloadPageState extends State<DownloadPage> {
         ),
       );
     }
-    
+
     return actions;
   }
 
@@ -1649,11 +1708,9 @@ class DownloadedComicTile extends ComicTile {
   final void Function(TapDownDetails details) onSecondaryTap;
 
   @override
-  List<String>? get tags => tag.map((e) =>
-    App.locale.languageCode == "zh"
-        ? e.translateTagsToCN
-        : e
-  ).toList();
+  List<String>? get tags => tag
+      .map((e) => App.locale.languageCode == "zh" ? e.translateTagsToCN : e)
+      .toList();
 
   @override
   String get description => "${size}MB";

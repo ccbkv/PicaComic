@@ -28,7 +28,7 @@ class DebugPageState extends State<DebugPage> {
     return SingleChildScrollView(
       child: Column(
         children: [
-          const SizedBox(height: 0), // 调整这个值来增加顶部高度，像第二张图片一样
+          const SizedBox(height: 0), // 调整这个值来增加顶部高度
           _CallbackSetting(
             title: "重新加载配置文件".tl,
             actionTitle: "重载".tl,

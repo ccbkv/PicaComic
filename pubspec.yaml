@@ -31,6 +31,10 @@ dependencies:
     sdk: flutter
   dio: 5.4.1
   shared_preferences: ^2.0.16
+  flutter_saf:
+    git:
+      url: https://github.com/venera-app/flutter_saf
+      ref: fe182cdf40e5fa6230f451bc1d643b860f610d13
   dynamic_color: ^1.6.9
   crypto: any
   pointycastle: ^3.7.3

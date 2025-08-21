@@ -30,6 +30,8 @@ class NaviPane extends StatefulWidget {
       this.initialPage = 0,
       this.onPageChange,
       required this.observer,
+      this.navigatorKey,
+      this.showTopBar = true,
       super.key});
 
   final List<PaneItemEntry> paneItems;
@@ -43,6 +45,10 @@ class NaviPane extends StatefulWidget {
   final int initialPage;
 
   final NaviObserver observer;
+
+  final GlobalKey<NavigatorState>? navigatorKey;
+
+  final bool showTopBar;
 
   @override
   State<NaviPane> createState() => _NaviPaneState();
@@ -171,12 +177,11 @@ class _NaviPaneState extends State<NaviPane>
                   bottom: bottomBarHeight * (0 - value),
                   child: buildBottom(),
                 ),
-              if (value <= 1)
+              if (value <= 1 && widget.showTopBar)
                 Positioned(
                   left: 0,
                   right: 0,
-                  top: _kTopBarHeight * (0 - value) +
-                      MediaQuery.of(context).padding.top * (1 - value),
+                  top: MediaQuery.of(context).padding.top,  // 修改为总是 padding.top，确保可见
                   child: buildTop(),
                 ),
               Positioned(
@@ -186,19 +191,18 @@ class _NaviPaneState extends State<NaviPane>
                 child: buildLeft(),
               ),
               Positioned(
-                top: _kTopBarHeight * ((1 - value).clamp(0, 1)) +
-                    MediaQuery.of(context).padding.top * (value == 1 ? 0 : 1),
+                top: MediaQuery.of(context).padding.top + (value <= 1 && widget.showTopBar ? _kTopBarHeight : 0),  // 调整主内容 top，在 value <=1 且 showTopBar 为 true 时留出顶部栏空间
                 left: _kFoldedSideBarWidth * ((value - 1).clamp(0, 1)) +
                     (_kSideBarWidth - _kFoldedSideBarWidth) *
                         ((value - 2).clamp(0, 1)),
                 right: 0,
                 bottom: bottomBarHeight * ((1 - value).clamp(0, 1)),
                 child: MediaQuery.removePadding(
-                  removeTop: value >= 2 || value == 0,
+                  removeTop: value >= 2 || !widget.showTopBar,  // 在 value >=2 或 showTopBar 为 false 时移除 top padding
                   context: context,
                   child: Material(child: widget.pageBuilder(currentPage)),
                 ),
-              ),
+              )
             ],
           );
         },
@@ -668,10 +672,13 @@ class NaviPaddingWidget extends StatelessWidget {
     return StateBuilder<NaviPaddingWidgetController>(
       builder: (controller) {
         return Padding(
-          padding: controller._withPadding ? EdgeInsets.only(
-            top: _NaviPaneState._kTopBarHeight + context.padding.top,
-            bottom: _NaviPaneState._kBottomBarHeight + context.padding.bottom,
-          ) : EdgeInsets.zero,
+          padding: controller._withPadding
+              ? EdgeInsets.only(
+                  top: _NaviPaneState._kTopBarHeight + context.padding.top,
+                  bottom:
+                      _NaviPaneState._kBottomBarHeight + context.padding.bottom,
+                )
+              : EdgeInsets.zero,
           child: child,
         );
       },

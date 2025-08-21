@@ -14,7 +14,9 @@ import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/comic_source/built_in/picacg.dart';
+import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/comic_source/built_in/jm.dart';
+import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/main.dart';
@@ -38,6 +40,7 @@ import '../../network/update.dart';
 import '../../network/webdav.dart';
 import '../../tools/background_service.dart';
 import '../../tools/debug.dart';
+import '../../tools/io.dart';
 import '../welcome_page.dart';
 import 'package:pica_comic/tools/translations.dart';
 
@@ -56,28 +59,40 @@ part "comic_source_settings.dart";
 part "blocking_keyword_page.dart";
 part "app_settings.dart";
 part 'components.dart';
+part 'debug.dart';
 
 class SettingsPage extends StatefulWidget {
-  static void open([int initialPage = -1]) {
-    App.globalTo(() => SettingsPage(initialPage: initialPage));
+  static void open([int initialPage = -1, VoidCallback? onPop]) {
+    App.globalTo(() => SettingsPage(initialPage: initialPage, onPop: onPop));
   }
 
-  const SettingsPage({this.initialPage = -1, super.key});
+  const SettingsPage({this.initialPage = -1, this.onPop, super.key});
 
   final int initialPage;
+  final VoidCallback? onPop;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> implements PopEntry{
+class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   int currentPage = -1;
 
   ColorScheme get colors => Theme.of(context).colorScheme;
 
   bool get enableTwoViews => !UiMode.m1(context);
 
-  final categories = <String>["浏览", "漫画源", "阅读", "外观", "本地收藏", "APP", "网络", "关于"];
+  final categories = <String>[
+    "浏览",
+    "漫画源",
+    "阅读",
+    "外观",
+    "本地收藏",
+    "APP",
+    "网络",
+    "关于",
+    "Debug"
+  ];
 
   final icons = <IconData>[
     Icons.explore,
@@ -87,7 +102,8 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
     Icons.collections_bookmark_rounded,
     Icons.apps,
     Icons.public,
-    Icons.info
+    Icons.info,
+    Icons.bug_report,
   ];
 
   double offset = 0;
@@ -259,7 +275,22 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
                 message: "Back",
                 child: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => App.globalBack(),
+                  onPressed: () {
+                    // 检查是否在移动端的子设置页面中
+                    if (currentPage != -1 && !enableTwoViews) {
+                      // 如果在子设置页面，返回上一级
+                      setState(() => currentPage = -1);
+                    } else if (currentPage == -1 && !enableTwoViews) {
+                      // 如果在主设置页面且是移动端模式，执行原有逻辑
+                      widget.onPop?.call();
+                      Navigator.of(context).pop();
+                    } else {
+                      // 双视图模式下或其他情况
+                      setState(() => currentPage = -1);
+                      widget.onPop?.call();
+                      Navigator.of(context).pop();
+                    }
+                  },
                 ),
               ),
               const SizedBox(
@@ -294,8 +325,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
         decoration: BoxDecoration(
             color: selected ? colors.primaryContainer : null,
-            borderRadius: BorderRadius.circular(16)
-        ),
+            borderRadius: BorderRadius.circular(16)),
         child: Row(children: [
           Icon(icons[id]),
           const SizedBox(
@@ -404,9 +434,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
                   ),
                   InkWell(
                     borderRadius: const BorderRadius.all(Radius.circular(18)),
-                    onTap: () => showDialogMessage(
-                        context,
-                        "高刷新率模式".tl,
+                    onTap: () => showDialogMessage(context, "高刷新率模式".tl,
                         "${"尝试强制设置高刷新率".tl}\n${"可能不起作用".tl}"),
                     child: const Icon(
                       Icons.info_outline,
@@ -445,49 +473,68 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
     return Column(
       children: [
         ListTile(
-          title: Text("日志".tl),
-        ),
-        ListTile(
-          leading: const Icon(Icons.bug_report),
-          title: const Text("Logs"),
-          trailing: const Icon(Icons.arrow_right),
-          onTap: () => context.to(() => const LogsPage()),
-        ),
-        ListTile(
-          title: Text("更新".tl),
-        ),
-        ListTile(
-          leading: const Icon(Icons.update),
-          title: Text("检查更新".tl),
-          subtitle: Text("${"当前:".tl} $appVersion"),
-          onTap: () {
-            findUpdate(context);
-          },
-        ),
-        SwitchSetting(
-          title: "启动时检查更新".tl,
-          settingsIndex: 2,
-          icon: const Icon(Icons.security_update),
-        ),
-        ListTile(
           title: Text("数据".tl),
+          leading: const Icon(Icons.storage),
         ),
+        ListTile(
+          title: Text("本地漫画的存储路径".tl),
+          subtitle: Text(DownloadManager().path ?? "", softWrap: false),
+
+          trailing: IconButton(
+            icon: const Icon(Icons.copy),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: DownloadManager().path ?? ""));
+              context.showMessage(message: "路径已复制到剪贴板".tl);
+            },
+          ),
+        ),
+
         if (App.isDesktop || App.isAndroid)
           ListTile(
-            leading: const Icon(Icons.folder),
+           // leading: const Icon(Icons.folder),
             title: Text("设置下载目录".tl),
-            trailing: const Icon(Icons.arrow_right),
             onTap: () => setDownloadFolder(),
+            trailing: TextButton(
+              onPressed: () => setDownloadFolder(),
+              child: Text('设置'.tl),
+            ),
           ),
+
+
+
         ListTile(
-          leading: const Icon(Icons.sd_storage_outlined),
-          title: Text("缓存大小限制".tl),
-          subtitle: Text('${bytesLengthToReadableSize(CacheManager().currentSize)}'
-                         ' / '
-                         '${bytesLengthToReadableSize(CacheManager().limitSize)}'),
-          onTap: setCacheLimit,
-          trailing: const Icon(Icons.arrow_right),
+          title: Text("缓存大小".tl),
+          subtitle: Text(bytesToReadableString(CacheManager().currentSize)),
         ),
+        _CallbackSetting(
+          title: "清除缓存".tl,
+          actionTitle: "清除".tl,
+          callback: () async {
+            var loadingDialog = showLoadingDialog(
+              context,
+              barrierDismissible: false,
+              allowCancel: false,
+            );
+            await CacheManager().clear();
+            loadingDialog.close();
+            context.showMessage(message: "Cache cleared".tl);
+            setState(() {});
+          },
+        ),
+    
+
+ 
+         ListTile(
+          title: Text("缓存限制".tl),
+          subtitle: Text('${bytesLengthToReadableSize(CacheManager().limitSize)}'),
+          onTap: setCacheLimit,
+          //trailing: const Icon(Icons.arrow_right),
+          trailing: TextButton(
+            onPressed: setCacheLimit,
+            child: Text('设置'.tl),
+         )),
+ 
+
         // ListTile(
         //   leading: const Icon(Icons.sd_storage_outlined),
         //   title: Text("设置缓存限制".tl),
@@ -495,46 +542,47 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
         //   trailing: const Icon(Icons.arrow_right),
         // ),
         ListTile(
-          leading: const Icon(Icons.delete_outline),
-          title: Text("清除缓存".tl),
-          onTap: () {
-            CacheManager().clear().then((value) {
-              if(mounted) {
-                setState(() {});
-              }
-            });
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.delete_forever),
+          //leading: const Icon(Icons.delete_forever),
           title: Text("删除所有数据".tl),
-          trailing: const Icon(Icons.arrow_right),
+         // trailing: const Icon(Icons.arrow_right),
           onTap: () => clearUserData(context),
+          trailing: TextButton(
+            onPressed: () => clearUserData(context),
+            child: Text('删除'.tl),
+          ),
         ),
+
         ListTile(
-          leading: const Icon(Icons.sim_card_download),
+         // leading: const Icon(Icons.sim_card_download),
           title: Text("导出用户数据".tl),
-          trailing: const Icon(Icons.arrow_right),
           onTap: () => exportDataSetting(context),
+          trailing: TextButton(
+            onPressed: () => exportDataSetting(context),
+            child: Text('导出'.tl),
+          ),
         ),
         ListTile(
-          leading: const Icon(Icons.data_object),
+         // leading: const Icon(Icons.data_object),
           title: Text("导入用户数据".tl),
-          trailing: const Icon(Icons.arrow_right),
           onTap: () => importDataSetting(context),
+          trailing: TextButton(
+            onPressed: () => importDataSetting(context),
+            child: Text('导入'.tl),
+          ),
         ),
         ListTile(
-          leading: const Icon(Icons.sync),
+         // leading: const Icon(Icons.sync),
           title: Text("数据同步".tl),
-          trailing: const Icon(Icons.arrow_right),
           onTap: () => syncDataSettings(context),
+          trailing: TextButton(
+            onPressed: () => syncDataSettings(context),
+            child: Text('同步'.tl),
+          ),
         ),
-        ListTile(
-          title: Text("隐私".tl),
-        ),
+
         if (App.isAndroid)
           ListTile(
-            leading: const Icon(Icons.screenshot),
+          //  leading: const Icon(Icons.screenshot),
             title: Text("阻止屏幕截图".tl),
             subtitle: Text("需要重启App以应用更改".tl),
             trailing: Switch(
@@ -546,18 +594,16 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
               },
             ),
           ),
-        SwitchSetting(
-          title: "需要身份验证".tl,
-          subTitle: "如果系统中未设置任何认证方法请勿开启".tl,
-          settingsIndex: 13,
-          icon: const Icon(Icons.security),
-        ),
+
         ListTile(
-          title: Text("其它".tl),
+          title: Text("用户".tl),
+          leading: const Icon(Icons.person_outline),
         ),
+
+  
         ListTile(
           title: Text("语言".tl),
-          leading: const Icon(Icons.language),
+          //leading: const Icon(Icons.language),
           trailing: Select(
             initialValue: ["", "cn", "tw", "en"].indexOf(appdata.settings[50]),
             values: const ["System", "中文(简体)", "中文(繁體)", "English"],
@@ -568,11 +614,26 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
             },
           ),
         ),
+
+        SwitchListTile(
+          title: Text("需要身份验证".tl),
+          subtitle: Text("如果系统中未设置任何认证方法请勿开启".tl),
+          value: appdata.settings[13] == "1",
+          onChanged: (b) {
+            setState(() {
+              appdata.settings[13] = b ? "1" : "0";
+            });
+            appdata.updateSettings();
+          },
+          //icon: const Icon(Icons.security),
+        ),
+
         ListTile(
           title: Text("下载并行".tl),
-          leading: const Icon(Icons.download),
+          //leading: const Icon(Icons.download),
           trailing: Select(
-            initialValue: ["1", "2", "4", "6", "8", "16"].indexOf(appdata.settings[79]),
+            initialValue:
+                ["1", "2", "4", "6", "8", "16"].indexOf(appdata.settings[79]),
             values: const ["1", "2", "4", "6", "8", "16"],
             onChange: (value) {
               appdata.settings[79] = ["1", "2", "4", "6", "8", "16"][value];
@@ -580,22 +641,24 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
             },
           ),
         ),
-        if(App.isAndroid)
+        if (App.isAndroid)
           ListTile(
             title: Text("应用链接".tl),
             subtitle: Text("在系统设置中管理APP支持的链接".tl),
             leading: const Icon(Icons.link),
             trailing: const Icon(Icons.arrow_right),
-            onTap: (){
+            onTap: () {
               const MethodChannel("pica_comic/settings").invokeMethod("link");
             },
           ),
-        if(kDebugMode)
-          const ListTile(
-            title: Text("Debug"),
-            onTap: debug,
-          ),
-        Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
+        //if (kDebugMode)
+        //  const ListTile(
+         //   title: Text("De.bug"),
+       //     onTap: debug,
+       //   ),
+        Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
       ],
     );
   }
@@ -610,8 +673,8 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
             child: Container(
               width: 156,
               height: 156,
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20)),
+              decoration:
+                  BoxDecoration(borderRadius: BorderRadius.circular(20)),
               child: const Image(
                 image: AssetImage("images/app_icon_no_bg.png"),
                 filterQuality: FilterQuality.medium,
@@ -628,6 +691,23 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
         const SizedBox(
           height: 16,
         ),
+        ListTile(
+          title: Text("检查更新".tl),
+          trailing: Button.filled(
+            child: Text("检查".tl),
+            onPressed: () => findUpdate(context),
+          ),
+        ),
+        SwitchListTile(
+          title: Text("启动时检查更新".tl),
+          value: appdata.settings[2] == "1",
+          onChanged: (value) {
+            appdata.settings[2] = value ? "1" : "0";
+            appdata.updateSettings();
+            setState(() {});
+          },
+        ),
+
         ListTile(
           leading: const Icon(Icons.code),
           title: Text("项目地址".tl),
@@ -657,7 +737,9 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
         //       mode: LaunchMode.externalApplication),
         //   trailing: const Icon(Icons.arrow_right),
         // ),
-        Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
+        Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
       ],
     );
   }
@@ -673,6 +755,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
       5 => buildAppSettings(),
       6 => const NetworkSettings(),
       7 => buildAbout(),
+      8 => const DebugPage(), // 添加此 case，返回 DebugPage widget
       _ => throw UnimplementedError()
     };
 
@@ -689,7 +772,18 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
                     ? null
                     : IconButton(
                         icon: const Icon(Icons.arrow_back),
-                        onPressed: () => setState(() => currentPage = -1),
+                        onPressed: () {
+                      // 检查是否在移动端模式下
+                      if (!enableTwoViews) {
+                        // 在移动端模式下，只返回到主设置页面
+                        setState(() => currentPage = -1);
+                      } else {
+                        // 在双视图模式下，执行原有逻辑
+                        setState(() => currentPage = -1);
+                        widget.onPop?.call();
+                        Navigator.of(context).pop();
+                      }
+                    },
                       )),
             SliverToBoxAdapter(
               child: body,
@@ -713,6 +807,8 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
       setState(() {
         currentPage = -1;
       });
+      // 调用onPop回调
+      widget.onPop?.call();
     }
   }
 
@@ -722,6 +818,8 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry{
       setState(() {
         currentPage = -1;
       });
+      // 调用onPop回调
+      widget.onPop?.call();
     }
   }
 }

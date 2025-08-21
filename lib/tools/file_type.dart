@@ -7,6 +7,8 @@ class FileType {
   final String mime;
 
   const FileType(this.ext, this.mime);
+
+  static fromExtension(String ext) {}
 }
 
 FileType detectFileType(List<int> data) {

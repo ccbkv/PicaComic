@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 4.2.8+428
+version: 4.2.6+426
 environment:
   sdk: '>=3.3.0'
 
@@ -38,15 +38,15 @@ dependencies:
   photo_view:
     git:
       url: https://github.com/wgh136/photo_view
-      ref: 94724a0b
+      ref: a1255d1
   url_launcher: ^6.1.8
   path_provider: ^2.0.12
   file_selector: ^1.0.1
   image_picker: ^1.0.2
   image_gallery_saver:
     git:
-      url: https://github.com/wgh136/image_gallery_saver
-      ref: master
+      url: https://github.com/mahdiramezanii/image_gallery_saver
+      ref: 9a51daf
   flutter_file_dialog: 3.0.1
   flutter_local_notifications: ^17.2.2
   share_plus: ^7.0.0
@@ -56,10 +56,7 @@ dependencies:
   image: 4.1.0
   shimmer_animation: ^2.1.0
   cookie_jar: any
-  workmanager:
-    git:
-      url: https://github.com/wgh136/flutter_workmanager
-      ref: main
+  workmanager: ^0.8.0
   flutter_localizations:
     sdk: flutter
   intl: any
@@ -76,28 +73,26 @@ dependencies:
   zip_flutter:
     git:
       url: https://github.com/wgh136/zip_flutter
-      ref: 92b7309e
+      ref: 64bb624
   collection: ^1.18.0
   window_manager:
-  flutter_inappwebview: 6.0.0
   pdf: ^3.10.8
   flutter_qjs:
     git:
       url: https://github.com/wgh136/flutter_qjs
-      ref: ade0b9d
+      ref: 8feae95
   sliver_tools: ^0.2.12
   mime: ^1.0.5
   desktop_webview_window:
     git:
       url: https://github.com/wgh136/flutter_desktop_webview
       path: packages/desktop_webview_window
-
-dependency_overrides:
-flutter_inappwebview_android: ^1.1.3
-    #git:
-      #url: https://github.com/holzgeist/flutter_inappwebview
-      #path: flutter_inappwebview_android
-      #ref: d89b1d32638b49dfc58c4b7c84153be0c269d057
+      ref: 7801fc5
+  flutter_inappwebview:
+    git:
+      url: https://github.com/venera-app/flutter_inappwebview
+      path: flutter_inappwebview
+      ref: 3ef899b
 
 dev_dependencies:
   flutter_test:
@@ -111,7 +106,6 @@ dev_dependencies:
   flutter_lints: ^2.0.0
   flutter_to_arch:
     git: https://github.com/wgh136/flutter_to_arch
-  msix: ^3.16.12
 
 flutter_to_arch:
   name: Pica Comic

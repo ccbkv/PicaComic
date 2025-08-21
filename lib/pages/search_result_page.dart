@@ -61,7 +61,8 @@ class SearchResultPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var comicSource = ComicSource.find(sourceKey) ?? (throw "source $sourceKey not found");
+    var comicSource =
+        ComicSource.find(sourceKey) ?? (throw "source $sourceKey not found");
     var options = this.options;
     if (comicSource.searchPageData?.searchOptions != null) {
       var searchOptions = comicSource.searchPageData!.searchOptions!;
@@ -114,10 +115,12 @@ class _SearchResultPageState extends State<_SearchResultPage> {
   @override
   void initState() {
     controller.text = keyword.trim();
-    if(!keyword.contains('language') && ComicSource.find(sourceKey)?.searchPageData?.enableLanguageFilter == true) {
+    if (!keyword.contains('language') &&
+        ComicSource.find(sourceKey)?.searchPageData?.enableLanguageFilter ==
+            true) {
       var lang = int.tryParse(appdata.settings[69]) ?? 0;
-      if(lang != 0) {
-        keyword += " language:${["chinese", "english", "japanese"][lang-1]}";
+      if (lang != 0) {
+        keyword += " language:${["chinese", "english", "japanese"][lang - 1]}";
       }
     }
     suggestionsController = _SuggestionsController(controller);
@@ -126,7 +129,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
 
   @override
   void dispose() {
-    if(suggestionOverlay != null) {
+    if (suggestionOverlay != null) {
       suggestionsController.remove();
     }
     super.dispose();
@@ -171,7 +174,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
   @override
   Widget build(BuildContext context) {
     Widget trailing;
-    if(context.width < 400) {
+    if (context.width < 400) {
       trailing = Button.icon(
         icon: const Icon(Icons.more_horiz),
         onPressed: more,
@@ -198,14 +201,14 @@ class _SearchResultPageState extends State<_SearchResultPage> {
     return Scaffold(
       floatingActionButton: _showFab
           ? FloatingActionButton(
-              child: const Icon(Icons.search),
-              onPressed: () {
-                var s = controller.text;
-                setState(() {
-                  keyword = s;
-                });
-              },
-            )
+        child: const Icon(Icons.search),
+        onPressed: () {
+          var s = controller.text;
+          setState(() {
+            keyword = s;
+          });
+        },
+      )
           : null,
       body: NotificationListener<ScrollUpdateNotification>(
         onNotification: (notification) {
@@ -237,6 +240,8 @@ class _SearchResultPageState extends State<_SearchResultPage> {
               maxHeight: 60,
               child: FloatingSearchBar(
                 onSearch: (s) {
+                  suggestionsController.suggestions.clear();
+                  suggestionsController.remove();
                   if (s == keyword) return;
                   setState(() {
                     keyword = s;
@@ -316,7 +321,8 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                 onPressed: () {
                   if (sourceKey != null) {
                     context.pop();
-                    var searchData = ComicSource.find(sourceKey!)!.searchPageData!;
+                    var searchData =
+                    ComicSource.find(sourceKey!)!.searchPageData!;
                     options = (searchData.searchOptions ?? [])
                         .map((e) => e.defaultValue)
                         .toList();
@@ -692,7 +698,7 @@ class _SearchOptionsState extends State<_SearchOptions> {
                 ),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(e.value.tl),
                 ),
               ),

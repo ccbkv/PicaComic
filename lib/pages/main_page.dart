@@ -68,6 +68,22 @@ class MainPageState extends State<MainPage> {
 
   late final NaviObserver _observer;
 
+  bool _showTopBar = true; // 控制顶部栏显示状态
+
+  // 当进入设置页面时隐藏顶部栏
+  void _hideTopBar() {
+    setState(() {
+      _showTopBar = false;
+    });
+  }
+
+  // 当从设置页面返回时显示顶部栏
+  void _showTopBarAgain() {
+    setState(() {
+      _showTopBar = true;
+    });
+  }
+
   void to(Widget Function() widget, {bool preventDuplicate = false}) async {
     if (preventDuplicate) {
       var page = widget();
@@ -87,6 +103,7 @@ class MainPageState extends State<MainPage> {
           key: Key(appdata.appSettings.explorePages.length.toString()),
         ),
         const AllCategoryPage(),
+        // 移除新增的 const SettingsPage()
       ];
 
   void _login() {
@@ -116,7 +133,10 @@ class MainPageState extends State<MainPage> {
     var s = await SharedPreferences.getInstance();
     var lastCheck = s.getInt("lastCheckUpdate");
     if (lastCheck != null) {
-      if (DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(lastCheck)).inDays < 1) {
+      if (DateTime.now()
+              .difference(DateTime.fromMillisecondsSinceEpoch(lastCheck))
+              .inDays <
+          1) {
         return;
       }
     }
@@ -212,6 +232,8 @@ class MainPageState extends State<MainPage> {
     return NaviPane(
       initialPage: int.parse(appdata.settings[23]),
       observer: _observer,
+      navigatorKey: _navigatorKey,
+      showTopBar: _showTopBar,
       paneItems: [
         PaneItemEntry(
             label: '我'.tl,
@@ -229,6 +251,7 @@ class MainPageState extends State<MainPage> {
             label: '分类'.tl,
             icon: Icons.account_tree_outlined,
             activeIcon: Icons.account_tree),
+        // 移除新增的 PaneItemEntry for 设置
       ],
       paneActions: [
         PaneActionEntry(
@@ -237,24 +260,25 @@ class MainPageState extends State<MainPage> {
             onTap: () => to(() => PreSearchPage(), preventDuplicate: true)),
         PaneActionEntry(
             icon: Icons.settings,
-            label: "设置".tl,
-            onTap: () => SettingsPage.open()),
+            label: _showTopBar ? "设置".tl : "设置",
+            onTap: () {
+              _hideTopBar();
+              to(() => SettingsPage(onPop: _showTopBarAgain), preventDuplicate: true);
+            }),  // 修改为使用本地 to() 推送设置页面
       ],
       pageBuilder: (index) {
         return Navigator(
-          observers: [_observer],
           key: _navigatorKey,
+          observers: [_observer],
           onGenerateRoute: (settings) => AppPageRoute(
-            preventRebuild: false,
-            isRootRoute: true,
-            builder: (context) {
-              return NaviPaddingWidget(child: _pages[index]);
-            },
+            builder: (context) => NaviPaddingWidget(child: _pages[index]),
           ),
         );
       },
       onPageChange: (index) {
         HapticFeedback.selectionClick();
+        var page = _pages[index];
+        if ("/${page.runtimeType}" == _observer.routes.last.toString()) return;
         _navigatorKey!.currentState?.pushAndRemoveUntil(
             AppPageRoute(
                 preventRebuild: false,

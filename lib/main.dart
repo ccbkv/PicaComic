@@ -205,13 +205,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         themeMode: appdata.appSettings.darkMode == 2
             ? ThemeMode.dark
             : appdata.appSettings.darkMode == 1
-            ? ThemeMode.light
-            : ThemeMode.system,
+                ? ThemeMode.light
+                : ThemeMode.system,
         onGenerateRoute: (settings) => AppPageRoute(
           builder: (context) => notFirstUse
               ? (appdata.settings[13] == "1"
-              ? const AuthPage()
-              : const MainPage())
+                  ? const AuthPage()
+                  : const MainPage())
               : const WelcomePage(),
         ),
         localizationsDelegates: const [
@@ -239,9 +239,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             if (App.isDesktop) {
               widget = Shortcuts(
                 shortcuts: {
-                  LogicalKeySet(LogicalKeyboardKey.escape):
-                  VoidCallbackIntent(
-                        () {
+                  LogicalKeySet(LogicalKeyboardKey.escape): VoidCallbackIntent(
+                    () {
                       if (App.canPop) {
                         App.globalBack();
                       } else {

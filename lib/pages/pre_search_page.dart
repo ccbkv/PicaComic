@@ -176,10 +176,16 @@ class PreSearchPage extends StatelessWidget {
 
   void search([String? s, String? type]) {
     var keyword = (s ?? controller.text).trim();
+
     if (searchController.language != null &&
         searchController.searchPageData.enableLanguageFilter) {
+      // 在添加语言筛选前，先移除掉可能存在的 language: 部分
+      // 主要是为了解决强迫症
+      final languagePattern = RegExp(r'\s*language:\w+');
+      keyword = keyword.replaceAll(languagePattern, '').trim();
       keyword += " language:${searchController.language}";
     }
+
     var context = App.mainNavigatorKey!.currentContext!;
     context.to(
       () => SearchResultPage(

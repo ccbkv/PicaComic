@@ -828,59 +828,59 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
   Widget buildLoading(BuildContext context) {
     return SingleChildScrollView(
       child: Shimmer(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          colorOpacity: 0.5,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        colorOpacity: 0.5,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          SizedBox(
+          height: 56,
+          child: const BackButton().toAlign(Alignment.centerLeft),
+        ).paddingLeft(8),
+        SizedBox(
+          width: double.infinity,
+          child: buildComicInfo(_logic, context, false),
+                ),
+        const Divider(),
+        SizedBox(
+          width: 100,
+          child: Row(
             children: [
-              SizedBox(
-                height: 56,
-                child: const BackButton().toAlign(Alignment.centerLeft),
-              ).paddingLeft(8),
-              SizedBox(
-                width: double.infinity,
-                child: buildComicInfo(_logic, context, false),
+              const SizedBox(
+                width: 18,
               ),
-              const Divider(),
-              SizedBox(
-                width: 100,
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 18,
-                    ),
-                    Text(
-                      "信息".tl,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w500, fontSize: 18),
-                    )
-                  ],
-                ),
-              ).paddingBottom(8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: List.generate(
-                  8,
-                      (index) => Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-                    child: Container(
-                      width: double.infinity,
-                      height: 32,
-                      constraints: const BoxConstraints(maxWidth: 400),
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
+              Text(
+                "信息".tl,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w500, fontSize: 18),
               )
             ],
-          )).paddingTop(MediaQuery.of(context).padding.top),
+          ),
+        ).paddingBottom(8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(
+            8,
+                (index) => Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+              child: Container(
+                width: double.infinity,
+                height: 32,
+                constraints: const BoxConstraints(maxWidth: 400),
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(12),
+                 ),
+                ),
+               ),
+              ),
+             )
+                  ],
+                )).paddingTop(MediaQuery.of(context).padding.top),
     );
   }
 

@@ -71,6 +71,7 @@ class JmSettings extends StatefulWidget {
 
 class _JmSettingsState extends State<JmSettings> {
   bool autoSelectStream = appdata.settings[15] == "1";
+  bool autoCheckIn = appdata.settings[88] == "1";
 
   @override
   Widget build(BuildContext context) {
@@ -155,8 +156,19 @@ class _JmSettingsState extends State<JmSettings> {
         ListTile(
           leading: const Icon(Icons.today),
           title: Text("每日签到".tl),
+          subtitle: Text("勾选启用, 点击测试".tl),
           onTap: () => JmSettings.daily(true),
-          trailing: const Icon(Icons.arrow_right),
+          trailing: Switch(
+            value: autoCheckIn,
+            onChanged: (b){
+              b ? appdata.settings[88] = "1" : appdata.settings[88] = "0";
+              setState(() {
+                autoCheckIn = b;
+              });
+              appdata.updateSettings();
+              if (autoCheckIn && jm.isLogin) JmSettings.daily(false);
+            },
+          ),
         ),
       ],
     );

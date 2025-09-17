@@ -412,6 +412,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.0.1"
+  flutter_saf:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: fe182cdf40e5fa6230f451bc1d643b860f610d13
+      resolved-ref: fe182cdf40e5fa6230f451bc1d643b860f610d13
+      url: "https://github.com/venera-app/flutter_saf"
+    source: git
+    version: "0.0.1"
   flutter_test:
     dependency: "direct dev"
     description: flutter

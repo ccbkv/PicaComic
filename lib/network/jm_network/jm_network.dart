@@ -704,6 +704,16 @@ class JmNetwork {
     } finally {
       _performingLogin = false;
       await updateImgUrl(int.parse(appdata.settings[37]) + 1);
+      if (appdata.settings[88] == "1") {
+        var res = await dailyChk();
+        LogManager.addLog(
+            res.error ? LogLevel.error : LogLevel.info,
+            "Network",
+            res.error
+                ? "JM auto check-in failed\n${res.errorMessage}"
+                : "JM auto check-in succeed\n${res.subData}"
+        );
+      }
     }
   }
 
@@ -996,7 +1006,7 @@ class JmNetwork {
       String msg = res.data['msg'];
       if (res.error) {
         return Res(null, errorMessage: res.errorMessage);
-      } else if (msg.startsWith("今天已經簽到過了")
+      } else if (msg.startsWith("今天")
               || msg.contains("Jcoin")
               || msg.contains("EXP")) {
         return Res(true, subData: msg);

@@ -219,9 +219,6 @@ class ComicReadingPage extends StatelessWidget {
       BaseImageProvider.setCacheSizeLimit(100 * 1024 * 1024);
       logic.openEpsView = openEpsDrawer;
       if (useDarkBackground) {
-        Future.microtask(() =>
-            StateController.findOrNull<WindowFrameController>()
-                ?.setDarkTheme());
       }
     }, dispose: (logic) {
       //清除缓存并减小最大缓存
@@ -262,8 +259,6 @@ class ComicReadingPage extends StatelessWidget {
         SystemChrome.setPreferredOrientations(DeviceOrientation.values);
       }
       if (useDarkBackground) {
-        Future.microtask(() =>
-            StateController.findOrNull<WindowFrameController>()?.resetTheme());
       }
     }, builder: (logic) {
       return DefaultTextStyle.merge(

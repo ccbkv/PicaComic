@@ -67,23 +67,18 @@ class MainPageState extends State<MainPage> {
   GlobalKey<NavigatorState>? _navigatorKey;
 
   late final NaviObserver _observer;
+  int _currentIndex = 0;
 
-  bool _showTopBar = true; // 控制顶部栏显示状态
-
-  // 当进入设置页面时隐藏顶部栏
-  void _hideTopBar() {
-    setState(() {
-      _showTopBar = false;
-    });
+  // Venera-style state management
+  void updateCurrentIndex(int index) {
+    if (_currentIndex != index) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
   }
 
-  // 当从设置页面返回时显示顶部栏
-  void _showTopBarAgain() {
-    setState(() {
-      _showTopBar = true;
-    });
-  }
-
+  // Venera-style navigation method
   void to(Widget Function() widget, {bool preventDuplicate = false}) async {
     if (preventDuplicate) {
       var page = widget();
@@ -92,19 +87,25 @@ class MainPageState extends State<MainPage> {
     App.to(_navigatorKey!.currentContext!, widget);
   }
 
+  // Venera-style navigation method
   void back() {
     _navigatorKey!.currentContext!.pop();
   }
 
   List<Widget> get _pages => [
-        const MePage(),
-        FavoritesPage(),
-        ExplorePage(
-          key: Key(appdata.appSettings.explorePages.length.toString()),
-        ),
-        const AllCategoryPage(),
-        // 移除新增的 const SettingsPage()
-      ];
+    const MePage(
+      key: PageStorageKey('me'),
+    ),
+    FavoritesPage(
+      key: PageStorageKey('favorites'),
+    ),
+    ExplorePage(
+      key: PageStorageKey('explore'),
+    ),
+    const AllCategoryPage(
+      key: PageStorageKey('categories'),
+    ),
+  ];
 
   void _login() {
     network.updateProfile().then((res) {
@@ -133,10 +134,7 @@ class MainPageState extends State<MainPage> {
     var s = await SharedPreferences.getInstance();
     var lastCheck = s.getInt("lastCheckUpdate");
     if (lastCheck != null) {
-      if (DateTime.now()
-              .difference(DateTime.fromMillisecondsSinceEpoch(lastCheck))
-              .inDays <
-          1) {
+      if (DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(lastCheck)).inDays < 1) {
         return;
       }
     }
@@ -210,6 +208,12 @@ class MainPageState extends State<MainPage> {
   void initState() {
     _navigatorKey = GlobalKey();
     App.mainNavigatorKey = _navigatorKey;
+    _observer = NaviObserver();
+    
+    // Initialize with the saved page index
+    _currentIndex = int.parse(appdata.settings[23]);
+    
+    // Keep all original functionality
     _login();
     notifications.requestPermission();
     notifications.cancelAll();
@@ -223,7 +227,7 @@ class MainPageState extends State<MainPage> {
 
     Future.delayed(const Duration(milliseconds: 300), () => Webdav.syncData())
         .then((v) => checkClipboard());
-    _observer = NaviObserver();
+    
     super.initState();
   }
 
@@ -232,61 +236,51 @@ class MainPageState extends State<MainPage> {
     return NaviPane(
       initialPage: int.parse(appdata.settings[23]),
       observer: _observer,
-      navigatorKey: _navigatorKey,
-      showTopBar: _showTopBar,
+      navigatorKey: _navigatorKey!,
       paneItems: [
         PaneItemEntry(
-            label: '我'.tl,
-            icon: Icons.person_outline,
-            activeIcon: Icons.person),
+            label: '主页'.tl,
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home),
         PaneItemEntry(
-            label: '收藏'.tl,
+            label: '收藏夹'.tl,
             icon: Icons.local_activity_outlined,
             activeIcon: Icons.local_activity),
         PaneItemEntry(
-            label: '探索'.tl,
+            label: '发现'.tl,
             icon: Icons.explore_outlined,
             activeIcon: Icons.explore),
         PaneItemEntry(
             label: '分类'.tl,
-            icon: Icons.account_tree_outlined,
-            activeIcon: Icons.account_tree),
-        // 移除新增的 PaneItemEntry for 设置
+            icon: Icons.category_outlined,
+            activeIcon: Icons.category),
       ],
       paneActions: [
-        PaneActionEntry(
+        if(_currentIndex != 0)
+          PaneActionEntry(
             icon: Icons.search,
             label: "搜索".tl,
-            onTap: () => to(() => PreSearchPage(), preventDuplicate: true)),
+            onTap: () => to(() => PreSearchPage(), preventDuplicate: true),
+          ),
         PaneActionEntry(
-            icon: Icons.settings,
-            label: _showTopBar ? "设置".tl : "设置",
-            onTap: () {
-              _hideTopBar();
-              to(() => SettingsPage(onPop: _showTopBarAgain), preventDuplicate: true);
-            }),  // 修改为使用本地 to() 推送设置页面
+          icon: Icons.settings,
+          label: "设置".tl,
+          onTap: () {
+            to(() => const SettingsPage(), preventDuplicate: true);
+          },
+        )
       ],
       pageBuilder: (index) {
-        return Navigator(
-          key: _navigatorKey,
-          observers: [_observer],
-          onGenerateRoute: (settings) => AppPageRoute(
-            builder: (context) => NaviPaddingWidget(child: _pages[index]),
-          ),
-        );
+        return _pages[index];
       },
-      onPageChange: (index) {
+      onPageChanged: (index) {
+        setState(() {
+          _currentIndex = index;
+          // Save current page index
+          appdata.settings[23] = index.toString();
+          appdata.writeData();
+        });
         HapticFeedback.selectionClick();
-        var page = _pages[index];
-        if ("/${page.runtimeType}" == _observer.routes.last.toString()) return;
-        _navigatorKey!.currentState?.pushAndRemoveUntil(
-            AppPageRoute(
-                preventRebuild: false,
-                isRootRoute: true,
-                builder: (context) {
-                  return NaviPaddingWidget(child: _pages[index]);
-                }),
-            (route) => false);
       },
     );
   }

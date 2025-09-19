@@ -82,6 +82,7 @@ class _ExplorePageState extends State<ExplorePage>
         Positioned.fill(
             child: Column(
           children: [
+            SizedBox(height: MediaQuery.of(context).padding.top),
             tabBar,
             Expanded(
               child: NotificationListener<ScrollNotification>(

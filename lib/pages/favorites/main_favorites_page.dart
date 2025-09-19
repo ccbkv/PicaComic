@@ -91,7 +91,7 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
         builder: (context, constrains) => Stack(
               children: [
                 Positioned(
-                  top: _kSecondaryTopBarHeight,
+                  top: _kSecondaryTopBarHeight + MediaQuery.of(context).padding.top,
                   left: 0,
                   right: 0,
                   bottom: 0,
@@ -109,7 +109,7 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                       context, constrains.maxHeight - _kSecondaryTopBarHeight),
                 ),
                 Positioned(
-                  top: 0,
+                  top: MediaQuery.of(context).padding.top,
                   left: 0,
                   right: 0,
                   child: buildTopBar(context),
@@ -299,7 +299,9 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
         child: SmoothCustomScrollView(
           slivers: [
             buildTitle("网络".tl)
-                .sliverPadding(const EdgeInsets.fromLTRB(12, 8, 12, 0)),
+                .sliverPadding(MediaQuery.of(context).size.width > 600 
+                    ? const EdgeInsets.fromLTRB(12, 40, 12, 0) // 桌面视图使用较大内边距
+                    : const EdgeInsets.fromLTRB(12, 8, 12, 0)), // 手机视图使用较小内边距
             buildNetwork().sliverPaddingHorizontal(12),
             const SliverToBoxAdapter(child: Divider())
                 .sliverPaddingHorizontal(12),

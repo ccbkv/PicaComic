@@ -341,9 +341,7 @@ class ComicReadingPageLogic extends StateController {
     focusNode.requestFocus();
 
     if(isFullScreen){
-      StateController.find<WindowFrameController>().hideWindowFrame();
     } else {
-      StateController.find<WindowFrameController>().showWindowFrame();
     }
   }
 

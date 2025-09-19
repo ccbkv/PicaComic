@@ -326,11 +326,9 @@ class TapController {
       logic.update(["ToolBar"]);
       if (logic.tools) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-        StateController.findOrNull<WindowFrameController>()?.resetTheme();
       } else {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
         if(appdata.settings[81] == "1") {
-          StateController.findOrNull<WindowFrameController>()?.setDarkTheme();
         }
       }
     }

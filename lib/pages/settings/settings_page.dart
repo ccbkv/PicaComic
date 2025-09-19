@@ -84,7 +84,6 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
   final categories = <String>[
     "浏览",
-    "漫画源",
     "阅读",
     "外观",
     "本地收藏",
@@ -748,14 +747,14 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     final Widget body = switch (currentPage) {
       -1 => const SizedBox(),
       0 => buildExploreSettings(context, false),
-      1 => const ComicSourceSettings(),
-      2 => const ReadingSettings(false),
-      3 => buildAppearanceSettings(),
-      4 => const LocalFavoritesSettings(),
-      5 => buildAppSettings(),
-      6 => const NetworkSettings(),
-      7 => buildAbout(),
-      8 => const DebugPage(), // 添加此 case，返回 DebugPage widget
+     // 1 => const ComicSourceSettings(),
+      1 => const ReadingSettings(false),
+      2 => buildAppearanceSettings(),
+      3 => const LocalFavoritesSettings(),
+      4 => buildAppSettings(),
+      5 => const NetworkSettings(),
+      6 => buildAbout(),
+      7 => const DebugPage(), // 添加此 case，返回 DebugPage widget
       _ => throw UnimplementedError()
     };
 

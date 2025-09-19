@@ -64,30 +64,42 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        buildCard(context),
-        const _BuiltInSources(),
-        if(appdata.appSettings.isComicSourceEnabled("picacg"))
-          const PicacgSettings(false).withDivider(),
-        if(appdata.appSettings.isComicSourceEnabled("ehentai"))
-          const EhSettings(false).withDivider(),
-        if(appdata.appSettings.isComicSourceEnabled("nhentai"))
-          const NhSettings(false).withDivider(),
-        if(appdata.appSettings.isComicSourceEnabled("jm"))
-          const JmSettings(false).withDivider(),
-        if(appdata.appSettings.isComicSourceEnabled("hitomi"))
-          const HitomiSettings(false).withDivider(),
-        if(appdata.appSettings.isComicSourceEnabled("htmanga"))
-          // const HtSettings(false).withDivider(),
-          const HtSettings(false),
-        // buildCustomSettings(),
-        for (var source in ComicSource.sources.where((e) => !e.isBuiltIn))
-          buildCustom(context, source),
-        Padding(
-            padding:
-                EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
-      ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("漫画源"),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        automaticallyImplyLeading: true,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            buildCard(context),
+            const _BuiltInSources(),
+            if(appdata.appSettings.isComicSourceEnabled("picacg"))
+              const PicacgSettings(false).withDivider(),
+            if(appdata.appSettings.isComicSourceEnabled("ehentai"))
+              const EhSettings(false).withDivider(),
+            if(appdata.appSettings.isComicSourceEnabled("nhentai"))
+              const NhSettings(false).withDivider(),
+            if(appdata.appSettings.isComicSourceEnabled("jm"))
+              const JmSettings(false).withDivider(),
+            if(appdata.appSettings.isComicSourceEnabled("hitomi"))
+              const HitomiSettings(false).withDivider(),
+            if(appdata.appSettings.isComicSourceEnabled("htmanga"))
+              // const HtSettings(false).withDivider(),
+              const HtSettings(false),
+            // buildCustomSettings(),
+            for (var source in ComicSource.sources.where((e) => !e.isBuiltIn))
+              buildCustom(context, source),
+            Padding(
+                padding: 
+                    EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
+          ],
+        ),
+      ),
     );
   }
 
@@ -123,19 +135,19 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
             children: [
               if (App.isDesktop)
                 Tooltip(
-                  message: "Edit",
+                  message: "编辑",
                   child: IconButton(
                       onPressed: () => edit(source),
                       icon: const Icon(Icons.edit_note)),
                 ),
               Tooltip(
-                message: "Update",
+                message: "更新",
                 child: IconButton(
                     onPressed: () => update(source),
                     icon: const Icon(Icons.update)),
               ),
               Tooltip(
-                message: "Delete",
+                message: "删除",
                 child: IconButton(
                     onPressed: () => delete(source),
                     icon: const Icon(Icons.delete)),
@@ -144,7 +156,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
           ),
         ),
         ListTile(
-          title: const Text("Version"),
+          title: const Text("版本"),
           subtitle: Text(source.version),
         )
       ],

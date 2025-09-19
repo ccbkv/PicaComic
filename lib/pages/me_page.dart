@@ -4,6 +4,7 @@ import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/image_loader/cached_image.dart';
 import 'package:pica_comic/network/download.dart';
+import 'package:pica_comic/pages/settings/settings_page.dart';
 import 'accounts_page.dart';
 import 'package:pica_comic/pages/download_page.dart';
 import 'package:pica_comic/pages/tools.dart';
@@ -11,6 +12,40 @@ import 'package:pica_comic/foundation/app.dart';
 import 'history_page.dart';
 import 'package:pica_comic/tools/translations.dart';
 import 'image_favorites.dart';
+import 'package:pica_comic/pages/pre_search_page.dart';
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: App.isMobile ? 52 : 46,
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 8),
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(32),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(32),
+          onTap: () {
+            context.to(() => PreSearchPage());
+          },
+          child: Row(
+            children:
+            [
+              const SizedBox(width: 16),
+              const Icon(Icons.search),
+              const SizedBox(width: 8),
+              Text('搜索'.tl),
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class MePage extends StatelessWidget {
   const MePage({super.key});
@@ -26,9 +61,10 @@ class MePage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Column(
               children: [
-                const SizedBox(
-                  height: 12,
+                SizedBox(
+                  height: MediaQuery.of(context).padding.top,
                 ),
+                const _SearchBar(),
                 buildHistory(context),
                 if (shouldShowTwoPanel)
                   Row(
@@ -45,6 +81,10 @@ class MePage extends StatelessWidget {
                               height: 12,
                             ),
                             buildDownload(context, width),
+                            const SizedBox(
+                              height: 12,
+                            ),
+                            buildComicSource(context, width),
                           ],
                         ),
                       ),
@@ -80,6 +120,10 @@ class MePage extends StatelessWidget {
                     height: 12,
                   ),
                   buildImageFavorite(context, width),
+                  const SizedBox(
+                    height: 12,
+                  ),
+                  buildComicSource(context, width),
                   const SizedBox(
                     height: 12,
                   ),
@@ -199,6 +243,8 @@ class MePage extends StatelessWidget {
     );
   }
 
+  
+
   Widget buildImageFavorite(BuildContext context, double width) {
     return _MePageCard(
       icon: const Icon(Icons.image),
@@ -206,6 +252,36 @@ class MePage extends StatelessWidget {
       description:
           "@a 条图片收藏".tlParams({"a": ImageFavoriteManager.length.toString()}),
       onTap: () => context.to(() => const ImageFavoritesPage()),
+    );
+  }
+
+  Widget buildComicSource(BuildContext context, double width) {
+    var comicSources = ComicSource.sources;
+    Widget buildItem(String name) {
+      return Container(
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(App.globalContext!).colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          name,
+          style: const TextStyle(fontSize: 12),
+        ).paddingTop(4),
+      );
+    }
+
+    return _MePageCard(
+      icon: const Icon(Icons.dashboard_customize),
+      title: "漫画源".tl,
+      description: "共 @a 个漫画源".tlParams({"a": comicSources.length.toString()}),
+      onTap: () => App.mainNavigatorKey?.currentContext?.to(() => const ComicSourceSettings()),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: comicSources.map((e) => buildItem(e.name.tl)).toList(),
+      ).paddingHorizontal(12).paddingBottom(12),
     );
   }
 

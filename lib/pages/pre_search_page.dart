@@ -264,10 +264,9 @@ class PreSearchPage extends StatelessWidget {
       ),
       body: Column(
         children: [
-          if (UiMode.m1(context))
-            SizedBox(
-              height: MediaQuery.of(context).padding.top,
-            ),
+          SizedBox(
+            height: MediaQuery.of(context).padding.top,
+          ),
           Builder(
             builder: (context) => _FloatingSearchBar(
               supportingText: '${'搜索'.tl} / ${'链接'.tl} / ID',

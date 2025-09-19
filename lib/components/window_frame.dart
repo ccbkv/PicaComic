@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/app.dart';
@@ -15,60 +16,103 @@ import 'package:pica_comic/tools/translations.dart';
 import 'package:pica_comic/pages/download_page.dart';
 import 'package:pica_comic/pages/downloading_page.dart';
 import 'package:window_manager/window_manager.dart';
+import '../comic_source/comic_source.dart';
 import 'components.dart';
 
 const _kTitleBarHeight = 36.0;
 
-class WindowFrameController extends StateController {
-  bool useDarkTheme = false;
+class WindowFrameController extends InheritedWidget {
+  /// Whether the window frame is hidden.
+  final bool isWindowFrameHidden;
 
-  bool isHideWindowFrame = false;
+  /// Sets the visibility of the window frame.
+  final void Function(bool) setWindowFrame;
 
-  void setDarkTheme() {
-    useDarkTheme = true;
-    update();
-  }
+  /// Adds a listener that will be called when close button is clicked.
+  /// The listener should return `true` to allow the window to be closed.
+  final void Function(WindowCloseListener listener) addCloseListener;
 
-  void resetTheme() {
-    useDarkTheme = false;
-    update();
-  }
+  /// Removes a close listener.
+  final void Function(WindowCloseListener listener) removeCloseListener;
 
-  VoidCallback openSideBar = () {};
+  const WindowFrameController._create({
+    required this.isWindowFrameHidden,
+    required this.setWindowFrame,
+    required this.addCloseListener,
+    required this.removeCloseListener,
+    required super.child,
+  });
 
-  void hideWindowFrame() {
-    isHideWindowFrame = true;
-    update();
-  }
-
-  void showWindowFrame() {
-    isHideWindowFrame = false;
-    update();
+  @override
+  bool updateShouldNotify(covariant InheritedWidget oldWidget) {
+    return false;
   }
 }
 
-class WindowFrame extends StatelessWidget {
+class WindowFrame extends StatefulWidget {
   const WindowFrame(this.child, {super.key});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    StateController.putIfNotExists<WindowFrameController>(
-        WindowFrameController());
-    if (App.isMobile) return child;
-    return StateBuilder<WindowFrameController>(builder: (controller) {
-      if (controller.isHideWindowFrame) return child;
+  State<WindowFrame> createState() => _WindowFrameState();
 
-      var body = Stack(
-        children: [
-          Positioned.fill(
-              child: MediaQuery(
+  static WindowFrameController of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<WindowFrameController>()!;
+  }
+}
+
+typedef WindowCloseListener = bool Function();
+
+class _WindowFrameState extends State<WindowFrame> {
+  bool isWindowFrameHidden = false;
+  bool useDarkTheme = false;
+  var closeListeners = <WindowCloseListener>[];
+
+  /// Sets the visibility of the window frame.
+  void setWindowFrame(bool show) {
+    setState(() {
+      isWindowFrameHidden = !show;
+    });
+  }
+
+  /// Adds a listener that will be called when close button is clicked.
+  /// The listener should return `true` to allow the window to be closed.
+  void addCloseListener(WindowCloseListener listener) {
+    closeListeners.add(listener);
+  }
+
+  /// Removes a close listener.
+  void removeCloseListener(WindowCloseListener listener) {
+    closeListeners.remove(listener);
+  }
+
+  void _onClose() {
+    for (var listener in closeListeners) {
+      if (!listener()) {
+        return;
+      }
+    }
+    exit(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (App.isMobile) return widget.child;
+
+    Widget body = Stack(
+      children: [
+        Positioned.fill(
+          child: MediaQuery(
             data: MediaQuery.of(context).copyWith(
-                padding: const EdgeInsets.only(top: _kTitleBarHeight)),
-            child: child,
-          )),
-          const _SideBar(),
+              padding: isWindowFrameHidden
+                  ? null
+                  : const EdgeInsets.only(top: _kTitleBarHeight),
+            ),
+            child: widget.child,
+          ),
+        ),
+        if (!isWindowFrameHidden)
           Positioned(
             top: 0,
             left: 0,
@@ -77,42 +121,47 @@ class WindowFrame extends StatelessWidget {
               color: Colors.transparent,
               child: Theme(
                 data: Theme.of(context).copyWith(
-                  brightness: controller.useDarkTheme ? Brightness.dark : null,
+                  brightness: useDarkTheme ? Brightness.dark : null,
                 ),
                 child: Builder(builder: (context) {
                   return SizedBox(
                     height: _kTitleBarHeight,
                     child: Row(
                       children: [
-                        if (!App.isMacOS)
-                          buildMenuButton(controller, context)
-                              .toAlign(Alignment.centerLeft)
-                        else
+                        if (App.isMacOS)
                           const DragToMoveArea(
                             child: SizedBox(
                               height: double.infinity,
                               width: 16,
                             ),
-                          ).paddingRight(52),
+                          ).paddingRight(52)
+                        else
+                          const SizedBox(width: 4),
                         Expanded(
                           child: DragToMoveArea(
                             child: Text(
                               'Pica Comic',
                               style: TextStyle(
-                                fontSize: 13,
-                                color: (controller.useDarkTheme ||
-                                    context.brightness == Brightness.dark)
+                                fontSize: 12,
+                                color: (useDarkTheme ||
+                                        context.brightness == Brightness.dark)
                                     ? Colors.white
                                     : Colors.black,
                               ),
-                            ).toAlign(Alignment.centerLeft).paddingLeft(4),
+                            )
+                                .toAlign(Alignment.centerLeft)
+                                .paddingLeft(4 + (App.isMacOS ? 25 : 0)),
                           ),
                         ),
+                        if (kDebugMode)
+                          const TextButton(
+                            onPressed: debug,
+                            child: Text('Debug'),
+                          ),
                         if (!App.isMacOS)
-                          const WindowButtons()
-                        else
-                          buildMenuButton(controller, context)
-                              .toAlign(Alignment.centerRight),
+                          _WindowButtons(
+                            onClose: _onClose,
+                          )
                       ],
                     ),
                   );
@@ -120,240 +169,33 @@ class WindowFrame extends StatelessWidget {
               ),
             ),
           )
-        ],
-      );
-
-      if(App.isLinux) {
-        return VirtualWindowFrame(child: body);
-      } else {
-        return body;
-      }
-    });
-  }
-
-  Widget buildMenuButton(
-      WindowFrameController controller, BuildContext context) {
-    return InkWell(
-        onTap: () {
-          controller.openSideBar();
-        },
-        child: SizedBox(
-          width: 42,
-          height: double.infinity,
-          child: Center(
-            child: CustomPaint(
-              size: const Size(18, 20),
-              painter: _MenuPainter(
-                  color: (controller.useDarkTheme ||
-                          Theme.of(context).brightness == Brightness.dark)
-                      ? Colors.white
-                      : Colors.black),
-            ),
-          ),
-        ));
-  }
-}
-
-class _MenuPainter extends CustomPainter {
-  final Color color;
-
-  _MenuPainter({this.color = Colors.black});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = getPaint(color);
-    final path = Path()
-      ..moveTo(0, size.height / 4)
-      ..lineTo(size.width, size.height / 4)
-      ..moveTo(0, size.height / 4 * 2)
-      ..lineTo(size.width, size.height / 4 * 2)
-      ..moveTo(0, size.height / 4 * 3)
-      ..lineTo(size.width, size.height / 4 * 3);
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _SideBar extends StatefulWidget {
-  const _SideBar();
-
-  @override
-  State<_SideBar> createState() => __SideBarState();
-}
-
-class __SideBarState extends State<_SideBar>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  void run() {
-    if (_controller.isAnimating) return;
-    if (_controller.isCompleted) {
-      _controller.reverse();
-    } else {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 160), value: 0);
-    var controller = StateController.find<WindowFrameController>();
-    controller.openSideBar = run;
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-        animation: CurvedAnimation(
-            parent: _controller, curve: Curves.fastEaseInToSlowEaseOut),
-        builder: (context, child) {
-          var value = _controller.value;
-          return Stack(
-            children: [
-              Positioned.fill(
-                  child: GestureDetector(
-                onTap: run,
-                child: Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  color:
-                      value == 0 ? null : Colors.black.withOpacity(0.2 * value),
-                ),
-              )),
-              Positioned(
-                left: !App.isMacOS ? (1 - _controller.value) * (-300) : null,
-                right: App.isMacOS ? (_controller.value - 1) * 300 : null,
-                top: 0,
-                bottom: 0,
-                child: Material(
-                  color: Theme.of(context).colorScheme.surface,
-                  surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
-                  elevation: 2,
-                  borderRadius: const BorderRadius.only(
-                    topRight: Radius.circular(8),
-                    bottomRight: Radius.circular(8),
-                  ),
-                  child: SizedBox(
-                    width: 300,
-                    height: double.infinity,
-                    child: const SingleChildScrollView(
-                      child: _SideBarBody(),
-                    ).paddingTop(_kTitleBarHeight),
-                  ),
-                ),
-              )
-            ],
-          );
-        });
-  }
-}
-
-class _SideBarBody extends StatelessWidget {
-  const _SideBarBody();
-
-  void toPage(Widget Function() builder) {
-    var context = App.mainNavigatorKey!.currentContext!;
-    MainPage.of(context).to(builder, preventDuplicate: true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        buildItem(
-            icon: Icons.person_outline,
-            title: '账号管理'.tl,
-            onTap: () {
-              StateController.find<WindowFrameController>().openSideBar();
-              showPopUpWidget(App.globalContext!, const AccountsPage());
-            }),
-        buildItem(
-            icon: Icons.history,
-            title: '历史记录'.tl,
-            onTap: () {
-              StateController.find<WindowFrameController>().openSideBar();
-              toPage(() => const HistoryPage());
-            }),
-        buildItem(
-            icon: Icons.download_outlined,
-            title: '已下载'.tl,
-            onTap: () {
-              StateController.find<WindowFrameController>().openSideBar();
-              toPage(() => const DownloadPage());
-            }),
-        buildItem(
-            icon: Icons.downloading,
-            title: '下载管理器'.tl,
-            onTap: () {
-              StateController.find<WindowFrameController>().openSideBar();
-              showPopUpWidget(App.globalContext!, const DownloadingPage());
-            }),
-        buildItem(
-            icon: Icons.image_outlined,
-            title: '图片收藏'.tl,
-            onTap: () {
-              StateController.find<WindowFrameController>().openSideBar();
-              toPage(() => const ImageFavoritesPage());
-            }),
-        const Divider().paddingHorizontal(8),
-        buildItem(
-            icon: Icons.search,
-            title: '搜索'.tl,
-            onTap: () {
-              StateController.find<WindowFrameController>().openSideBar();
-              toPage(() => PreSearchPage());
-            }),
-        buildItem(
-            icon: Icons.settings,
-            title: '设置'.tl,
-            onTap: () {
-              StateController.find<WindowFrameController>().openSideBar();
-              SettingsPage.open();
-            }),
       ],
     );
-  }
 
-  Widget buildItem(
-      {required IconData icon,
-      required String title,
-      required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: Row(
-          children: [
-            Icon(icon, size: 20),
-            const SizedBox(width: 16),
-            Text(title, style: const TextStyle(fontSize: 14)),
-          ],
-        ),
-      ),
-    ).paddingHorizontal(8);
+    if (App.isLinux) {
+      body = VirtualWindowFrame(child: body);
+    }
+
+    return WindowFrameController._create(
+      isWindowFrameHidden: isWindowFrameHidden,
+      setWindowFrame: setWindowFrame,
+      addCloseListener: addCloseListener,
+      removeCloseListener: removeCloseListener,
+      child: body,
+    );
   }
 }
 
-class WindowButtons extends StatefulWidget {
-  const WindowButtons({super.key});
+class _WindowButtons extends StatefulWidget {
+  const _WindowButtons({required this.onClose});
+
+  final void Function() onClose;
 
   @override
-  State<WindowButtons> createState() => _WindowButtonsState();
+  State<_WindowButtons> createState() => _WindowButtonsState();
 }
 
-class _WindowButtonsState extends State<WindowButtons> with WindowListener {
+class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
   bool isMaximized = false;
 
   @override
@@ -442,53 +284,7 @@ class _WindowButtonsState extends State<WindowButtons> with WindowListener {
               color: !dark ? Colors.white : Colors.black,
             ),
             hoverColor: Colors.red,
-            onPressed: () {
-              if (appdata.implicitData[2] == '0') {
-                showDialog(
-                    context: App.navigatorKey.currentContext!,
-                    builder: (context) {
-                      bool isCheck = false;
-                      return AlertDialog(
-                        title: Text('是否退出程序?'.tl),
-                        content: StatefulBuilder(builder: (context, setState) {
-                          return Row(
-                            children: [
-                              Checkbox(
-                                value: isCheck,
-                                onChanged: (value) {
-                                  setState(() {
-                                    isCheck = value!;
-                                  });
-                                },
-                              ),
-                              Text('不再提示'.tl),
-                            ],
-                          );
-                        }),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: Text('否'.tl),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              if (isCheck) {
-                                appdata.implicitData[2] = '1';
-                                appdata.writeImplicitData();
-                              }
-                              windowManager.close();
-                            },
-                            child: Text('是'.tl),
-                          ),
-                        ],
-                      );
-                    });
-              } else {
-                windowManager.close();
-              }
-            },
+            onPressed: widget.onClose,
           )
         ],
       ),
@@ -707,8 +503,15 @@ class WindowPlacement {
     }
   }
 
+  static Rect? lastValidRect;
+
   static Future<WindowPlacement> get current async {
     var rect = await windowManager.getBounds();
+    if (validate(rect)) {
+      lastValidRect = rect;
+    } else {
+      rect = lastValidRect ?? defaultPlacement.rect;
+    }
     var isMaximized = await windowManager.isMaximized();
     return WindowPlacement(rect, isMaximized);
   }
@@ -723,9 +526,6 @@ class WindowPlacement {
   static void loop() async {
     timer ??= Timer.periodic(const Duration(milliseconds: 100), (timer) async {
       var placement = await WindowPlacement.current;
-      if (!validate(placement.rect)) {
-        return;
-      }
       if (placement.rect != cache.rect ||
           placement.isMaximized != cache.isMaximized) {
         cache = placement;
@@ -771,21 +571,18 @@ class _VirtualWindowFrameState extends State<VirtualWindowFrame>
   }
 
   Widget _buildVirtualWindowFrame(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(_isMaximized ? 0 : 8),
         color: Colors.transparent,
-        border: Border.all(
-          color: Theme.of(context).dividerColor,
-          width: (_isMaximized || _isFullScreen) ? 0 : 1,
-        ),
         boxShadow: <BoxShadow>[
-          if (!_isMaximized && !_isFullScreen)
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              offset: Offset(0.0, _isFocused ? 4 : 2),
-              blurRadius: 6,
-            )],
+          BoxShadow(
+            color: Colors.black.withOpacity(_isFocused ? 0.4 : 0.2),
+            blurRadius: 4,
+          )
+        ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: widget.child,
     );
   }
@@ -793,9 +590,12 @@ class _VirtualWindowFrameState extends State<VirtualWindowFrame>
   @override
   Widget build(BuildContext context) {
     return DragToResizeArea(
-        enableResizeEdges: (_isMaximized || _isFullScreen) ? [] : null,
+      enableResizeEdges: (_isMaximized || _isFullScreen) ? [] : null,
+      child: Padding(
+        padding: EdgeInsets.all(_isMaximized ? 0 : 4),
         child: _buildVirtualWindowFrame(context),
-      );
+      ),
+    );
   }
 
   @override
@@ -848,4 +648,8 @@ TransitionBuilder VirtualWindowFrameInit() {
       child: child!,
     );
   };
+}
+
+void debug() {
+  ComicSource.reload();
 }

@@ -32,6 +32,7 @@ class AllCategoryPage extends StatelessWidget {
             key: Key(categories.toString()),
             child: Column(
               children: [
+                SizedBox(height: MediaQuery.of(context).padding.top),
                 FilledTabBar(
                   tabs: categories.map((e) {
                     String title = e;

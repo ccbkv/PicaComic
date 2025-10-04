@@ -499,13 +499,10 @@ class JmNetwork {
 
   Future<Res<List<JmComicBrief>>> searchNew(
       String keyword, int page, ComicsOrder order) async {
-    appdata.searchHistory.remove(keyword);
-    appdata.searchHistory.add(keyword);
     keyword = keyword.trim();
     keyword = keyword.replaceAll('  ', ' ');
     keyword = Uri.encodeComponent(keyword);
     keyword = keyword.replaceAll('%20', '+');
-    appdata.writeHistory();
     Res res;
     if (page != 1) {
       res = await get(

@@ -40,8 +40,7 @@ Widget buildExploreSettings(BuildContext context, bool popUp) {
       ),
       NewPageSetting(
           title: "关键词屏蔽".tl,
-          onTap: () => showPopUpWidget(context,
-              BlockingKeywordPage(popUp: MediaQuery.of(context).size.width>600,)),
+          onTap: () => App.to(context, () => const BlockingKeywordPage()),
           icon: const Icon(Icons.block)
       ),
       SwitchSetting(

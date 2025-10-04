@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
+import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/pair.dart';
-import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
 import 'package:pica_comic/tools/app_links.dart';
@@ -176,6 +176,8 @@ class PreSearchPage extends StatelessWidget {
 
   void search([String? s, String? type]) {
     var keyword = (s ?? controller.text).trim();
+
+    HistoryManager.addSearchHistory(keyword);
 
     if (searchController.language != null &&
         searchController.searchPageData.enableLanguageFilter) {

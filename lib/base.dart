@@ -147,6 +147,9 @@ class Appdata {
 
   ///屏蔽的关键词
   List<String> blockingKeyword = [];
+  
+  ///禁漫天堂专用屏蔽关键词
+  List<String> jmBlockingKeyword = [];
 
   ///是否第一次使用的判定, 用于显示提示
   List<String> firstUse = [
@@ -216,6 +219,7 @@ class Appdata {
     var s = await SharedPreferences.getInstance();
     await updateSettings();
     await s.setStringList("blockingKeyword", blockingKeyword);
+    await s.setStringList("jmBlockingKeyword", jmBlockingKeyword);
     await s.setStringList("firstUse", firstUse);
   }
 
@@ -226,6 +230,7 @@ class Appdata {
       searchHistory = s.getStringList("search") ?? [];
       favoriteTags = (s.getStringList("favoriteTags") ?? []).toSet();
       blockingKeyword = s.getStringList("blockingKeyword") ?? [];
+      jmBlockingKeyword = s.getStringList("jmBlockingKeyword") ?? [];
       if (s.getStringList("firstUse") != null) {
         var st = s.getStringList("firstUse")!;
         for (int i = 0; i < st.length; i++) {

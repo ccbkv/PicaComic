@@ -174,11 +174,6 @@ class NhentaiNetwork {
 
   Future<Res<List<NhentaiComicBrief>>> search(String keyword, int page,
       [NhentaiSort sort = NhentaiSort.recent]) async {
-    if (appdata.searchHistory.contains(keyword)) {
-      appdata.searchHistory.remove(keyword);
-    }
-    appdata.searchHistory.add(keyword);
-    appdata.writeHistory();
     var res = await get(
         "$baseUrl/search/?q=${Uri.encodeComponent(keyword)}&page=$page${sort.value}");
     if (res.error) {

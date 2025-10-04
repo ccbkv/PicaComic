@@ -280,11 +280,6 @@ class PicacgNetwork {
       {bool addToHistory = false}) async {
     var response = await post('$apiUrl/comics/advanced-search?page=$page',
         {"keyword": keyWord, "sort": sort});
-    if (page == 1 && addToHistory && keyWord != "") {
-      appdata.searchHistory.remove(keyWord);
-      appdata.searchHistory.add(keyWord);
-      appdata.writeHistory();
-    }
     if (response.error) {
       return Res(null, errorMessage: response.errorMessage);
     }

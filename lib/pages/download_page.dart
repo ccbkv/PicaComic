@@ -774,6 +774,26 @@ class _DownloadPageState extends State<DownloadPage> {
                       .contains(logic.tagKeyword.toLowerCase()))) // 支持中英文标签搜索
               .toList();
         }
+      } else if (logic.categorySearchMode) {
+        // 分类搜索模式下使用分类搜索结果
+        if (logic.categoryKeyword.isEmpty) {
+          fullResultComics = logic.baseComics;
+        } else {
+          fullResultComics = logic.baseComics
+              .where((comic) {
+                // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
+                if (comic is DownloadedComic) {
+                  return comic.comicItem.categories.any((c) =>
+                      c.toLowerCase().contains(logic.categoryKeyword.toLowerCase()) ||
+                      c.translateTagsToCN
+                          .toLowerCase()
+                          .contains(logic.categoryKeyword.toLowerCase()));
+                }
+                // 对于其他类型的DownloadedItem，暂时不进行分类搜索
+                return false;
+              })
+              .toList();
+        }
       } else if (logic.searchMode) {
         // 普通搜索模式下使用普通搜索结果
         if (logic.keyword.isEmpty) {
@@ -812,7 +832,59 @@ class _DownloadPageState extends State<DownloadPage> {
       // 更新当前页数据
       logic.comics = fullResultComics.sublist(startIndex, endIndex);
     } else {
-      logic.comics = logic.baseComics.toList();
+      // 非分页模式下的搜索处理
+      if (logic.tagSearchMode) {
+        // 标签搜索模式下使用标签搜索结果
+        if (logic.tagKeyword.isEmpty) {
+          logic.comics = logic.baseComics.toList();
+        } else {
+          logic.comics = logic.baseComics
+              .where((comic) => comic.tags.any((t) =>
+                  t.toLowerCase().contains(logic.tagKeyword.toLowerCase()) ||
+                  t.translateTagsToCN
+                      .toLowerCase()
+                      .contains(logic.tagKeyword.toLowerCase()))) // 支持中英文标签搜索
+              .toList();
+        }
+      } else if (logic.categorySearchMode) {
+        // 分类搜索模式下使用分类搜索结果
+        if (logic.categoryKeyword.isEmpty) {
+          logic.comics = logic.baseComics.toList();
+        } else {
+          logic.comics = logic.baseComics
+              .where((comic) {
+                // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
+                if (comic is DownloadedComic) {
+                  return comic.comicItem.categories.any((c) =>
+                      c.toLowerCase().contains(logic.categoryKeyword.toLowerCase()) ||
+                      c.translateTagsToCN
+                          .toLowerCase()
+                          .contains(logic.categoryKeyword.toLowerCase()));
+                }
+                // 对于其他类型的DownloadedItem，暂时不进行分类搜索
+                return false;
+              })
+              .toList();
+        }
+      } else if (logic.searchMode) {
+        // 普通搜索模式下使用普通搜索结果
+        if (logic.keyword.isEmpty) {
+          logic.comics = logic.baseComics.toList();
+        } else {
+          logic.comics = logic.baseComics
+              .where((comic) =>
+                  comic.name
+                      .toLowerCase()
+                      .contains(logic.keyword.toLowerCase()) ||
+                  comic.subTitle
+                      .toLowerCase()
+                      .contains(logic.keyword.toLowerCase()))
+              .toList();
+        }
+      } else {
+        // 默认使用所有漫画
+        logic.comics = logic.baseComics.toList();
+      }
     }
 
     // 重新初始化selected数组，确保其长度与当前显示的comics数组长度一致

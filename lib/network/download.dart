@@ -666,8 +666,10 @@ abstract mixin class _DownloadDb {
             e['json'],
             DateTime.fromMillisecondsSinceEpoch(e['time']),
             e['directory']
-          )!,
+          ),
         )
+        .where((comic) => comic != null)
+        .cast<DownloadedItem>()
         .toList();
   }
 
@@ -680,6 +682,9 @@ abstract mixin class _DownloadDb {
       select directory from download
       where id = ?
     ''', [id]);
+      if (result.isEmpty) {
+        throw Exception("Directory not found for id: $id");
+      }
       directory = result.first['directory'];
       directory = _findAccurateDirectory(directory!);
       if(_cache.length > 50) {

@@ -178,6 +178,7 @@ class DownloadPageLogic extends StateController {
 
   bool searchMode = false;
   bool tagSearchMode = false;
+  bool categorySearchMode = false;
 
   bool searchInit = false;
 
@@ -188,12 +189,17 @@ class DownloadPageLogic extends StateController {
   String keyword_ = "";
   String tagKeyword = "";
   String tagKeyword_ = "";
+  String categoryKeyword = "";
+  String categoryKeyword_ = "";
 
   /// 普通搜索防抖计时器
   Timer? _searchDebounceTimer;
 
   /// 标签搜索防抖计时器
   Timer? _tagDebounceTimer;
+  
+  /// 分类搜索防抖计时器
+  Timer? _categoryDebounceTimer;
 
   /// 防抖延迟时间（毫秒）
   final int _debounceDelay = 300;
@@ -204,6 +210,7 @@ class DownloadPageLogic extends StateController {
   //int pageSize = 4;
   int maxPage = 1;
   String _lastTagKeyword = "";
+  String _lastCategoryKeyword = "";
 
   ///获取当前显示模式（连续或分页）
   bool get isPaginationMode => appdata.settings[25] == "1";
@@ -267,6 +274,57 @@ class DownloadPageLogic extends StateController {
     update();
   }
 
+  void searchByCategory() {
+    // 添加调试日志
+    print('开始执行分类搜索: categoryKeyword = $categoryKeyword');
+    print('搜索前漫画总数: ${baseComics.length}');
+
+    List<DownloadedItem> filteredComics;
+    if (categoryKeyword.isEmpty) {
+      print('分类关键词为空，显示所有漫画');
+      filteredComics = List.from(baseComics);
+    } else {
+      filteredComics = baseComics
+          .where((comic) {
+            // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
+            if (comic is DownloadedComic) {
+              return comic.comicItem.categories.any((c) =>
+                  c.toLowerCase().contains(categoryKeyword.toLowerCase()) ||
+                  c.translateTagsToCN
+                      .toLowerCase()
+                      .contains(categoryKeyword.toLowerCase()));
+            }
+            // 对于其他类型的DownloadedItem，暂时不进行分类搜索
+            return false;
+          })
+          .toList();
+      print('找到 ${filteredComics.length} 个匹配的漫画');
+    }
+
+    // 处理分页
+    if (isPaginationMode) {
+      if (categoryKeyword != _lastCategoryKeyword) {
+        resetPagination();
+        _lastCategoryKeyword = categoryKeyword;
+      }
+      maxPage = (filteredComics.length / pageSize).ceil();
+      int startIndex = (currentPage - 1) * pageSize;
+      int endIndex = startIndex + pageSize;
+      if (endIndex > filteredComics.length) {
+        endIndex = filteredComics.length;
+      }
+      comics = filteredComics.sublist(startIndex, endIndex);
+    } else {
+      comics = filteredComics;
+    }
+
+    // 同步selected数组长度
+    resetSelected(comics.length);
+
+    print('重置分页，更新UI');
+    update();
+  }
+
   void onTagSearchSubmitted(String value) {
     tagKeyword = value;
     searchByTag();
@@ -293,6 +351,18 @@ class DownloadPageLogic extends StateController {
     _tagDebounceTimer = Timer(Duration(milliseconds: _debounceDelay), () {
       tagKeyword = value;
       searchByTag();
+    });
+  }
+
+  /// 分类搜索防抖方法
+  void _debounceUpdateCategoryKeyword(String value) {
+    // 如果已有计时器，先取消
+    _categoryDebounceTimer?.cancel();
+
+    // 创建新的计时器
+    _categoryDebounceTimer = Timer(Duration(milliseconds: _debounceDelay), () {
+      categoryKeyword = value;
+      searchByCategory();
     });
   }
 
@@ -856,6 +926,13 @@ class _DownloadPageState extends State<DownloadPage> {
     if (logic.comics[index].type == DownloadType.other) {
       type = (logic.comics[index] as CustomDownloadedItem).sourceName;
     }
+    
+    // 获取分类信息
+    List<String>? categories;
+    if (logic.comics[index].type == DownloadType.picacg) {
+      categories = (logic.comics[index] as DownloadedComic).comicItem.categories;
+    }
+    
     return Padding(
       padding: const EdgeInsets.all(2),
       child: Container(
@@ -870,6 +947,7 @@ class _DownloadPageState extends State<DownloadPage> {
           imagePath: downloadManager.getCover(logic.comics[index].id),
           type: type,
           tag: logic.comics[index].tags,
+          category: categories,
           onTap: () async {
             // 再次检查边界，防止在异步操作期间数组发生变化
             if (index < 0 ||
@@ -1085,12 +1163,12 @@ class _DownloadPageState extends State<DownloadPage> {
       );
 
   Widget buildTitle(BuildContext context, DownloadPageLogic logic) {
-    if ((logic.searchMode || logic.tagSearchMode) && !logic.selecting) {
+    if ((logic.searchMode || logic.tagSearchMode || logic.categorySearchMode) && !logic.selecting) {
       // 使用一个持久化的focusNode，避免每次build都创建新的
       // 控制器已经在State初始化时创建
 
       // 同步控制器文本内容
-      final currentText = logic.searchMode ? logic.keyword : logic.tagKeyword;
+      final currentText = logic.searchMode ? logic.keyword : (logic.tagSearchMode ? logic.tagKeyword : logic.categoryKeyword);
       if (logic.searchController?.text != currentText) {
         logic.searchController?.text = currentText;
         logic.searchController?.selection = TextSelection.fromPosition(
@@ -1110,7 +1188,7 @@ class _DownloadPageState extends State<DownloadPage> {
         focusNode: logic.searchFocusNode,
         decoration: InputDecoration(
           border: InputBorder.none,
-          hintText: logic.searchMode ? "搜索漫画名".tl : "搜索标签".tl,
+          hintText: logic.searchMode ? "搜索漫画名".tl : (logic.tagSearchMode ? "搜索标签".tl : "搜索分类".tl),
         ),
         controller: logic.searchController,
         inputFormatters: [LowercaseEnglishInputFormatter()],
@@ -1119,9 +1197,12 @@ class _DownloadPageState extends State<DownloadPage> {
           if (!logic.searchController!.isComposing) {
             if (logic.searchMode) {
               logic._debounceUpdateKeyword(s);
-            } else {
+            } else if (logic.tagSearchMode) {
               print('标签搜索模式下更新关键词: $s');
               logic._debounceUpdateTagKeyword(s);
+            } else {
+              print('分类搜索模式下更新关键词: $s');
+              logic._debounceUpdateCategoryKeyword(s);
             }
           }
         },
@@ -1129,10 +1210,14 @@ class _DownloadPageState extends State<DownloadPage> {
           if (logic.searchMode) {
             logic.keyword = s;
             logic.find();
-          } else {
+          } else if (logic.tagSearchMode) {
             print('标签搜索模式下提交搜索: $s');
             logic.tagKeyword = s;
             logic.searchByTag();
+          } else {
+            print('分类搜索模式下提交搜索: $s');
+            logic.categoryKeyword = s;
+            logic.searchByCategory();
           }
         },
       );
@@ -1352,14 +1437,67 @@ class _DownloadPageState extends State<DownloadPage> {
           ),
         ),
       );
+      actions.add(
+        Tooltip(
+          message: "分类搜索".tl,
+          child: IconButton(
+            icon: const Icon(Icons.category),
+            onPressed: () {
+              if (!logic.categorySearchMode) {
+                // 切换到分类搜索模式
+                logic.categorySearchMode = true;
+                logic.searchMode = false;
+                logic.tagSearchMode = false;
+                logic.searchInit = true;
+                // 同步分类关键词到搜索控制器
+                logic.searchController?.text = logic.categoryKeyword;
+                logic.searchController?.selection = TextSelection.fromPosition(
+                  TextPosition(offset: logic.categoryKeyword.length),
+                );
+                // 执行分类搜索
+                logic.searchByCategory();
+              } else {
+                // 退出分类搜索模式
+                logic.categorySearchMode = false;
+                logic.searchMode = false;
+                logic.tagSearchMode = false;
+                // 保留当前页面，不重置为第一页
+                // logic.currentPage = 1;
+                logic.selected =
+                    List.generate(logic.comics.length, (index) => false);
+                logic.selectedNum = 0;
+                logic.searchController?.text = '';
+                // 退出搜索模式时保留当前页面，不调用会重置分页的refresh()
+                // 只更新UI而不重置分页信息
+                logic.update();
+              }
+            },
+          ),
+        ),
+      );
       // 始终显示搜索按钮，根据模式执行不同的搜索逻辑
       actions.add(
         Tooltip(
-          message: logic.tagSearchMode ? "标签搜索".tl : "搜索".tl,
+          message: logic.categorySearchMode ? "分类搜索".tl : (logic.tagSearchMode ? "标签搜索".tl : "搜索".tl),
           child: IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              if (logic.tagSearchMode) {
+              if (logic.categorySearchMode) {
+                // 从分类搜索模式切换到普通搜索模式
+                logic.categorySearchMode = false;
+                logic.searchMode = true;
+                logic.tagSearchMode = false;
+                logic.searchInit = true;
+                // 同步普通关键词到搜索控制器
+                logic.searchController?.text = logic.keyword;
+                logic.searchController?.selection = TextSelection.fromPosition(
+                  TextPosition(offset: logic.keyword.length),
+                );
+                // 执行普通搜索
+                logic.find();
+                // 确保UI更新
+                logic.update();
+              } else if (logic.tagSearchMode) {
                 // 从标签搜索模式切换到普通搜索模式
                 logic.tagSearchMode = false;
                 logic.searchMode = true;
@@ -1703,6 +1841,7 @@ class DownloadedComicTile extends ComicTile {
   final String name;
   final String type;
   final List<String> tag;
+  final List<String>? category;
   final void Function() onTap;
   final void Function() onLongTap;
   final void Function(TapDownDetails details) onSecondaryTap;
@@ -1711,6 +1850,9 @@ class DownloadedComicTile extends ComicTile {
   List<String>? get tags => tag
       .map((e) => App.locale.languageCode == "zh" ? e.translateTagsToCN : e)
       .toList();
+
+  @override
+  List<String>? get categories => category?.map((e) => App.locale.languageCode == "zh" ? e.translateTagsToCN : e).toList();
 
   @override
   String get description => "${size}MB";
@@ -1750,6 +1892,7 @@ class DownloadedComicTile extends ComicTile {
       required this.onSecondaryTap,
       required this.type,
       required this.tag,
+      this.category,
       super.key});
 }
 

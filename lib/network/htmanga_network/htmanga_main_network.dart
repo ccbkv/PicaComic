@@ -51,6 +51,25 @@ class HtmangaNetwork {
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.receiveTimeout) {
         return const Res(null, errorMessage: "连接超时");
+      } else if (e.response?.statusCode == 403 && url.contains("www.wnacg.com")) {
+        // 当使用带www的域名请求失败时，尝试使用不带www的域名重新请求
+        String newUrl = url.replaceAll("www.wnacg.com", "wnacg.com");
+        try {
+          var res = await dio.get(
+              newUrl,
+              BaseOptions(headers: {
+                "User-Agent": webUA,
+                if (headers != null) ...headers
+              }),
+              cookieJar: SingleInstanceCookieJar.instance,
+              expiredTime: cache ? CacheExpiredTime.short : CacheExpiredTime.no);
+          if(res.url.contains("users-login")){
+            return Res(null, errorMessage: "未登录或登录到期".tl);
+          }
+          return Res(res.data);
+        } catch (e2) {
+          return Res(null, errorMessage: e.toString());
+        }
       } else {
         return Res(null, errorMessage: e.toString());
       }

@@ -158,9 +158,14 @@ class JmComicPage extends BaseComicPage<JmComicInfo> {
 
   @override
   Map<String, List<String>>? get tags => {
-        "作者".tl: (data!.author.isEmpty) ? "未知".tl.toList() : data!.author,
-        "ID": "JM${data!.id}".toList(),
-        "标签".tl: data!.tags
+    "ID": "JM${data!.id}".toList(),
+    "作者".tl: (data!.author.isEmpty) ? "未知".tl.toList() : data!.author,
+    if (data!.works.isNotEmpty)
+      "作品".tl: data!.works,
+    if (data!.actors.isNotEmpty)
+      "登场人物".tl: data!.actors,
+    if (data!.tags.isNotEmpty)
+      "标签".tl: data!.tags
       };
 
   @override

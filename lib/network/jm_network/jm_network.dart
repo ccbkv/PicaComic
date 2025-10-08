@@ -133,6 +133,37 @@ class JmNetwork {
     loginFromAppdata();
   }
 
+  Future<Res<dynamic>> getAppVersionCode() async {
+    var dio = logDio(
+        BaseOptions(
+          headers: {
+            ...getBaseHeaders(),
+            "Accept-Encoding": "gzip",
+            "user-agent": ua,
+          },
+        )
+    );
+    try {
+      var res = await dio.get("$baseUrl/static/jmapp3apk/version.json");
+      try {
+        String version = res.data['version'];
+        if (version.isNotEmpty) {
+          return Res(version);
+        } else {
+          return const Res.error("No version code in response.");
+        }
+      } catch (e) {
+        return Res(null, errorMessage: e.toString());
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print(e);
+      }
+      return Res(null, errorMessage: e.toString());
+    }
+  }
+
+
   Future<Res<dynamic>> getApiDomains() async {
     var dio = Dio(
       BaseOptions(
@@ -653,6 +684,14 @@ class JmNetwork {
       for (var s in res.data["tags"] ?? []) {
         tags.add(s);
       }
+      var works = <String>[];
+      for (var s in res.data["works"] ?? []) {
+        works.add(s);
+      }
+      var actors = <String>[];
+      for (var s in res.data["actors"] ?? []) {
+        actors.add(s);
+      }
       var related = <JmComicBrief>[];
       for (var c in res.data["related_list"] ?? []) {
         related.add(JmComicBrief(c["id"], c["author"] ?? "Unknown",
@@ -667,6 +706,8 @@ class JmNetwork {
           int.parse(res.data["total_views"] ?? "0"),
           series,
           tags,
+          works,
+          actors,
           related,
           res.data["liked"] ?? false,
           res.data["is_favorite"] ?? false,

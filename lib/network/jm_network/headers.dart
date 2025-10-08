@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:pica_comic/base.dart';
 
 String get ua {
   return "Mozilla/5.0 (Linux; Android 10; K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.0.0 Mobile Safari/537.36";
@@ -10,7 +11,9 @@ String get jmImgUA {
   return "Dalvik/2.1.0 (Linux; Android 10; K)";
 }
 
-const _jmVersion = "2.0.1";
+String get jmAppVersion {
+  return appdata.settings[89];
+}
 
 const _jmPkgName = "com.example.app";
 
@@ -61,7 +64,7 @@ BaseOptions getApiOptions(int time,
         "Authorization": "Bearer",
         "Sec-Fetch-Storage-Access": "active",
         "token": token.toString(),
-        "tokenparam": "$time,$_jmVersion",
+        "tokenparam": "$time,$jmAppVersion",
         "user-agent": ua,
         if (post) "Content-Type": "application/x-www-form-urlencoded"
       });

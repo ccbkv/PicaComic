@@ -49,8 +49,9 @@ class JmSettings extends StatefulWidget {
         msg += "${"域名".tl}${domains.indexOf(domain) + 1}: $domain\n";
     }
     msg = msg.trim();
-    showConfirmDialog(App.globalContext!, title, msg, () {
+    showConfirmDialog(App.globalContext!, title, msg, () async {
       appdata.appSettings.jmApiDomains = domains;
+      await updateAppVersionCode();
       JmNetwork().loginFromAppdata();
     });
   }
@@ -66,6 +67,13 @@ class JmSettings extends StatefulWidget {
     var title = res.success ? "签到成功".tl : "签到失败".tl;
     var msg = res.success ? "${res.subData}".tl : res.errorMessage;
     showDialogMessage(App.globalContext!, title, msg!);
+  }
+  static Future<void> updateAppVersionCode() async {
+    var res = await JmNetwork().getAppVersionCode();
+    if (!res.error) {
+      appdata.settings[89] = res.data;
+      appdata.updateSettings();
+    }
   }
 }
 

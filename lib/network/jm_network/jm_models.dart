@@ -105,6 +105,8 @@ class JmComicInfo with HistoryMixin {
   ///章节信息, 键为章节序号, 值为漫画ID
   Map<int, String> series;
   List<String> tags;
+  List<String> works;
+  List<String> actors;
   List<JmComicBrief> relatedComics;
   bool liked;
   bool favorite;
@@ -119,6 +121,8 @@ class JmComicInfo with HistoryMixin {
       this.views,
       this.series,
       this.tags,
+      this.works,
+      this.actors,
       this.relatedComics,
       this.liked,
       this.favorite,
@@ -135,8 +139,13 @@ class JmComicInfo with HistoryMixin {
 
   static Map<int, String> jsonMapToSeries(Map<String, dynamic> map) {
     var res = <int, String>{};
+    if (map == null) return res;
     for (var i in map.entries) {
-      res[int.parse(i.key)] = i.value;
+      try {
+        res[int.parse(i.key)] = i.value?.toString() ?? "";
+      } catch (e) {
+        // 忽略解析错误
+      }
     }
     return res;
   }
@@ -151,6 +160,8 @@ class JmComicInfo with HistoryMixin {
       "views": "",
       "series": seriesToJsonMap(series),
       "tags": tags,
+      "works": works,
+      "actors": actors,
       "relatedComics": [],
       "liked": "",
       "favorite": "",
@@ -159,19 +170,21 @@ class JmComicInfo with HistoryMixin {
   }
 
   JmComicInfo.fromMap(Map<String, dynamic> map)
-      : name = map["name"],
-        id = map["id"],
-        author = List<String>.from(map["author"]),
-        description = map["description"],
+      : name = map["name"] ?? "",
+        id = map["id"] ?? "",
+        author = map["author"] != null ? List<String>.from(map["author"]) : [],
+        description = map["description"] ?? "",
         likes = 0,
         views = 0,
-        series = jsonMapToSeries(map["series"]),
-        tags = List<String>.from(map["tags"]),
+        series = map["series"] != null ? jsonMapToSeries(map["series"]) : {},
+        tags = map["tags"] != null ? List<String>.from(map["tags"]) : [],
+        works = map["works"] != null ? List<String>.from(map["works"]) : [],
+        actors = map["actors"] != null ? List<String>.from(map["actors"]) : [],
         relatedComics = [],
         liked = false,
         favorite = false,
         comments = 0,
-        epNames = List.from(map["epNames"] ?? []);
+        epNames = map["epNames"] != null ? List.from(map["epNames"]) : [];
 
   JmComicBrief toBrief() =>
       JmComicBrief(id, author.firstOrNull ?? "", name, description, []);

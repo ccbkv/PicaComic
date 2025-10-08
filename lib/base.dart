@@ -87,7 +87,7 @@ class Appdata {
     "1", //55 长按缩放
     "https://18comic.vip", //56 jm domain
     "1", //57 show page info in reader
-    "0", //58 hosts
+    "1", //58 hosts
     "012345678", //59 explore page(废弃)
     "0", //60 action when local favorite is tapped
     "0", //61 check link in clipboard
@@ -118,6 +118,7 @@ class Appdata {
     "https://cdn-msp.jmapiproxy3.cc", //86 jm image url
     "gold-usergeneratedcontent.net", //87 hitomi cdn url
     "0",
+    "2.0.11", //89 jm app version
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步

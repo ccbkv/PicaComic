@@ -292,9 +292,45 @@ class _SearchResultPageState extends State<_SearchResultPage> {
             pinned: _showFab && SmoothScrollProvider.isMouseScroll,
             floating: !SmoothScrollProvider.isMouseScroll,
             delegate: _SliverAppBarDelegate(
-              minHeight: 60,
-              maxHeight: 60,
-              child: FloatingSearchBar(
+              minHeight: context.width > 600 ? 96.0 : 60.0,
+              maxHeight: context.width > 600 ? 96.0 : 60.0,
+              child: context.width > 600 ? Column(
+                children: [
+                  SizedBox(height: 36.0),
+                  Expanded(
+                    child: FloatingSearchBar(
+                      onSearch: (s) {
+                        suggestionsController.suggestions.clear();
+                        suggestionsController.remove();
+                        HistoryManager.addSearchHistory(s);
+                        String newKeyword = s;
+                        // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
+                        if (sourceKey == "jm") {
+                          newKeyword = _addJmBlockingKeywords(newKeyword);
+                        }
+                        if (!newKeyword.contains('language') &&
+                            ComicSource.find(sourceKey)
+                                    ?.searchPageData
+                                    ?.enableLanguageFilter ==
+                                true) {
+                          var lang = int.tryParse(appdata.settings[69]) ?? 0;
+                          if (lang != 0) {
+                            newKeyword +=
+                                " language:${["chinese", "english", "japanese"][lang - 1]}";
+                          }
+                        }
+                        if (newKeyword == keyword) return;
+                        setState(() {
+                          keyword = newKeyword;
+                        });
+                      },
+                      controller: controller,
+                      onChanged: onChanged,
+                      trailing: trailing,
+                    ),
+                  ),
+                ],
+              ) : FloatingSearchBar(
                 onSearch: (s) {
                   suggestionsController.suggestions.clear();
                   suggestionsController.remove();

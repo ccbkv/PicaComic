@@ -30,7 +30,7 @@ class DownloadedJmComic extends DownloadedItem {
         downloadedChapters = [] {
     if (map["downloadedChapters"] == null) {
       //旧版本中的数据不包含这一项
-      for (int i = 0; i < comic.series.length; i++) {
+      for (int i = 0; i < (comic.series.length); i++) {
         downloadedChapters.add(i);
       }
       if (downloadedChapters.isEmpty) {

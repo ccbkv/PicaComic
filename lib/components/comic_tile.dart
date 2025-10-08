@@ -26,6 +26,8 @@ abstract class ComicTile extends StatelessWidget {
 
   List<String>? get tags => null;
 
+  List<String>? get categories => null;
+
   int get maxLines => 2;
 
   FavoriteItem? get favoriteItem => null;
@@ -340,6 +342,7 @@ abstract class ComicTile extends StatelessWidget {
                     subDescription: buildSubDescription(context),
                     badge: badge,
                     tags: tags,
+                    categories: categories,
                     maxLines: maxLines,
                   ),
                 ),
@@ -424,7 +427,8 @@ class _ComicDescription extends StatelessWidget {
       this.subDescription,
       this.badge,
       this.maxLines = 2,
-      this.tags});
+      this.tags,
+      this.categories});
 
   final String title;
   final String user;
@@ -432,12 +436,16 @@ class _ComicDescription extends StatelessWidget {
   final Widget? subDescription;
   final String? badge;
   final List<String>? tags;
+  final List<String>? categories;
   final int maxLines;
 
   @override
   Widget build(BuildContext context) {
     if (tags != null) {
       tags!.removeWhere((element) => element.removeAllBlank == "");
+    }
+    if (categories != null) {
+      categories!.removeWhere((element) => element.removeAllBlank == "");
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,40 +468,129 @@ class _ComicDescription extends StatelessWidget {
         const SizedBox(
           height: 4,
         ),
-        if (tags != null)
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) => Padding(
-                padding: EdgeInsets.only(bottom: constraints.maxHeight % 23),
-                child: Wrap(
-                  runAlignment: WrapAlignment.start,
-                  clipBehavior: Clip.antiAlias,
-                  crossAxisAlignment: WrapCrossAlignment.end,
-                  children: [
-                    for (var s in tags!)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 0, 4, 3),
-                        child: Container(
-                          padding: const EdgeInsets.fromLTRB(3, 1, 3, 3),
-                          decoration: BoxDecoration(
-                            color: s == "Unavailable"
-                                ? Theme.of(context).colorScheme.errorContainer
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .secondaryContainer,
-                            borderRadius:
-                                const BorderRadius.all(Radius.circular(8)),
-                          ),
-                          child: Text(
-                            s,
-                            style: const TextStyle(fontSize: 12),
-                          ),
+        if (categories != null && categories!.isNotEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Card(
+                    margin: EdgeInsets.zero,
+                    color: colors["分类".tl.hashCode.abs() % colors.length]
+                        .shade100
+                        .withOpacity(0.6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(3, 1, 3, 3),
+                      child: Text(
+                        "分类".tl,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                         ),
-                      )
-                  ],
-                ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: SizedBox(
+                      height: 23,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => Wrap(
+                          runAlignment: WrapAlignment.start,
+                          clipBehavior: Clip.antiAlias,
+                          crossAxisAlignment: WrapCrossAlignment.end,
+                          children: [
+                            for (var s in categories!)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(0, 0, 4, 3),
+                                child: Container(
+                                  padding: const EdgeInsets.fromLTRB(3, 1, 3, 3),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer,
+                                    borderRadius:
+                                        const BorderRadius.all(Radius.circular(8)),
+                                  ),
+                                  child: Text(
+                                    s,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              )
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
+            ],
+          ),
+        if (tags != null && tags!.isNotEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Card(
+                    margin: EdgeInsets.zero,
+                    color: colors["标签".tl.hashCode.abs() % colors.length]
+                        .shade100
+                        .withOpacity(0.6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(3, 1, 3, 3),
+                      child: Text(
+                        "标签".tl,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: SizedBox(
+                      height: 23,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => Wrap(
+                          runAlignment: WrapAlignment.start,
+                          clipBehavior: Clip.antiAlias,
+                          crossAxisAlignment: WrapCrossAlignment.end,
+                          children: [
+                            for (var s in tags!)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(0, 0, 4, 3),
+                                child: Container(
+                                  padding: const EdgeInsets.fromLTRB(3, 1, 3, 3),
+                                  decoration: BoxDecoration(
+                                    color: s == "Unavailable"
+                                        ? Theme.of(context).colorScheme.errorContainer
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .secondaryContainer,
+                                    borderRadius:
+                                        const BorderRadius.all(Radius.circular(8)),
+                                  ),
+                                  child: Text(
+                                    s,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              )
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         const SizedBox(
           height: 2,

@@ -208,6 +208,22 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
               } else {
                 comics = logic.comics!;
               }
+              if (comics.isEmpty) {
+                return SmoothCustomScrollView(
+                  slivers: [
+                    if (title != null)
+                      SliverAppbar(
+                        title: Text(title!),
+                        actions: tailing != null ? [tailing!] : null,
+                      ),
+                    if (header != null) header!,
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: buildEmptyView(context),
+                    ),
+                  ],
+                );
+              }
               return SmoothCustomScrollView(
                 slivers: [
                   if (title != null)
@@ -249,6 +265,22 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
                 }
               } else {
                 comics = logic.dividedComics![logic.current]!;
+              }
+              if (comics.isEmpty) {
+                return SmoothCustomScrollView(
+                  slivers: [
+                    if (title != null)
+                      SliverAppbar(
+                        title: Text(title!),
+                        actions: tailing != null ? [tailing!] : null,
+                      ),
+                    if (header != null) header!,
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: buildEmptyView(context),
+                    ),
+                  ],
+                );
               }
               Widget body = SmoothCustomScrollView(
                 slivers: [
@@ -530,6 +562,22 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
     }
   }
 
+  Widget buildEmptyView(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.search_off, size: 56),
+          const SizedBox(height: 12),
+          Text("无匹配结果".tl,
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  
   Widget buildItem(BuildContext context, T item) {
     return buildComicTile(context, item, sourceKey, addonMenuOptions: addonMenuOptions);
   }

@@ -577,7 +577,7 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
     );
   }
 
-  
+
   Widget buildItem(BuildContext context, T item) {
     return buildComicTile(context, item, sourceKey, addonMenuOptions: addonMenuOptions);
   }

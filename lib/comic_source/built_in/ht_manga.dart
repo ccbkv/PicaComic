@@ -108,7 +108,7 @@ final htManga = ComicSource.named(
         ],
       ),
     ],
-    enableRankingPage: false,
+    enableRankingPage: true,
   ),
   categoryComicsData: CategoryComicsData.named(
     load: (category, param, options, page) async {
@@ -120,6 +120,19 @@ final htManga = ComicSource.named(
         page,
       );
     },
+    rankingData: RankingData.named(
+      options: {
+        "/albums-favorite_ranking-type-day.html": "今日",
+        "/albums-favorite_ranking-type-week.html": "本週",
+        "/albums-favorite_ranking-type-month.html": "本月",
+      },
+      load: (option, page) {
+        return HtmangaNetwork().getComicList(
+          "${HtmangaNetwork.baseUrl}$option",
+          page,
+        );
+      },
+    ),
   ),
   account: AccountConfig.named(
     registerWebsite: "https://www.wnacg.com/albums.html",

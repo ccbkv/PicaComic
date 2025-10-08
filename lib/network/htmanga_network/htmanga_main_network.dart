@@ -164,6 +164,8 @@ class HtmangaNetwork {
     if (page != 1) {
       if (url.contains("search")) {
         url = "$url&p=$page";
+      } else if (url.contains("ranking")) {
+        url = url.replaceAll("ranking", "ranking-page-$page");
       } else {
         if (!url.contains("-")) {
           url = url.replaceAll(".html", "-.html");

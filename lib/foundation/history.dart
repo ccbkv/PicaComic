@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'package:pica_comic/base.dart';
 import 'package:pica_comic/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/log.dart';
@@ -440,5 +441,41 @@ class HistoryManager {
       select count(*) from history;
     """);
     return res.first[0] as int;
+  }
+
+  /// Get plain search keyword from a keyword that may be polluted.
+  static String getPlainSearchKeyword(String keyword) {
+    // remove language filter
+    final languagePattern = RegExp(r'\s*language:\w+');
+    var result = keyword.replaceAll(languagePattern, '').trim();
+
+    // remove jm blocking keywords
+    if (appdata.jmBlockingKeyword.isNotEmpty) {
+      var words = result.trim().split(' ').where((s) => s.isNotEmpty);
+      var userWords = <String>[];
+      var jmBlockingSet = appdata.jmBlockingKeyword.toSet();
+      for (var word in words) {
+        if (word.startsWith('-') && jmBlockingSet.contains(word.substring(1))) {
+          // is a blocking keyword, skip it
+        } else {
+          userWords.add(word);
+        }
+      }
+      result = userWords.join(' ');
+    }
+
+    return result;
+  }
+
+  /// Add search history, keyword will be cleaned before adding.
+  static void addSearchHistory(String keyword) {
+    final plainKeyword = getPlainSearchKeyword(keyword.trim());
+    if (plainKeyword.isEmpty) return;
+
+    if (appdata.searchHistory.contains(plainKeyword)) {
+      appdata.searchHistory.remove(plainKeyword);
+    }
+    appdata.searchHistory.add(plainKeyword);
+    appdata.writeHistory();
   }
 }

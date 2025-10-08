@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
+import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/pair.dart';
 import 'package:pica_comic/network/base_comic.dart';
@@ -105,7 +106,7 @@ class _SearchResultPage extends StatefulWidget {
 class _SearchResultPageState extends State<_SearchResultPage> {
   var controller = TextEditingController();
   bool _showFab = true;
-  late String keyword = widget.keyword;
+  late String keyword;
 
   OverlayEntry? get suggestionOverlay => suggestionsController.entry;
   late _SuggestionsController suggestionsController;
@@ -114,7 +115,16 @@ class _SearchResultPageState extends State<_SearchResultPage> {
 
   @override
   void initState() {
-    controller.text = keyword.trim();
+    var plainKeyword = HistoryManager.getPlainSearchKeyword(widget.keyword);
+    controller.text = plainKeyword;
+    keyword = widget.keyword;
+
+    // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
+    if (sourceKey == "jm") {
+      keyword = _addJmBlockingKeywords(keyword);
+    }
+
+    // 添加语言筛选
     if (!keyword.contains('language') &&
         ComicSource.find(sourceKey)?.searchPageData?.enableLanguageFilter ==
             true) {
@@ -125,6 +135,34 @@ class _SearchResultPageState extends State<_SearchResultPage> {
     }
     suggestionsController = _SuggestionsController(controller);
     super.initState();
+  }
+
+  String _addJmBlockingKeywords(String originalKeyword) {
+    // 如果没有禁漫天堂专用屏蔽关键词，直接返回
+    if (appdata.jmBlockingKeyword.isEmpty) {
+      return originalKeyword;
+    }
+
+    // 检查是否已经添加了屏蔽关键词部分
+    var words = originalKeyword.trim().split(' ').where((s) => s.isNotEmpty);
+    var userWords = <String>[];
+    var jmBlockingSet = appdata.jmBlockingKeyword.toSet();
+
+    for (var word in words) {
+      if (word.startsWith('-') && jmBlockingSet.contains(word.substring(1))) {
+        // is a blocking keyword, skip it
+      } else {
+        userWords.add(word);
+      }
+    }
+    String cleanKeyword = userWords.join(' ');
+
+    if (appdata.jmBlockingKeyword.isEmpty) {
+      return cleanKeyword;
+    }
+
+    final blockingPart = appdata.jmBlockingKeyword.map((e) => " -$e").join("");
+    return "$cleanKeyword$blockingPart";
   }
 
   @override
@@ -201,14 +239,32 @@ class _SearchResultPageState extends State<_SearchResultPage> {
     return Scaffold(
       floatingActionButton: _showFab
           ? FloatingActionButton(
-        child: const Icon(Icons.search),
-        onPressed: () {
-          var s = controller.text;
-          setState(() {
-            keyword = s;
-          });
-        },
-      )
+              child: const Icon(Icons.search),
+              onPressed: () {
+                var s = controller.text;
+                HistoryManager.addSearchHistory(s);
+                String newKeyword = s;
+                // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
+                if (sourceKey == "jm") {
+                  newKeyword = _addJmBlockingKeywords(newKeyword);
+                }
+                if (!newKeyword.contains('language') &&
+                    ComicSource.find(sourceKey)
+                            ?.searchPageData
+                            ?.enableLanguageFilter ==
+                        true) {
+                  var lang = int.tryParse(appdata.settings[69]) ?? 0;
+                  if (lang != 0) {
+                    newKeyword +=
+                        " language:${["chinese", "english", "japanese"][lang - 1]}";
+                  }
+                }
+                if (newKeyword == keyword) return;
+                setState(() {
+                  keyword = newKeyword;
+                });
+              },
+            )
           : null,
       body: NotificationListener<ScrollUpdateNotification>(
         onNotification: (notification) {
@@ -242,9 +298,26 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                 onSearch: (s) {
                   suggestionsController.suggestions.clear();
                   suggestionsController.remove();
-                  if (s == keyword) return;
+                  HistoryManager.addSearchHistory(s);
+                  String newKeyword = s;
+                  // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
+                  if (sourceKey == "jm") {
+                    newKeyword = _addJmBlockingKeywords(newKeyword);
+                  }
+                  if (!newKeyword.contains('language') &&
+                      ComicSource.find(sourceKey)
+                              ?.searchPageData
+                              ?.enableLanguageFilter ==
+                          true) {
+                    var lang = int.tryParse(appdata.settings[69]) ?? 0;
+                    if (lang != 0) {
+                      newKeyword +=
+                          " language:${["chinese", "english", "japanese"][lang - 1]}";
+                    }
+                  }
+                  if (newKeyword == keyword) return;
                   setState(() {
-                    keyword = s;
+                    keyword = newKeyword;
                   });
                 },
                 controller: controller,
@@ -322,7 +395,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                   if (sourceKey != null) {
                     context.pop();
                     var searchData =
-                    ComicSource.find(sourceKey!)!.searchPageData!;
+                        ComicSource.find(sourceKey!)!.searchPageData!;
                     options = (searchData.searchOptions ?? [])
                         .map((e) => e.defaultValue)
                         .toList();
@@ -698,7 +771,7 @@ class _SearchOptionsState extends State<_SearchOptions> {
                 ),
                 child: Padding(
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(e.value.tl),
                 ),
               ),

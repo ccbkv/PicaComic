@@ -1077,7 +1077,24 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
           PopupMenuItem(
             child: Text("屏蔽".tl),
             onTap: () {
-              appdata.blockingKeyword.add(text);
+              // 根据漫画源类型添加到不同的屏蔽关键词分区
+              if (sourceKey == "jm") {
+                // 禁漫天堂漫画源，添加到禁漫天堂专用分区
+                if (!appdata.jmBlockingKeyword.contains(text)) {
+                  appdata.jmBlockingKeyword.add(text);
+                  showToast(message: "已添加到禁漫天堂屏蔽关键词".tl);
+                } else {
+                  showToast(message: "禁漫天堂屏蔽关键词已存在".tl);
+                }
+              } else {
+                // 其他漫画源，添加到通用分区
+                if (!appdata.blockingKeyword.contains(text)) {
+                  appdata.blockingKeyword.add(text);
+                  showToast(message: "已添加到通用屏蔽关键词".tl);
+                } else {
+                  showToast(message: "通用屏蔽关键词已存在".tl);
+                }
+              }
               appdata.writeData();
             },
           ),

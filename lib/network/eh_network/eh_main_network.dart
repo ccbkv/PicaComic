@@ -844,11 +844,6 @@ class EhNetwork {
   ///搜索e-hentai
   Future<Res<Galleries>> search(String keyword,
       {int? fCats, int? startPages, int? endPages, int? minStars}) async {
-    if (keyword != "") {
-      appdata.searchHistory.remove(keyword);
-      appdata.searchHistory.add(keyword);
-      appdata.writeHistory();
-    }
     keyword = keyword.replaceAll(RegExp(r"\s+"), " ").trim();
     if(keyword.contains(" | ")) {
       var keywords = _splitKeyword(keyword);

@@ -99,6 +99,18 @@ class SelectSettingWithAppdata extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 安全地解析设置值，处理无效的字符串
+    int initialValue;
+    try {
+      initialValue = int.parse(appdata.settings[settingsIndex]);
+    } catch (e) {
+      // 如果解析失败，使用默认值 0
+      initialValue = 0;
+      // 同时修复设置值
+      appdata.settings[settingsIndex] = "0";
+      appdata.updateSettings();
+    }
+    
     return SelectSetting(
       leading: icon,
       title: title,
@@ -108,7 +120,7 @@ class SelectSettingWithAppdata extends StatelessWidget {
         appdata.updateSettings();
         onChanged?.call();
       },
-      initialValue: int.parse(appdata.settings[settingsIndex]),
+      initialValue: initialValue,
     );
   }
 }

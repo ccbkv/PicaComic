@@ -87,7 +87,7 @@ class Appdata {
     "1", //55 长按缩放
     "https://18comic.vip", //56 jm domain
     "1", //57 show page info in reader
-    "1", //58 hosts
+    "0", //58 hosts
     "012345678", //59 explore page(废弃)
     "0", //60 action when local favorite is tapped
     "0", //61 check link in clipboard

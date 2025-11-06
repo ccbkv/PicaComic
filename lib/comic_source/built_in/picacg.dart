@@ -132,11 +132,19 @@ final picacg = ComicSource.named(
       } else if (category == "latest") {
         return PicacgNetwork().getLatest(page);
       }
+      
+      // 支持多分类选择
+      String categories = category;
+      if (param != null && param.contains(',')) {
+        // 如果param包含多个分类，使用param作为分类参数
+        categories = param;
+      }
+      
       return PicacgNetwork().getCategoryComics(
-        category,
+        categories,
         page,
         options[0],
-        param ?? 'c',
+        'c',
       );
     },
     options: [

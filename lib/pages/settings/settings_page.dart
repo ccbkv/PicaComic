@@ -627,19 +627,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           //icon: const Icon(Icons.security),
         ),
 
-        ListTile(
-          title: Text("下载并行".tl),
-          //leading: const Icon(Icons.download),
-          trailing: Select(
-            initialValue:
-                ["1", "2", "4", "6", "8", "16"].indexOf(appdata.settings[79]),
-            values: const ["1", "2", "4", "6", "8", "16"],
-            onChange: (value) {
-              appdata.settings[79] = ["1", "2", "4", "6", "8", "16"][value];
-              appdata.updateSettings();
-            },
-          ),
-        ),
+
         if (App.isAndroid)
           ListTile(
             title: Text("应用链接".tl),
@@ -685,8 +673,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           "V$appVersion",
           style: TextStyle(fontSize: 16),
         ),
-        Text("Pica Comic是一个完全免费的漫画阅读APP".tl),
-        Text("仅用于学习交流".tl),
+        Text("Pica Comic是一个免费的开源漫画阅读应用。".tl),
         const SizedBox(
           height: 16,
         ),

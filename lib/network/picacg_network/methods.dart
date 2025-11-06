@@ -83,7 +83,7 @@ class PicacgNetwork {
   }
 
   Future<Res<Map<String, dynamic>>> post(
-      String url, Map<String, String>? data) async {
+      String url, Map<String, dynamic>? data) async {
     var api = "https://picaapi.picacomic.com";
     if (token == "" &&
         url != '$api/auth/sign-in' &&
@@ -275,11 +275,13 @@ class PicacgNetwork {
   }
 
   ///搜索
-  Future<Res<List<ComicItemBrief>>> search(
-      String keyWord, String sort, int page,
-      {bool addToHistory = false}) async {
-    var response = await post('$apiUrl/comics/advanced-search?page=$page',
-        {"keyword": keyWord, "sort": sort});
+  Future<Res<List<ComicItemBrief>>> search(String keyWord, String sort, int page,
+      {bool addToHistory = false, List<String> categories = const []}) async {
+    var params = <String, dynamic>{"keyword": keyWord, "sort": sort};
+    if (categories.isNotEmpty) {
+      params["categories"] = categories;
+    }
+    var response = await post('$apiUrl/comics/advanced-search?page=$page', params);
     if (response.error) {
       return Res(null, errorMessage: response.errorMessage);
     }
@@ -956,6 +958,58 @@ class PicacgNetwork {
   Future<Res<List<ComicItemBrief>>> getCategoryComics(
       String keyWord, int page, String sort,
       [String type = "c"]) async {
+    
+    // 处理多分类参数 - 参考picacg-qt-main项目实现
+    if (keyWord.contains(',')) {
+      // 如果是多个分类，使用高级搜索API
+      List<String> categories = keyWord.split(',');
+      // 过滤空字符串
+      categories = categories.where((category) => category.isNotEmpty).toList();
+      
+      // 使用高级搜索API进行多分类搜索
+      var response = await post(
+        '$apiUrl/comics/advanced-search?page=$page',
+        {
+          'categories': categories, // 直接传递分类列表（数组）
+          'keyword': '',
+          'sort': sort,
+        }
+      );
+      
+      if (response.error) {
+        return Res(null, errorMessage: response.errorMessage);
+      }
+      
+      var res = response.data;
+      var pages = res["data"]["comics"]["pages"];
+      var comics = <ComicItemBrief>[];
+      for (int i = 0; i < res["data"]["comics"]["docs"].length; i++) {
+        try {
+          var tags = <String>[];
+          tags.addAll(
+              List<String>.from(res["data"]["comics"]["docs"][i]["tags"] ?? []));
+          tags.addAll(List<String>.from(
+              res["data"]["comics"]["docs"][i]["categories"] ?? []));
+          var si = ComicItemBrief(
+            res["data"]["comics"]["docs"][i]["title"] ?? "Unknown",
+            res["data"]["comics"]["docs"][i]["author"] ?? "Unknown",
+            int.parse(res["data"]["comics"]["docs"][i]["likesCount"].toString()),
+            res["data"]["comics"]["docs"][i]["thumb"]["fileServer"] +
+                "/static/" +
+                res["data"]["comics"]["docs"][i]["thumb"]["path"],
+            res["data"]["comics"]["docs"][i]["_id"],
+            tags,
+            pages: res["data"]["comics"]["docs"][i]["pagesCount"],
+          );
+          comics.add(si);
+        } catch (e) {
+          continue;
+        }
+      }
+      return Res(comics, subData: pages);
+    }
+    
+    // 单个分类使用普通分类搜索
     var response = await get(
         '$apiUrl/comics?page=$page&$type=${Uri.encodeComponent(keyWord)}&s=$sort',
         expiredTime: CacheExpiredTime.no);

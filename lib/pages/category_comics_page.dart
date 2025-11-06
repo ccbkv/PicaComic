@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 import "package:pica_comic/comic_source/comic_source.dart";
 import 'package:pica_comic/components/components.dart';
+import 'package:pica_comic/components/category_selector.dart';
 import "package:pica_comic/foundation/app.dart";
 import 'package:pica_comic/network/base_comic.dart';
 import "package:pica_comic/network/res.dart";
@@ -28,6 +29,8 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
   late final CategoryComicsData data;
   late final List<CategoryComicsOptions> options;
   late List<String> optionsValue;
+  List<String> selectedCategories = [];
+  bool showCategorySelector = false;
 
   void findData() {
     for (final source in ComicSource.sources) {
@@ -42,6 +45,13 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
           return true;
         }).toList();
         optionsValue = options.map((e) => e.options.keys.first).toList();
+        
+        // 初始化选中的分类
+        if (widget.param != null && widget.param!.contains(',')) {
+          selectedCategories = widget.param!.split(',');
+        } else {
+          selectedCategories = [widget.category];
+        }
         return;
       }
     }
@@ -56,29 +66,136 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 获取分类列表
+    final source = ComicSource.sources
+        .firstWhere((e) => e.categoryData?.key == widget.categoryKey);
+    final categories = _getCategories(source);
+    
     return Scaffold(
       appBar: Appbar(
-        title: Text(widget.category),
+        title: Text(selectedCategories.length > 1 
+            ? "${selectedCategories.length}个分类" 
+            : selectedCategories.firstOrNull ?? widget.category),
+        actions: [
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.black),
+            ),
+            child: TextButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => CategorySelectorDialog(
+                    categories: categories,
+                    initialSelectedCategories: selectedCategories,
+                    onCategoriesSelected: (newSelectedCategories) {
+                      setState(() {
+                        selectedCategories = newSelectedCategories;
+                      });
+                    },
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              child: const Text("分类过滤"),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
+          // 显示已选分类
+          if (selectedCategories.length > 1) ...[
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: selectedCategories.map((category) {
+                  return Chip(
+                    label: Text(category),
+                    onDeleted: () {
+                      setState(() {
+                        selectedCategories.remove(category);
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+          
           Expanded(
             child: _CategoryComicsList(
               key: ValueKey(
-                  "${widget.category} with ${widget.param} and $optionsValue"),
+                  "${selectedCategories.join(',')} with $optionsValue"),
               loader: data.load,
-              category: widget.category,
+              category: selectedCategories.join(','),
               options: optionsValue,
-              param: widget.param,
+              param: selectedCategories.join(','),
               header: buildOptions(),
-              sourceKey: ComicSource.sources
-                  .firstWhere((e) => e.categoryData?.key == widget.categoryKey)
-                  .key,
+              sourceKey: source.key,
             ),
           ),
         ],
       ),
     );
+  }
+  
+  // 获取分类列表
+  List<String> _getCategories(ComicSource source) {
+    // 尝试从picacg源获取分类列表
+    if (source.key == "picacg") {
+      return const [
+        "大家都在看",
+        "大濕推薦",
+        "那年今天",
+        "官方都在看",
+        "嗶咔漢化",
+        "全彩",
+        "長篇",
+        "同人",
+        "短篇",
+        "圓神領域",
+        "碧藍幻想",
+        "CG雜圖",
+        "英語 ENG",
+        "生肉",
+        "純愛",
+        "百合花園",
+        "耽美花園",
+        "偽娘哲學",
+        "後宮閃光",
+        "扶他樂園",
+        "單行本",
+        "姐姐系",
+        "妹妹系",
+        "SM",
+        "性轉換",
+        "足の恋",
+        "人妻",
+        "NTR",
+        "強暴",
+        "非人類",
+        "艦隊收藏",
+        "Love Live",
+        "SAO 刀劍神域",
+        "Fate",
+        "東方",
+        "WEBTOON",
+        "禁書目錄",
+        "歐美",
+        "Cosplay",
+        "重口地帶"
+      ];
+    }
+    
+    // 默认返回当前分类
+    return [widget.category];
   }
 
   Widget buildOptionItem(

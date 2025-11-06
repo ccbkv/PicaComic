@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/comic_source/built_in/picacg.dart';
+import 'package:pica_comic/network/picacg_network/methods.dart';
 import 'package:pica_comic/components/components.dart';
+import 'package:pica_comic/components/category_selector.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/pair.dart';
@@ -21,11 +24,14 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
     required this.options,
     required this.header,
     required this.sourceKey,
+    this.selectedCategories = const [],
   });
 
   final String keyword;
 
   final List<String> options;
+
+  final List<String> selectedCategories;
 
   @override
   final String sourceKey;
@@ -36,6 +42,11 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
   @override
   Future<Res<List<BaseComic>>> getComics(int i) async {
     var loader = ComicSource.find(sourceKey)!.searchPageData!.loadPage!;
+    // 对于Picacg源，传递分类参数
+    if (sourceKey == "picacg" && selectedCategories.isNotEmpty) {
+      return await PicacgNetwork().search(keyword, options[0], i, 
+          categories: selectedCategories, addToHistory: true);
+    }
     return await loader(keyword, i, options);
   }
 
@@ -107,6 +118,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
   var controller = TextEditingController();
   bool _showFab = true;
   late String keyword;
+  List<String> selectedCategories = []; // 存储选中的分类
 
   OverlayEntry? get suggestionOverlay => suggestionsController.entry;
   late _SuggestionsController suggestionsController;
@@ -213,14 +225,53 @@ class _SearchResultPageState extends State<_SearchResultPage> {
   Widget build(BuildContext context) {
     Widget trailing;
     if (context.width < 400) {
-      trailing = Button.icon(
-        icon: const Icon(Icons.more_horiz),
-        onPressed: more,
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 为Picacg源添加分类过滤按钮
+          if (sourceKey == "picacg")
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: TextButton(
+                onPressed: showCategoryFilter,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+                child: const Text("分类"),
+              ),
+            ),
+          if (sourceKey == "picacg") const SizedBox(width: 4),
+          Button.icon(
+            icon: const Icon(Icons.more_horiz),
+            onPressed: more,
+          ),
+        ],
       );
     } else {
       trailing = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 为Picacg源添加分类过滤按钮
+          if (sourceKey == "picacg")
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.black, width: 1.5),
+              ),
+              child: TextButton(
+                onPressed: showCategoryFilter,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                ),
+                child: const Text("分类过滤"),
+              ),
+            ),
+          if (sourceKey == "picacg") const SizedBox(width: 4),
           Button.icon(
             icon: const Icon(Icons.dataset_outlined),
             onPressed: changeSource,
@@ -287,7 +338,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
         child: _SearchPageComicList(
           keyword: keyword,
           sourceKey: sourceKey,
-          key: Key(keyword + options.toString() + sourceKey),
+          key: Key(keyword + options.toString() + sourceKey + selectedCategories.toString()),
           header: SliverPersistentHeader(
             pinned: _showFab && SmoothScrollProvider.isMouseScroll,
             floating: !SmoothScrollProvider.isMouseScroll,
@@ -322,6 +373,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                         if (newKeyword == keyword) return;
                         setState(() {
                           keyword = newKeyword;
+                          selectedCategories = []; // 清空分类选择
                         });
                       },
                       controller: controller,
@@ -354,6 +406,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                   if (newKeyword == keyword) return;
                   setState(() {
                     keyword = newKeyword;
+                    selectedCategories = []; // 清空分类选择
                   });
                 },
                 controller: controller,
@@ -363,6 +416,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
             ),
           ),
           options: options,
+          selectedCategories: selectedCategories,
         ),
       ),
     );
@@ -455,6 +509,62 @@ class _SearchResultPageState extends State<_SearchResultPage> {
           );
         });
       },
+    );
+  }
+
+  void showCategoryFilter() {
+    showDialog(
+      context: context,
+      builder: (context) => CategorySelectorDialog(
+        categories: const [
+          "大家都在看",
+          "大濕推薦", 
+          "那年今天",
+          "官方都在看",
+          "嗶咔漢化",
+          "全彩",
+          "長篇",
+          "同人",
+          "短篇",
+          "圓神領域",
+          "碧藍幻想",
+          "CG雜圖",
+          "英語 ENG",
+          "生肉",
+          "純愛",
+          "百合花園",
+          "耽美花園",
+          "偽娘哲學",
+          "後宮閃光",
+          "扶他樂園",
+          "單行本",
+          "姐姐系",
+          "妹妹系",
+          "SM",
+          "性轉換",
+          "足の恋",
+          "人妻",
+          "NTR",
+          "強暴",
+          "非人類",
+          "艦隊收藏",
+          "Love Live",
+          "SAO 刀劍神域",
+          "Fate",
+          "東方",
+          "WEBTOON",
+          "禁書目錄",
+          "歐美",
+          "Cosplay",
+          "重口地帶"
+        ],
+        initialSelectedCategories: selectedCategories,
+        onCategoriesSelected: (newSelectedCategories) {
+          setState(() {
+            selectedCategories = newSelectedCategories;
+          });
+        },
+      ),
     );
   }
 

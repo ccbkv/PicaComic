@@ -9,54 +9,123 @@ import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/tools/translations.dart';
 
-class AllCategoryPage extends StatelessWidget {
+class AllCategoryPage extends StatefulWidget {
   const AllCategoryPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return StateBuilder<SimpleController>(
-      tag: "category",
-      init: SimpleController(),
-      builder: (controller) {
-        var categories = appdata.appSettings.categoryPages;
-        var allCategories = ComicSource.sources
-            .map((e) => e.categoryData?.key)
-            .where((element) => element != null)
-            .map((e) => e!)
-            .toList();
-        categories = categories.where((element) => allCategories.contains(element)).toList();
+  State<AllCategoryPage> createState() => _AllCategoryPageState();
+}
 
-        return Material(
-          child: DefaultTabController(
-            length: categories.length,
-            key: Key(categories.toString()),
-            child: Column(
-              children: [
-                SizedBox(height: MediaQuery.of(context).padding.top),
-                FilledTabBar(
-                  tabs: categories.map((e) {
-                    String title = e;
-                    try {
-                      title = getCategoryDataWithKey(e).title;
-                    } catch (e) {
-                      //
-                    }
-                    return Tab(
-                      text: title.tl,
-                      key: Key(e),
-                    );
-                  }).toList(),
-                ),
-                Expanded(
-                  child: TabBarView(
-                      children:
-                          categories.map((e) => CategoryPage(e)).toList()),
-                )
-              ],
-            ),
+class _AllCategoryPageState extends State<AllCategoryPage>
+    with AutomaticKeepAliveClientMixin<AllCategoryPage> {
+  
+  @override
+  bool get wantKeepAlive => true; // 保持页面状态
+  
+  late TabController _tabController;
+  
+  @override
+  void initState() {
+    super.initState();
+    // 初始化TabController
+    var categories = appdata.appSettings.categoryPages;
+    var allCategories = ComicSource.sources
+        .map((e) => e.categoryData?.key)
+        .where((element) => element != null)
+        .map((e) => e!)
+        .toList();
+    categories = categories.where((element) => allCategories.contains(element)).toList();
+    
+    _tabController = TabController(
+      length: categories.length,
+      vsync: Navigator.of(context),
+    );
+    
+    // 添加监听器，在标签切换时保存状态
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        // 保存当前标签索引到PageStorage
+        PageStorage.of(context).writeState(context, _tabController.index, identifier: 'category_tab_index');
+      }
+    });
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // 从PageStorage恢复之前保存的标签索引
+    final savedIndex = PageStorage.of(context).readState(context, identifier: 'category_tab_index') as int?;
+    if (savedIndex != null && savedIndex >= 0 && savedIndex < _tabController.length) {
+      _tabController.index = savedIndex;
+    }
+  }
+  
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // 必须调用，以使AutomaticKeepAliveClientMixin生效
+    
+    var categories = appdata.appSettings.categoryPages;
+    var allCategories = ComicSource.sources
+        .map((e) => e.categoryData?.key)
+        .where((element) => element != null)
+        .map((e) => e!)
+        .toList();
+    categories = categories.where((element) => allCategories.contains(element)).toList();
+
+    // 如果分类数量发生变化，需要重新创建TabController
+    if (_tabController.length != categories.length) {
+      _tabController.dispose();
+      _tabController = TabController(
+        length: categories.length,
+        vsync: Navigator.of(context),
+      );
+      
+      // 重新添加监听器
+      _tabController.addListener(() {
+        if (_tabController.indexIsChanging) {
+          // 保存当前标签索引到PageStorage
+          PageStorage.of(context).writeState(context, _tabController.index, identifier: 'category_tab_index');
+        }
+      });
+    }
+
+    return Material(
+      child: Column(
+        children: [
+          SizedBox(height: MediaQuery.of(context).padding.top),
+          FilledTabBar(
+            tabs: categories.map((e) {
+              String title = e;
+              try {
+                title = getCategoryDataWithKey(e).title;
+              } catch (e) {
+                //
+              }
+              return Tab(
+                text: title.tl,
+                key: Key(e),
+              );
+            }).toList(),
+            controller: _tabController,
           ),
-        );
-      },
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: categories.map((e) => CategoryPage(
+                e,
+                key: PageStorageKey(e), // 使用PageStorageKey确保状态保存
+              )).toList(),
+            ),
+          )
+        ],
+      ),
     );
   }
 }

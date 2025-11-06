@@ -18,7 +18,7 @@ class ExplorePage extends StatefulWidget {
 }
 
 class _ExplorePageState extends State<ExplorePage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin<ExplorePage> {
   late TabController controller;
 
   bool showFB = true;
@@ -28,7 +28,11 @@ class _ExplorePageState extends State<ExplorePage>
   var pages = appdata.appSettings.explorePages;
 
   @override
+  bool get wantKeepAlive => true; // 保持页面状态
+
+  @override
   void initState() {
+    super.initState();
     pages = appdata.appSettings.explorePages;
     var all = ComicSource.sources.map((e) => e.explorePages).expand((e) => e.map((e) => e.title)).toList();
     pages = pages.where((e) => all.contains(e)).toList();
@@ -44,9 +48,33 @@ class _ExplorePageState extends State<ExplorePage>
       length: pages.length,
       vsync: this,
     );
-    super.initState();
+    
+    // 添加监听器，在标签切换时保存状态
+    controller.addListener(() {
+      if (controller.indexIsChanging) {
+        // 保存当前标签索引到PageStorage
+        PageStorage.of(context).writeState(context, controller.index, identifier: 'explore_tab_index');
+      }
+    });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // 从PageStorage恢复之前保存的标签索引
+    final savedIndex = PageStorage.of(context).readState(context, identifier: 'explore_tab_index') as int?;
+    if (savedIndex != null && savedIndex >= 0 && savedIndex < pages.length) {
+      controller.index = savedIndex;
+    }
+  }
+  
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+  
   void refresh() {
     int page = controller.index;
     String currentPageId = pages[page];
@@ -70,6 +98,8 @@ class _ExplorePageState extends State<ExplorePage>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // 必须调用，以使AutomaticKeepAliveClientMixin生效
+    
     Widget tabBar = Material(
       child: FilledTabBar(
         tabs: pages.map((e) => buildTab(e)).toList(),
@@ -117,7 +147,10 @@ class _ExplorePageState extends State<ExplorePage>
                   child: TabBarView(
                     controller: controller,
                     children: pages
-                        .map((e) => buildBody(e))
+                        .map((e) => _SingleExplorePage(
+                          e,
+                          key: PageStorageKey(e), // 使用PageStorageKey确保状态保存
+                        ))
                         .toList(),
                   ),
                 ),

@@ -100,6 +100,8 @@ Future<void> _checkOldData() async {
     if (int.parse(appdata.settings[40]) > 40) {
       appdata.settings[40] = '40';
     }
+    // 强制关闭Hosts功能（设置项58）
+    appdata.settings[58] = '0';
     appdata.blockingKeyword.removeWhere((value) => value.isEmpty);
 
     if (io.Directory("${App.dataPath}/comic_source/cookies/").existsSync() ||

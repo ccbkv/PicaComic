@@ -958,10 +958,9 @@ class PicacgNetwork {
   Future<Res<List<ComicItemBrief>>> getCategoryComics(
       String keyWord, int page, String sort,
       [String type = "c"]) async {
-    
-    // 处理多分类参数 - 参考picacg-qt-main项目实现
-    if (keyWord.contains(',')) {
-      // 如果是多个分类，使用高级搜索API
+    // 作者搜索(类型'a')始终使用GET请求，无论是否包含逗号
+    if (type == "c" && keyWord.contains(',')) {
+      // 只有分类搜索且包含逗号时，才使用高级搜索API
       List<String> categories = keyWord.split(',');
       // 过滤空字符串
       categories = categories.where((category) => category.isNotEmpty).toList();
@@ -1009,7 +1008,7 @@ class PicacgNetwork {
       return Res(comics, subData: pages);
     }
     
-    // 单个分类使用普通分类搜索
+    // 作者搜索和单个分类使用普通GET请求
     var response = await get(
         '$apiUrl/comics?page=$page&$type=${Uri.encodeComponent(keyWord)}&s=$sort',
         expiredTime: CacheExpiredTime.no);

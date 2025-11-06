@@ -136,7 +136,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
               loader: data.load,
               category: selectedCategories.join(','),
               options: optionsValue,
-              param: selectedCategories.join(','),
+              param: widget.param, // 保留原始参数，特别是作者搜索的"a"参数
               header: buildOptions(),
               sourceKey: source.key,
             ),

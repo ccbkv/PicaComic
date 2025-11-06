@@ -135,16 +135,14 @@ final picacg = ComicSource.named(
       
       // 支持多分类选择
       String categories = category;
-      if (param != null && param.contains(',')) {
-        // 如果param包含多个分类，使用param作为分类参数
-        categories = param;
-      }
+      // 确定搜索类型，默认'c'为分类，'a'为作者
+      String type = param == "a" ? "a" : "c";
       
       return PicacgNetwork().getCategoryComics(
         categories,
         page,
         options[0],
-        'c',
+        type,
       );
     },
     options: [

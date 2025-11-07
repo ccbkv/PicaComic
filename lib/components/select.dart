@@ -158,16 +158,28 @@ class _FilterChipFixedWidthState extends State<FilterChipFixedWidth> {
 
   @override
   void initState() {
-    Future.microtask(measureSize);
     super.initState();
+    // 使用addPostFrameCallback替代Future.microtask，确保在组件完全构建后再测量尺寸
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        measureSize();
+      }
+    });
   }
 
   void measureSize() {
-    final RenderBox renderBox =
-        key.currentContext!.findRenderObject() as RenderBox;
-    labelWidth = renderBox.size.width;
-    labelHeight = renderBox.size.height;
-    setState(() {});
+    // 添加空值检查，防止在iPad上出现空指针异常
+    if (key.currentContext != null) {
+      final RenderBox? renderBox =
+          key.currentContext!.findRenderObject() as RenderBox?;
+      if (renderBox != null && renderBox.hasSize) {
+        labelWidth = renderBox.size.width;
+        labelHeight = renderBox.size.height;
+        if (mounted) {
+          setState(() {});
+        }
+      }
+    }
   }
 
   @override

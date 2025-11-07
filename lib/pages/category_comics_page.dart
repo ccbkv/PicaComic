@@ -84,18 +84,35 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
             ),
             child: TextButton(
               onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => CategorySelectorDialog(
-                    categories: categories,
-                    initialSelectedCategories: selectedCategories,
-                    onCategoriesSelected: (newSelectedCategories) {
-                      setState(() {
-                        selectedCategories = newSelectedCategories;
-                      });
-                    },
-                  ),
-                );
+                // 添加延迟确保在iPad上正确显示对话框
+                Future.delayed(Duration.zero, () {
+                  if (mounted) {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false, // 防止意外点击外部关闭对话框
+                      builder: (context) => GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop(); // 点击空白处关闭对话框
+                        },
+                        child: Material(
+                          color: Colors.transparent,
+                          child: GestureDetector(
+                            onTap: () {}, // 防止点击对话框内容区域时关闭
+                            child: CategorySelectorDialog(
+                              categories: categories,
+                              initialSelectedCategories: selectedCategories,
+                              onCategoriesSelected: (newSelectedCategories) {
+                                setState(() {
+                                  selectedCategories = newSelectedCategories;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                });
               },
               style: TextButton.styleFrom(
                 foregroundColor: Colors.black,

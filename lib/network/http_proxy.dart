@@ -144,21 +144,47 @@ class HttpProxyServer {
     var file = File("${App.dataPath}/rule.json");
     if(!file.existsSync()){
       var rule = {
-        "port": 7891,
-        "rule": {
-          "picaapi.picacomic.com": "104.21.91.145",
-          "img.picacomic.com": "104.21.91.145",
-          "storage1.picacomic.com": "104.21.91.145",
-          "storage-b.picacomic.com": "104.21.91.145",
-          "e-hentai.org": "172.67.0.127",
-          "exhentai.org": "178.175.129.254",
-          "s.exhentai.org": "178.175.129.254"
-        },
-        "sni": [
-          "e-hentai.org",
-          "exhentai.org",
-          "s.exhentai.org"
-        ]
+    "port": 7891,
+    "rule": {
+        "picaapi.picacomic.com": "104.20.42.9",
+        "img.picacomic.com": "104.20.42.9",
+        "storage1.picacomic.com": "104.20.42.9",
+        "storage-b.picacomic.com": "104.20.42.9",
+        "e-hentai.org": "172.67.2.238",
+        "exhentai.org": "178.175.129.251",
+        "s.exhentai.org": "89.39.106.43",
+        "api.e-hentai.org": "5.79.104.110",
+        "forums.e-hentai.org": "94.100.18.243",
+        "ehgt.org": "89.39.106.43",
+        "www.wnacg.com": "104.26.12.109",
+        "nhentai.net": "104.26.4.188",
+        "i1.nhentai.net": "77.247.178.1",
+        "i2.nhentai.net": "77.247.178.1",
+        "i3.nhentai.net": "77.247.178.1",
+        "i4.nhentai.net": "77.247.178.1",
+        "i9.nhentai.net": "77.247.178.1",
+        "t1.nhentai.net": "77.247.178.1",
+        "t2.nhentai.net": "77.247.178.1",
+        "t3.nhentai.net": "77.247.178.1",
+        "t4.nhentai.net": "77.247.178.1",
+        "t9.nhentai.net": "77.247.178.1",
+        "t4.qy0.ru": "104.20.44.182",
+        "hitomi.la": "198.251.80.166",
+        "ltn.gold-usergeneratedcontent.net": "216.230.225.130",
+        "atn.gold-usergeneratedcontent.net": "216.230.225.130",
+        "btn.gold-usergeneratedcontent.net": "66.187.78.242",
+        "tn.gold-usergeneratedcontent.net":  "66.187.18.242",
+        "w1.gold-usergeneratedcontent.net": "a1.gold-usergeneratedcontent.net",
+        "w2.gold-usergeneratedcontent.net": "a2.gold-usergeneratedcontent.net"
+    },
+    "sni": [
+        "e-hentai.org",
+        "exhentai.org",
+        "s.exhentai.org",
+        "api.e-hentai.org",
+        "forums.e-hentai.org",
+        "ehgt.org"
+    ]
       };
       var spaces = ' ' * 4;
       var encoder = JsonEncoder.withIndent(spaces);

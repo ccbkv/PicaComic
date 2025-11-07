@@ -100,8 +100,11 @@ Future<void> _checkOldData() async {
     if (int.parse(appdata.settings[40]) > 40) {
       appdata.settings[40] = '40';
     }
-    // 强制关闭Hosts功能（设置项58）
-    appdata.settings[58] = '0';
+    // 只在设置项58未设置时强制关闭DNS覆写（默认关闭，用户可自行开启）
+    if (appdata.settings[58].isEmpty || appdata.settings[58] == '') {
+      appdata.settings[58] = '0'; // 强制关闭DNS覆写，用户之后可以自行打开开关
+      appdata.writeData(); // 保存设置以确保持久化
+    }
     appdata.blockingKeyword.removeWhere((value) => value.isEmpty);
 
     if (io.Directory("${App.dataPath}/comic_source/cookies/").existsSync() ||

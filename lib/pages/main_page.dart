@@ -18,6 +18,7 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/network/update.dart';
 import 'me_page.dart';
 import 'package:pica_comic/network/picacg_network/methods.dart';
+import 'package:pica_comic/tools/android_first_use_manager.dart';
 
 bool _haveClipboardDialog = false;
 
@@ -210,7 +211,7 @@ class MainPageState extends State<MainPage> {
     App.mainNavigatorKey = _navigatorKey;
     _observer = NaviObserver();
     
-    // Initialize with the saved page index
+    // Initialize with the initial page setting, not the current page state
     _currentIndex = int.parse(appdata.settings[23]);
     
     // Keep all original functionality
@@ -223,6 +224,11 @@ class MainPageState extends State<MainPage> {
     if (appdata.firstUse[3] == "0") {
       appdata.firstUse[3] = "1";
       appdata.writeData();
+      
+      // 在Android平台上同时更新AndroidFirstUseManager
+      if (App.isAndroid) {
+        AndroidFirstUseManager.instance.setFirstUse3("1");
+      }
     }
 
     Future.delayed(const Duration(milliseconds: 300), () => Webdav.syncData())
@@ -276,8 +282,8 @@ class MainPageState extends State<MainPage> {
       onPageChanged: (index) {
         setState(() {
           _currentIndex = index;
-          // Save current page index
-          appdata.settings[23] = index.toString();
+          // Save current page state to settings[24], keep initial page setting at settings[23]
+          appdata.settings[24] = index.toString();
           appdata.writeData();
         });
         HapticFeedback.selectionClick();

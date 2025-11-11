@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/jm_network/jm_network.dart';
@@ -53,7 +53,7 @@ class Appdata {
     "111111", //21 启用的漫画源
     "", //22 下载目录, 仅Windows端, 为空表示使用App数据目录
     "0", //23 初始页面,
-    "1111111111", //24 [废弃]分类页面
+    "0", //24 当前页面状态（用于恢复应用状态）
     "0", //25 漫画列表显示模式
     "00", //26 已下载页面排序模式: 时间, 漫画名, 作者名, 大小
     "0", //27 颜色
@@ -127,6 +127,9 @@ class Appdata {
     "0", // 双页模式下第一页显示单页
     "0", // 点击关闭按钮时不显示提示
     webUA, // UA
+    "title", // 图片收藏排序方式
+    "all", // 图片收藏时间筛选
+    "0", // 图片收藏数量筛选
   ];
 
   void writeImplicitData() async {
@@ -135,14 +138,29 @@ class Appdata {
   }
 
   void readImplicitData() async {
-    var s = await SharedPreferences.getInstance();
-    var data = s.getStringList("implicitData");
-    if (data == null) {
+    try {
+      var s = await SharedPreferences.getInstance();
+      var data = s.getStringList("implicitData");
+      if (data == null) {
+        writeImplicitData();
+        return;
+      }
+      
+      // 确保implicitData数组有足够的元素
+      while (implicitData.length < data.length) {
+        implicitData.add("");
+      }
+      
+      // 安全复制数据
+      for (int i = 0; i < data.length && i < implicitData.length; i++) {
+        if (data[i] != null) {
+          implicitData[i] = data[i];
+        }
+      }
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "Appdata.readImplicitData", "Failed to read implicit data: $e");
+      // 发生错误时，重新初始化数据
       writeImplicitData();
-      return;
-    }
-    for (int i = 0; i < data.length && i < implicitData.length; i++) {
-      implicitData[i] = data[i];
     }
   }
 
@@ -169,40 +187,67 @@ class Appdata {
   void setSearchMode(int mode) async {
     var modes = ["dd", "da", "ld", "vd"];
     settings[1] = modes[mode];
-    var s = await SharedPreferences.getInstance();
-    await s.setStringList("settings", settings);
+    updateSettings();
   }
 
-  Future<void> readSettings(SharedPreferences s) async {
-    var settingsFile = File("${App.dataPath}/settings");
-    List<String> st;
-    if (settingsFile.existsSync()) {
-      var json = jsonDecode(await settingsFile.readAsString());
-      if (json is List) {
-        st = List.from(json);
+  Future<void> readSettings() async {
+    try {
+      var settingsFile = File("${App.dataPath}/settings");
+
+      List<String> st;
+
+      if (settingsFile.existsSync()) {
+        try {
+          var json = jsonDecode(await settingsFile.readAsString());
+          if (json is List) {
+            st = List<String>.from(json);
+          } else {
+            st = [];
+            LogManager.addLog(LogLevel.warning, "Appdata.readSettings", "Settings file contains invalid data format");
+          }
+        } catch (e) {
+          LogManager.addLog(LogLevel.error, "Appdata.readSettings", "Failed to read settings file: $e");
+          st = [];
+        }
       } else {
         st = [];
       }
-    } else {
-      st = s.getStringList("settings") ?? [];
-    }
-    for (int i = 0; i < st.length && i < settings.length; i++) {
-      settings[i] = st[i];
-    }
-    if (settings[26].length < 2) {
-      settings[26] += "0";
+
+      for (int i = 0; i < st.length && i < settings.length; i++) {
+        settings[i] = st[i];
+      }
+
+      while (settings.length < 90) {
+        settings.add("0");
+      }
+
+      if (settings[26].length < 2) {
+        settings[26] += "0";
+      }
+
+      if (settings[10].isEmpty) {
+        settings[10] = "0";
+      }
+
+      if (settings[13].isEmpty) {
+        settings[13] = "0";
+      }
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "Appdata.readSettings", "Critical error in readSettings: $e");
     }
   }
 
   Future<void> updateSettings([bool syncData = true]) async {
     var settingsFile = File("${App.dataPath}/settings");
+
     await settingsFile.writeAsString(jsonEncode(settings));
+
     if (syncData) {
       Webdav.uploadData();
     }
   }
 
-  void writeFirstUse() async {
+  Future<void> writeFirstUse() async {
     var s = await SharedPreferences.getInstance();
     await s.setStringList("firstUse", firstUse);
   }
@@ -217,31 +262,81 @@ class Appdata {
     if (sync) {
       Webdav.uploadData();
     }
-    var s = await SharedPreferences.getInstance();
     await updateSettings();
-    await s.setStringList("blockingKeyword", blockingKeyword);
-    await s.setStringList("jmBlockingKeyword", jmBlockingKeyword);
-    await s.setStringList("firstUse", firstUse);
+    if(!App.isAndroid) {
+      var s = await SharedPreferences.getInstance();
+      await s.setStringList("blockingKeyword", blockingKeyword);
+      await s.setStringList("jmBlockingKeyword", jmBlockingKeyword);
+      await s.setStringList("firstUse", firstUse);
+    }
   }
 
   Future<bool> readData() async {
-    var s = await SharedPreferences.getInstance();
     try {
-      await readSettings(s);
-      searchHistory = s.getStringList("search") ?? [];
-      favoriteTags = (s.getStringList("favoriteTags") ?? []).toSet();
-      blockingKeyword = s.getStringList("blockingKeyword") ?? [];
-      jmBlockingKeyword = s.getStringList("jmBlockingKeyword") ?? [];
-      if (s.getStringList("firstUse") != null) {
-        var st = s.getStringList("firstUse")!;
-        for (int i = 0; i < st.length; i++) {
-          firstUse[i] = st[i];
+      await readSettings();
+
+      if(!App.isAndroid) {
+        var s = await SharedPreferences.getInstance();
+        searchHistory = s.getStringList("search") ?? [];
+        favoriteTags = (s.getStringList("favoriteTags") ?? []).toSet();
+        blockingKeyword = s.getStringList("blockingKeyword") ?? [];
+        jmBlockingKeyword = s.getStringList("jmBlockingKeyword") ?? [];
+        var firstUseData = s.getStringList("firstUse");
+        if (firstUseData != null) {
+          for (int i = 0; i < firstUseData.length && i < firstUse.length; i++) {
+            firstUse[i] = firstUseData[i];
+          }
         }
       }
-      readImplicitData();
-      return firstUse[3] == "1";
+
+      try {
+        readImplicitData();
+      } catch (e) {
+        LogManager.addLog(
+            LogLevel.error, "Appdata.readData", "Failed to read implicit data: $e");
+        writeImplicitData();
+      }
+
+      while (settings.length < 90) {
+        settings.add("0");
+      }
+
+      return firstUse.length > 3 ? firstUse[3] == "1" : false;
     } catch (e) {
+      LogManager.addLog(
+          LogLevel.error, "Appdata.readData", "Failed to read app data: $e");
+      await _resetToDefaults();
       return false;
+    }
+  }
+
+  /// 重置应用数据为默认值
+  Future<void> _resetToDefaults() async {
+    try {
+      LogManager.addLog(LogLevel.info, "Appdata._resetToDefaults", "Resetting app data to defaults");
+      
+      // 重置所有数据为默认值
+      searchHistory = [];
+      favoriteTags = {};
+      blockingKeyword = [];
+      jmBlockingKeyword = [];
+      
+      // 确保firstUse有默认值
+      while (firstUse.length < 5) {
+        firstUse.add("0");
+      }
+      
+      // 不强制设置firstUse[3]为"1"，保持默认值，确保全新安装可以显示开始界面
+      
+      // 重置隐式数据
+      writeImplicitData();
+      
+      // 保存重置后的数据
+      await writeData();
+      
+      LogManager.addLog(LogLevel.info, "Appdata._resetToDefaults", "Successfully reset app data");
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "Appdata._resetToDefaults", "Failed to reset app data: $e");
     }
   }
 

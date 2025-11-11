@@ -381,3 +381,24 @@ class _StatefulSwitchState extends State<StatefulSwitch> {
         });
   }
 }
+
+class MenuButton extends StatelessWidget {
+  const MenuButton({
+    super.key,
+    required this.entries,
+  });
+
+  final List<DesktopMenuEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return Button.icon(
+      icon: const Icon(Icons.more_vert),
+      onPressed: () {
+        final renderBox = context.findRenderObject() as RenderBox;
+        final offset = renderBox.localToGlobal(Offset.zero);
+        showDesktopMenu(context, offset, entries);
+      },
+    );
+  }
+}

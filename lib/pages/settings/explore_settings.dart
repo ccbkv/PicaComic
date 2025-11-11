@@ -12,7 +12,7 @@ Widget buildExploreSettings(BuildContext context, bool popUp) {
       SelectSettingWithAppdata(
         icon: const Icon(Icons.home_outlined),
         title: "初始页面".tl,
-        options: ["我".tl, "收藏".tl, "探索".tl, "分类".tl],
+        options: ["主页".tl, "收藏夹".tl, "发现".tl, "分类".tl],
         settingsIndex: 23,
       ),
       NewPageSetting(

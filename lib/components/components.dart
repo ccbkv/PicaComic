@@ -2,6 +2,8 @@ library components;
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -27,11 +29,13 @@ import 'package:pica_comic/pages/pre_search_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/pages/show_image_page.dart';
 import 'package:pica_comic/tools/extensions.dart';
+import 'package:pica_comic/tools/io_tools.dart';
 import 'package:pica_comic/tools/tags_translation.dart';
 import 'package:pica_comic/tools/translations.dart';
 
 import '../base.dart';
 import '../foundation/ui_mode.dart';
+import '../pages/favorites/network_to_local.dart';
 
 part 'animated_image.dart';
 part 'appbar.dart';

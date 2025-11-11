@@ -18,13 +18,12 @@ import 'package:pica_comic/pages/main_page.dart';
 import 'package:pica_comic/pages/welcome_page.dart';
 import 'package:pica_comic/tools/block_screenshot.dart';
 import 'package:pica_comic/tools/mouse_listener.dart';
+import 'package:pica_comic/tools/android_first_use_manager.dart';
 import 'package:pica_comic/tools/tags_translation.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'components/components.dart';
 import 'network/webdav.dart';
-
-bool notFirstUse = false;
 
 void main(List<String> args) {
   if (runWebViewTitleBarWidget(args)) {
@@ -37,7 +36,7 @@ void main(List<String> args) {
       LogManager.addLog(LogLevel.error, "Unhandled Exception",
           "${details.exception}\n${details.stack}");
     };
-    notFirstUse = appdata.firstUse[3] == "1";
+    
     setNetworkProxy();
     runApp(const MyApp());
     if (App.isDesktop) {
@@ -99,18 +98,30 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    bool enableAuth = appdata.settings[13] == "1";
-    if (App.isAndroid && appdata.settings[38] == "1") {
+    // 安全检查settings数组
+    bool enableAuth = false;
+    try {
+      enableAuth = appdata.settings.length > 13 ? appdata.settings[13] == "1" : false;
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "MyApp.didChangeAppLifecycleState", "Error checking auth settings: $e");
+      enableAuth = false;
+    }
+    
+    if (App.isAndroid) {
       try {
-        FlutterDisplayMode.setHighRefreshRate();
+        bool highRefreshRate = appdata.settings.length > 38 ? appdata.settings[38] == "1" : false;
+        if (highRefreshRate) {
+          FlutterDisplayMode.setHighRefreshRate();
+        }
       } catch (e) {
-        // ignore
+        LogManager.addLog(LogLevel.error, "MyApp.didChangeAppLifecycleState", "Error checking refresh rate settings: $e");
       }
     }
+    
     setNetworkProxy();
     scheduleMicrotask(() {
       if (state == AppLifecycleState.hidden && enableAuth) {
-        if (!AuthPage.lock && appdata.settings[13] == "1") {
+        if (!AuthPage.lock && enableAuth) {
           AuthPage.initial = false;
           AuthPage.lock = true;
           App.to(App.globalContext!, () => const AuthPage());
@@ -137,18 +148,34 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     MyApp.updater = () => setState(() => forceRebuild = true);
     time = DateTime.now();
     TagsTranslation.readData();
-    if (App.isAndroid && appdata.settings[38] == "1") {
+    
+    // 安全检查Android高刷新率设置
+    if (App.isAndroid) {
       try {
-        FlutterDisplayMode.setHighRefreshRate();
-      } finally {}
+        bool highRefreshRate = appdata.settings.length > 38 ? appdata.settings[38] == "1" : false;
+        if (highRefreshRate) {
+          FlutterDisplayMode.setHighRefreshRate();
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "MyApp.initState", "Error setting high refresh rate: $e");
+      }
     }
+    
     listenMouseSideButtonToBack();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WidgetsBinding.instance.addObserver(this);
     notifications.init();
-    if (appdata.settings[12] == "1") {
-      blockScreenshot();
+    
+    // 安全检查截图阻止设置
+    try {
+      bool shouldBlockScreenshot = appdata.settings.length > 12 ? appdata.settings[12] == "1" : false;
+      if (shouldBlockScreenshot) {
+        blockScreenshot();
+      }
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "MyApp.initState", "Error setting screenshot block: $e");
     }
+    
     PaintingBinding.instance.imageCache.maximumSizeBytes = 200 * 1024 * 1024;
     super.initState();
   }
@@ -161,17 +188,52 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   (ColorScheme, ColorScheme) _generateColorSchemes(
       ColorScheme? light, ColorScheme? dark) {
     Color? color;
-    if (int.parse(appdata.settings[27]) != 0) {
-      color = colors[int.parse(appdata.settings[27]) - 1];
-    } else {
+    
+    // 安全检查主题设置
+    try {
+      int themeIndex = appdata.settings.length > 27 ? int.parse(appdata.settings[27]) : 0;
+      if (themeIndex != 0) {
+        color = colors[themeIndex - 1];
+      } else {
+        color = light?.primary ?? Colors.blueAccent;
+      }
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "MyApp._generateColorSchemes", "Error getting theme color: $e");
       color = light?.primary ?? Colors.blueAccent;
     }
-    light = ColorScheme.fromSeed(seedColor: color);
-    dark = ColorScheme.fromSeed(seedColor: color, brightness: Brightness.dark);
-    if (appdata.settings[84] == "1") {
-      dark = dark.copyWith(surface: Colors.black).harmonized();
+    
+    final lightScheme = ColorScheme.fromSeed(seedColor: color);
+    final darkScheme = ColorScheme.fromSeed(seedColor: color, brightness: Brightness.dark);
+    
+    // 安全检查纯黑色模式设置
+    try {
+      bool pureBlackMode = appdata.settings.length > 84 ? appdata.settings[84] == "1" : false;
+      if (pureBlackMode) {
+        final modifiedDarkScheme = darkScheme.copyWith(surface: Colors.black).harmonized();
+        return (lightScheme, modifiedDarkScheme);
+      }
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "MyApp._generateColorSchemes", "Error checking pure black mode: $e");
     }
-    return (light, dark);
+    
+    return (lightScheme, darkScheme);
+  }
+
+  // 异步检查firstUse[3]的值
+  Future<bool> _checkFirstUse() async {
+    try {
+      // 在Android平台上使用AndroidFirstUseManager
+      if (App.isAndroid) {
+        return await AndroidFirstUseManager.isFirstUse();
+      }
+      // 确保数据已经加载
+      await appdata.readData();
+      // 检查firstUse[3]的值
+      return appdata.firstUse.length > 3 ? appdata.firstUse[3] != "1" : true;
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "MyApp._checkFirstUse", "Error checking firstUse: $e");
+      return true; // 发生错误时，显示欢迎页面
+    }
   }
 
   @override
@@ -208,11 +270,34 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 ? ThemeMode.light
                 : ThemeMode.system,
         onGenerateRoute: (settings) => AppPageRoute(
-          builder: (context) => notFirstUse
-              ? (appdata.settings[13] == "1"
-                  ? const AuthPage()
-                  : const MainPage())
-              : const WelcomePage(),
+          builder: (context) {
+            // 使用FutureBuilder来异步检查firstUse[3]的值
+            return FutureBuilder<bool>(
+              future: _checkFirstUse(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  // 显示加载页面
+                  return const Scaffold(
+                    body: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                } else if (snapshot.hasError) {
+                  // 发生错误，显示欢迎页面
+                  LogManager.addLog(LogLevel.error, "MyApp.onGenerateRoute", "Error checking firstUse: ${snapshot.error}");
+                  return const WelcomePage();
+                } else {
+                  // 根据firstUse[3]的值决定显示哪个页面
+                  bool isFirstUse = snapshot.data ?? true;
+                  return isFirstUse
+                      ? const WelcomePage()
+                      : (appdata.settings[13] == "1"
+                          ? const AuthPage()
+                          : const MainPage());
+                }
+              },
+            );
+          },
         ),
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
@@ -241,11 +326,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 shortcuts: {
                   LogicalKeySet(LogicalKeyboardKey.escape): VoidCallbackIntent(
                     () {
-                      if (App.canPop) {
+                      // 检查当前是否在主页、收藏夹、发现或分类页面
+                      final navigator = App.mainNavigatorKey?.currentState;
+                      if (navigator != null && navigator.canPop()) {
+                        // 只有在导航栈中有页面时才执行pop
+                        navigator.pop();
+                      } else if (App.canPop) {
+                        // 如果全局导航栈可以pop，则执行全局pop
                         App.globalBack();
-                      } else {
-                        App.mainNavigatorKey?.currentContext?.pop();
                       }
+                      // 在主页、收藏夹、发现或分类页面时不执行任何操作，避免黑屏
                     },
                   ),
                 },

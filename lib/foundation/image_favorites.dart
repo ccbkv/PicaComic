@@ -50,6 +50,45 @@ class ImageFavoriteManager{
         ImageFavorite(e["id"], e["cover"], e["title"], e["ep"], e["page"], jsonDecode(e["other"]))).toList();
   }
 
+  /// 根据关键词搜索图片收藏
+  static List<ImageFavorite> search(String keyword) {
+    if (keyword.isEmpty) return getAll();
+    
+    var res = _db.select("""
+      select * from image_favorites 
+      where title like ? or id like ?
+    """, ['%$keyword%', '%$keyword%']);
+    
+    return res.map((e) =>
+        ImageFavorite(e["id"], e["cover"], e["title"], e["ep"], e["page"], jsonDecode(e["other"]))).toList();
+  }
+
+  /// 按漫画ID分组获取图片收藏
+  static Map<String, List<ImageFavorite>> getGroupedByComic() {
+    var allFavorites = getAll();
+    var grouped = <String, List<ImageFavorite>>{};
+    
+    for (var favorite in allFavorites) {
+      if (!grouped.containsKey(favorite.id)) {
+        grouped[favorite.id] = [];
+      }
+      grouped[favorite.id]!.add(favorite);
+    }
+    
+    return grouped;
+  }
+
+  /// 批量删除图片收藏
+  static void deleteMultiple(Iterable<ImageFavorite> favorites) {
+    for (var favorite in favorites) {
+      _db.execute("""
+        delete from image_favorites
+        where id = ? and ep = ? and page = ?;
+      """, [favorite.id, favorite.ep, favorite.page]);
+    }
+    Webdav.uploadData();
+  }
+
   static void delete(ImageFavorite favorite){
     _db.execute("""
       delete from image_favorites

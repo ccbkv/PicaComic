@@ -32,6 +32,9 @@ class FavoritesPageController extends StateController {
   var openComicMenuFuncs = <FavoriteItem, Function>{};
 
   bool get isSelectingComics => selectedComics.isNotEmpty;
+  
+  // 添加状态变量跟踪侧边栏是否已经消失
+  bool isSidebarHidden = false;
 
   FavoritesPageController() {
     var data = appdata.implicitData[0].split(";");
@@ -69,9 +72,16 @@ class FavoritesPageController extends StateController {
     }
     super.update(ids);
   }
+  
+  // 添加方法来设置侧边栏隐藏状态
+  void setSidebarHidden(bool hidden) {
+    isSidebarHidden = hidden;
+    update();
+  }
 }
 
 const _kSecondaryTopBarHeight = 48.0;
+const _kTopBarHeight = 56.0;
 
 class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
   FavoritesPage({super.key});
@@ -88,34 +98,78 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
 
   Widget buildPage(BuildContext context) {
     return LayoutBuilder(
-        builder: (context, constrains) => Stack(
-              children: [
-                Positioned(
-                  top: _kSecondaryTopBarHeight + MediaQuery.of(context).padding.top,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: buildContent(context),
+        builder: (context, constrains) {
+          // 根据屏幕宽度决定侧边栏宽度
+          final sidebarWidth = constrains.maxWidth < 600 ? constrains.maxWidth * 0.3 : 280.0;
+          final isSmallScreen = constrains.maxWidth < 768;
+          
+          // 使用 addPostFrameCallback 延迟状态更新，避免在构建过程中调用 setState
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (isSmallScreen && !controller.isSidebarHidden) {
+              controller.setSidebarHidden(true);
+            } else if (!isSmallScreen && controller.isSidebarHidden) {
+              controller.setSidebarHidden(false);
+            }
+          });
+          
+          return Stack(
+            children: [
+              Positioned(
+                top: MediaQuery.of(context).padding.top,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Row(
+                  children: [
+                    // 左侧文件夹侧边栏
+                    SizedBox(
+                      width: isSmallScreen ? 0 : sidebarWidth,
+                      child: isSmallScreen ? const SizedBox.shrink() : Material(
+                        elevation: 1,
+                        child: buildFoldersList(context),
+                      ),
+                    ),
+                    // 右侧内容区域
+                    Expanded(
+                      child: Padding(
+                        // 添加顶部内边距，避免内容被顶部栏遮挡
+                        padding: EdgeInsets.only(top: _kTopBarHeight),
+                        child: controller.current != null
+                                ? buildContent(context)
+                                : Container(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.folder_open,
+                                            size: 64,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            "请选择一个收藏夹".tl,
+                                            style: Theme.of(context).textTheme.titleMedium,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                      ),
+                    ),
+                  ],
                 ),
-                AnimatedPositioned(
-                  key: const Key("folders"),
-                  duration: const Duration(milliseconds: 180),
-                  left: 0,
-                  right: 0,
-                  bottom: controller.selectingFolder
-                      ? 0
-                      : constrains.maxHeight - _kSecondaryTopBarHeight,
-                  child: buildFoldersList(
-                      context, constrains.maxHeight - _kSecondaryTopBarHeight),
-                ),
-                Positioned(
-                  top: MediaQuery.of(context).padding.top,
-                  left: 0,
-                  right: 0,
-                  child: buildTopBar(context),
-                ),
-              ],
-            ));
+              ),
+              Positioned(
+                top: MediaQuery.of(context).padding.top,
+                left: isSmallScreen ? 0 : sidebarWidth, // 根据屏幕大小调整位置
+                right: 0,
+                child: buildTopBar(context),
+              ),
+            ],
+          );
+        });
   }
 
   void multiSelectedMenu() {
@@ -175,6 +229,8 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
 
   Widget buildTopBar(BuildContext context) {
     final iconColor = Theme.of(context).colorScheme.primary;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 1024;
 
     if (controller.isSelectingComics) {
       return Material(
@@ -182,6 +238,18 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
         child: SizedBox(
           height: _kSecondaryTopBarHeight,
           child: Row(children: [
+            if (controller.isSidebarHidden) ...[
+              // 在侧边栏隐藏后才显示菜单按钮
+              IconButton(
+                icon: const Icon(Icons.reorder),
+                onPressed: () {
+                  _showFoldersDrawer(context);
+                },
+              ),
+            ] else ...[
+              // 在大屏幕上保持原有左边距
+              const SizedBox(width: 16),
+            ],
             Icon(
               Icons.rule_folder,
               color: iconColor,
@@ -189,12 +257,13 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
             const SizedBox(
               width: 8,
             ),
-            Text(
-              "已选择 @num 个项目".tlParams(
-                  {"num": controller.selectedComics.length.toString()}),
-              style: const TextStyle(fontSize: 16),
-            ).paddingBottom(3),
-            const Spacer(),
+            Expanded(
+              child: Text(
+                "已选择 @num 个项目".tlParams(
+                    {"num": controller.selectedComics.length.toString()}),
+                style: const TextStyle(fontSize: 16),
+              ).paddingBottom(3),
+            ),
             Tooltip(
               message: "全选".tl,
               child: IconButton(
@@ -231,86 +300,518 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                 },
               ),
             ),
-          ]).paddingHorizontal(16),
+          ]),
         ),
       );
     }
 
     return Material(
       elevation: 1,
-      child: InkWell(
-        hoverColor: Colors.transparent,
-        onTap: () {
-          if (controller.selectingFolder) {
-            if (controller.current == null) {
-              showToast(message: "选择收藏夹".tl);
-              return;
-            }
-            controller.selectingFolder = false;
-            controller.update();
-          } else {
-            controller.selectingFolder = true;
-            controller.update();
-            appdata.implicitData[0] = "1;;";
-            appdata.writeImplicitData();
-          }
-        },
-        child: SizedBox(
-          height: _kSecondaryTopBarHeight,
-          child: Row(children: [
-            if (controller.isNetwork == null)
-              Icon(
-                Icons.folder_outlined,
-                color: iconColor,
-              )
-            else if (controller.isNetwork!)
-              Icon(
-                Icons.folder_special,
-                color: iconColor,
-              )
-            else
-              Icon(
-                Icons.folder,
-                color: iconColor,
-              ),
-            const SizedBox(
-              width: 8,
+      child: SizedBox(
+        height: _kSecondaryTopBarHeight,
+        child: Row(children: [
+          if (controller.isSidebarHidden) ...[
+            // 在侧边栏隐藏后才显示菜单按钮
+            IconButton(
+              icon: const Icon(Icons.reorder),
+              onPressed: () {
+                _showFoldersDrawer(context);
+              },
             ),
-            Text(
+          ] else ...[
+            // 在大屏幕上保持原有左边距
+            const SizedBox(width: 16),
+          ],
+          if (controller.isNetwork == null)
+            Icon(
+              Icons.folder_outlined,
+              color: iconColor,
+            )
+          else if (controller.isNetwork!)
+            Icon(
+              Icons.folder_special,
+              color: iconColor,
+            )
+          else
+            Icon(
+              Icons.folder,
+              color: iconColor,
+            ),
+          const SizedBox(
+            width: 8,
+          ),
+          Expanded(
+            child: Text(
               controller.current != null ? controller.current!.tl : "未选择".tl,
               style: const TextStyle(fontSize: 16),
             ).paddingBottom(3),
-            const Spacer(),
-            if (controller.selectingFolder)
-              const Icon(Icons.keyboard_arrow_up)
-            else
-              const Icon(Icons.keyboard_arrow_down),
-          ]).paddingHorizontal(16),
-        ),
+          ),
+        ]),
       ),
     );
   }
 
-  Widget buildFoldersList(BuildContext context, double height) {
-    return Material(
-      child: SizedBox(
-        height: height,
-        width: double.infinity,
-        child: SmoothCustomScrollView(
-          slivers: [
-            buildTitle("网络".tl)
-                .sliverPadding(MediaQuery.of(context).size.width > 600 
-                    ? const EdgeInsets.fromLTRB(12, 40, 12, 0) // 桌面视图使用较大内边距
-                    : const EdgeInsets.fromLTRB(12, 8, 12, 0)), // 手机视图使用较小内边距
-            buildNetwork().sliverPaddingHorizontal(12),
-            const SliverToBoxAdapter(child: Divider())
-                .sliverPaddingHorizontal(12),
-            buildTitle("本地".tl).sliverPaddingHorizontal(12),
-            buildUtils(context),
-            buildLocal().sliverPaddingHorizontal(12),
-          ],
+  // 在小屏幕上显示文件夹抽屉
+  void _showFoldersDrawer(BuildContext context) {
+    // 使用 Drawer 替代 BottomSheet，实现从左边滑出的效果
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (BuildContext buildContext, Animation<double> animation, Animation<double> secondaryAnimation) {
+        // 保存原始context的引用，用于按钮点击事件
+        final originalContext = context;
+        
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(-1.0, 0.0), // 从左侧开始
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeInOut,
+          )),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Material(
+              color: Colors.white,
+              child: Container(
+                width: 280, // 设置抽屉宽度
+                height: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 标题栏
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(buildContext).colorScheme.surface,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Theme.of(buildContext).dividerColor,
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.folder,
+                            color: Theme.of(buildContext).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "收藏夹",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(buildContext).colorScheme.onSurface,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.of(buildContext).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 收藏夹列表
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 网络收藏夹
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.cloud, size: 16, color: Theme.of(buildContext).colorScheme.onSurface),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    "网络",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(buildContext).colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            buildNetworkList(),
+                            const SizedBox(height: 16),
+                            // 添加灰色分割线
+                            Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: Theme.of(buildContext).dividerColor,
+                            ),
+                            // 本地收藏夹
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.local_activity, size: 16, color: Theme.of(buildContext).colorScheme.onSurface),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    "本地",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(buildContext).colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            buildLocalList(),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // 工具按钮
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(buildContext).colorScheme.surface,
+                        border: Border(
+                          top: BorderSide(
+                            color: Theme.of(buildContext).dividerColor,
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          // 第一行按钮
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // 新建收藏夹按钮
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(buildContext).pop(); // 关闭抽屉
+                                    showDialog(
+                                      context: App.globalContext!,
+                                      builder: (context) => const CreateFolderDialog(),
+                                    ).then((value) => controller.update());
+                                  },
+                                  icon: const Icon(Icons.create_new_folder_outlined, size: 16),
+                                  label: const Text("新建", style: TextStyle(fontSize: 12)),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // 搜索按钮
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(buildContext).pop(); // 关闭抽屉
+                                    App.globalTo(() => const LocalSearchPage());
+                                  },
+                                  icon: const Icon(Icons.search, size: 16),
+                                  label: const Text("搜索", style: TextStyle(fontSize: 12)),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // 第二行按钮
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.of(buildContext).pop(); // 关闭抽屉
+                                App.globalTo(() => const _FoldersReorderPage());
+                              },
+                              icon: const Icon(Icons.reorder, size: 16),
+                              label: const Text("排序收藏夹", style: TextStyle(fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return child;
+      },
+    );
+  }
+
+  Widget buildFoldersList(BuildContext context) {
+    return Column(
+      children: [
+        // 顶部标题栏
+        Container(
+          height: _kSecondaryTopBarHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: Theme.of(context).dividerColor,
+                width: 1,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.folder,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "收藏夹".tl,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        // 文件夹列表
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 网络收藏夹
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.cloud,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "网络".tl,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                buildNetworkList(),
+                // 本地收藏夹
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.local_activity,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "本地".tl,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                buildLocalList(),
+                // 工具按钮
+                buildUtils(context),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildNetwork() {
+    return Column(
+      children: [
+        if (controller.selectingFolder) buildNetworkList(),
+        if (!controller.selectingFolder) buildNetworkList(),
+      ],
+    );
+  }
+  Widget buildNetworkList() {
+    var folders = appdata.appSettings.networkFavorites
+        .map((e) => getFavoriteDataOrNull(e));
+    folders = folders.whereType<FavoriteData>();
+    
+    return Column(
+      children: folders.map((data) {
+        final isSelected = controller.current == data?.title && controller.isNetwork == true;
+        return Builder(
+          builder: (context) => InkWell(
+            onTap: () {
+              controller.current = data?.title;
+              controller.isNetwork = true;
+              controller.selectingFolder = false;
+              controller.networkData = data;
+              controller.update();
+              appdata.implicitData[0] = "0;1;${data?.title ?? ""}";
+              appdata.writeImplicitData();
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                    : null,
+                border: Border(
+                  left: BorderSide(
+                    color: isSelected 
+                        ? Theme.of(context).colorScheme.primary 
+                        : Colors.transparent,
+                    width: 3,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.folder_special,
+                    color: isSelected 
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.secondary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      data?.title != null ? data!.title.tl : "未知".tl,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget buildLocal() {
+    return Column(
+      children: [
+        if (controller.selectingFolder) buildLocalList(),
+        if (!controller.selectingFolder) buildLocalList(),
+      ],
+    );
+  }
+
+  Widget buildLocalList() {
+    final folders = LocalFavoritesManager().folderNames;
+    
+    return Column(
+      children: folders.map((data) {
+        final isSelected = controller.current == data && controller.isNetwork == false;
+        return Builder(
+          builder: (context) => InkWell(
+            onTap: () {
+              controller.current = data;
+              controller.isNetwork = false;
+              controller.selectingFolder = false;
+              controller.update();
+              appdata.implicitData[0] = "0;0;$data";
+              appdata.writeImplicitData();
+            },
+            onLongPress: () {
+              // 获取点击位置并显示菜单
+              final RenderBox renderBox = context.findRenderObject() as RenderBox;
+              final Offset tapPosition = renderBox.localToGlobal(renderBox.size.centerRight(Offset.zero));
+              _showMenu(data, tapPosition);
+            },
+            onSecondaryTapUp: (details) => _showDesktopMenu(data, details.globalPosition),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                    : null,
+                border: Border(
+                  left: BorderSide(
+                    color: isSelected 
+                        ? Theme.of(context).colorScheme.primary 
+                        : Colors.transparent,
+                    width: 3,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.folder,
+                    color: isSelected 
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.secondary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      data,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      LocalFavoritesManager().folderComics(data).toString(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -323,151 +824,59 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
     );
   }
 
-  Widget buildNetwork() {
-    var folders = appdata.appSettings.networkFavorites
-        .map((e) => getFavoriteDataOrNull(e));
-    folders = folders.whereType<FavoriteData>();
-    return SliverGrid(
-      gridDelegate: const SliverGridDelegateWithFixedHeight(
-        maxCrossAxisExtent: 240,
-        itemHeight: 48,
-      ),
-      delegate: SliverChildBuilderDelegate((context, index) {
-        final data = folders.elementAt(index);
-        return InkWell(
-          onTap: () {
-            controller.current = data?.title;
-            controller.isNetwork = true;
-            controller.selectingFolder = false;
-            controller.networkData = data;
-            controller.update();
-            appdata.implicitData[0] = "0;1;${data?.title ?? ""}";
-            appdata.writeImplicitData();
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Row(
-            children: [
-              const SizedBox(width: 16),
-              Icon(
-                Icons.folder_special,
-                color: Theme.of(context).colorScheme.secondary,
+  Widget buildUtils(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 创建新收藏夹按钮
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                showDialog(
+                        context: context,
+                        builder: (context) => const CreateFolderDialog())
+                    .then((value) => controller.update());
+              },
+              icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+              label: Text("新建收藏夹".tl),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
               ),
-              const SizedBox(width: 8),
-              Text(data?.title != null ? data!.title.tl : "未知".tl,),
-            ],
-          ),
-        );
-      }, childCount: folders.length),
-    );
-  }
-
-  Widget buildLocal() {
-    final folders = LocalFavoritesManager().folderNames;
-    return SliverGrid(
-      gridDelegate: const SliverGridDelegateWithFixedHeight(
-        maxCrossAxisExtent: 260,
-        itemHeight: 48,
-      ),
-      delegate: SliverChildBuilderDelegate((context, index) {
-        final data = folders.elementAt(index);
-        return GestureDetector(
-          onLongPressStart: (details) =>
-              _showMenu(data, details.globalPosition),
-          child: InkWell(
-            onTap: () {
-              controller.current = data;
-              controller.isNetwork = false;
-              controller.selectingFolder = false;
-              controller.update();
-              appdata.implicitData[0] = "0;0;$data";
-              appdata.writeImplicitData();
-            },
-            onSecondaryTapUp: (details) =>
-                _showDesktopMenu(data, details.globalPosition),
-            borderRadius: BorderRadius.circular(8),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Icon(
-                  Icons.folder,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    data,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  height: 18,
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Text(
-                    LocalFavoritesManager().count(data).toString(),
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
             ),
           ),
-        );
-      }, childCount: folders.length),
-    );
-  }
-
-  Widget buildUtils(BuildContext context) {
-    Widget buildItem(String title, IconData icon, VoidCallback onTap) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: const BorderRadius.all(Radius.circular(8)),
-        child: SizedBox(
-          height: 72,
-          width: 64,
-          child: Column(
-            children: [
-              const SizedBox(
-                height: 12,
+          const SizedBox(height: 8),
+          // 搜索按钮
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => App.to(context, () => const LocalSearchPage()),
+              icon: const Icon(Icons.search, size: 18),
+              label: Text("搜索".tl),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
               ),
-              Icon(
-                icon,
-                size: 24,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(
-                height: 8,
-              ),
-              Text(
-                title,
-                style: const TextStyle(fontSize: 12),
-              )
-            ],
+            ),
           ),
-        ),
-      );
-    }
-
-    return SliverToBoxAdapter(
-      child: Wrap(
-        children: [
-          buildItem("新建".tl, Icons.create_new_folder_outlined, () {
-            showDialog(
-                    context: context,
-                    builder: (context) => const CreateFolderDialog())
-                .then((value) => controller.update());
-          }),
-          buildItem("搜索".tl, Icons.search,
-              () => App.to(context, () => const LocalSearchPage())),
-          buildItem("排序".tl, Icons.reorder, () {
-            context.to(() => const _FoldersReorderPage());
-          })
+          const SizedBox(height: 8),
+          // 排序按钮
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                context.to(() => const _FoldersReorderPage());
+              },
+              icon: const Icon(Icons.reorder, size: 18),
+              label: Text("排序".tl),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+            ),
+          ),
         ],
-      ).paddingHorizontal(12),
+      ),
     );
   }
 
@@ -521,51 +930,12 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
               App.globalBack();
               deleteFolder(folder);
             },
-          ),
-          PopupMenuItem(
-            child: Text("排序".tl),
-            onTap: () {
-              App.globalBack();
-              App.globalTo(() => LocalFavoritesFolder(folder))
-                  .then((value) => controller.update());
-            },
-          ),
+          ), 
           PopupMenuItem(
             child: Text("重命名".tl),
             onTap: () {
               App.globalBack();
               rename(folder);
-            },
-          ),
-          PopupMenuItem(
-            child: Text("检查漫画存活".tl),
-            onTap: () {
-              App.globalBack();
-              checkFolder(folder).then((value) {
-                controller.update();
-              });
-            },
-          ),
-          PopupMenuItem(
-            child: Text("导出".tl),
-            onTap: () {
-              App.globalBack();
-              export(folder);
-            },
-          ),
-          PopupMenuItem(
-            child: Text("下载全部".tl),
-            onTap: () {
-              App.globalBack();
-              addDownload(folder);
-            },
-          ),
-          PopupMenuItem(
-            child: Text("更新漫画信息".tl),
-            onTap: () {
-              App.globalBack();
-              var comics = LocalFavoritesManager().getAllComics(folder);
-              UpdateFavoritesInfoDialog.show(comics, folder);
             },
           ),
         ]);
@@ -579,38 +949,9 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
             deleteFolder(folder);
           }),
       DesktopMenuEntry(
-          text: "排序".tl,
-          onClick: () {
-            App.globalTo(() => LocalFavoritesFolder(folder))
-                .then((value) => controller.update());
-          }),
-      DesktopMenuEntry(
           text: "重命名".tl,
           onClick: () {
             rename(folder);
-          }),
-      DesktopMenuEntry(
-          text: "检查漫画存活".tl,
-          onClick: () {
-            checkFolder(folder).then((value) {
-              controller.update();
-            });
-          }),
-      DesktopMenuEntry(
-          text: "导出".tl,
-          onClick: () {
-            export(folder);
-          }),
-      DesktopMenuEntry(
-          text: "下载全部".tl,
-          onClick: () {
-            addDownload(folder);
-          }),
-      DesktopMenuEntry(
-          text: "更新漫画信息".tl,
-          onClick: () {
-            var comics = LocalFavoritesManager().getAllComics(folder);
-            UpdateFavoritesInfoDialog.show(comics, folder);
           }),
     ]);
   }
@@ -635,30 +976,6 @@ mixin class _LocalFavoritesManager {
         context: App.globalContext!,
         builder: (context) => RenameFolderDialog(folder));
     StateController.find<FavoritesPageController>().update();
-  }
-
-  void export(String folder) async {
-    var controller = showLoadingDialog(
-      App.globalContext!,
-      onCancel: () {},
-      message: "正在导出".tl,
-    );
-    try {
-      await exportStringDataAsFile(
-          LocalFavoritesManager().folderToJsonString(folder), "$folder.json");
-      controller.close();
-    } catch (e, s) {
-      controller.close();
-      showToast(message: e.toString());
-      log("$e\n$s", "IO", LogLevel.error);
-    }
-  }
-
-  void addDownload(String folder) {
-    for (var comic in LocalFavoritesManager().getAllComics(folder)) {
-      comic.addDownload();
-    }
-    showToast(message: "已添加下载任务".tl);
   }
 }
 

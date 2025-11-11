@@ -19,6 +19,7 @@ import 'package:pica_comic/tools/cache_auto_clear.dart';
 import 'package:pica_comic/tools/io_extensions.dart';
 import 'package:pica_comic/tools/io_tools.dart';
 import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/tools/android_first_use_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -49,7 +50,24 @@ Future<void> init() async {
     }
     LogManager.logFile = logFile;
     LogManager.addLog(LogLevel.info, "App Status", "Start initialization.");
-    await appdata.readData();
+    
+    // 安全读取应用数据
+    try {
+      var dataReadSuccess = await appdata.readData();
+      if (!dataReadSuccess) {
+        LogManager.addLog(LogLevel.warning, "Init", "Failed to read some app data, using defaults");
+      }
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "Init", "Critical error reading app data: $e");
+      // 尝试重新初始化应用数据
+      try {
+        appdata = Appdata();
+        await appdata.readData();
+      } catch (e2) {
+        LogManager.addLog(LogLevel.error, "Init", "Failed to reinitialize app data: $e2");
+      }
+    }
+    
     SingleInstanceCookieJar("${App.dataPath}/cookies.db");
     HttpProxyServer.createConfigFile();
     if (appdata.settings[58] == "1") {
@@ -73,6 +91,12 @@ Future<void> init() async {
     await checkDownloadPath();
     await _checkOldData();
 
+    // 初始化Android平台的firstUse管理器
+    if (App.isAndroid) {
+      await AndroidFirstUseManager.instance.init();
+      await AndroidFirstUseManager.instance.migrateFromSharedPreferences();
+    }
+
     await JsEngine().init();
 
     await ComicSource.init();
@@ -89,6 +113,16 @@ Future<void> init() async {
   } catch (e, s) {
     LogManager.addLog(
         LogLevel.error, "Init", "App initialization failed!\n$e$s");
+    
+    // 尝试基本初始化，确保应用可以启动
+    try {
+      appdata = Appdata();
+      await appdata.readData();
+      LogManager.addLog(LogLevel.info, "Init", "Basic initialization completed");
+    } catch (e2, s2) {
+      LogManager.addLog(
+          LogLevel.error, "Init", "Basic initialization failed!\n$e2$s2");
+    }
   }
 }
 

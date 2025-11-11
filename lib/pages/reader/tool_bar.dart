@@ -149,6 +149,8 @@ extension ToolBar on ComicReadingPage {
                                 otherInfo["eps"] = readingData.eps;
                               }
                               otherInfo["url"] = logic.urls[logic.index - 1];
+                              // 添加章节总页数信息
+                              otherInfo["epTotalPages"] = logic.urls.length;
                               var favorite = ImageFavorite(
                                   id,
                                   image,

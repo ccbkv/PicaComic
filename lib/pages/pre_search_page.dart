@@ -703,9 +703,8 @@ class PreSearchPage extends StatelessWidget {
               ),
               onPressed: () {
                 appdata.favoriteTags.remove(tag);
-                searchController.update();
-                appdata.writeHistory();
-                App.globalBack();
+                appdata.writeFavoriteTags();
+                logic.update();
               },
               child: Text("确认".tl),
             )
@@ -713,7 +712,15 @@ class PreSearchPage extends StatelessWidget {
         );
       },
       child: ListTile(
-        title: Text(tag.substring(tag.indexOf(':') + 1)),
+        title: Text(tag),
+        trailing: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            appdata.favoriteTags.remove(tag);
+            appdata.writeFavoriteTags();
+            logic.update();
+          },
+        ),
         subtitle: Text(tag.split(':').first),
         onTap: () {
           String type = switch (tag.split(':').first) {
@@ -747,6 +754,7 @@ class PreSearchPage extends StatelessWidget {
               ),
               onPressed: () {
                 appdata.searchHistory.clear();
+                appdata.writeSearchHistory();
                 appdata.writeHistory();
                 logic.update(["history"]);
                 App.globalBack();
@@ -775,7 +783,7 @@ class PreSearchPage extends StatelessWidget {
               ),
               onPressed: () {
                 appdata.favoriteTags.clear();
-                appdata.writeHistory();
+                appdata.writeFavoriteTags();
                 logic.update();
                 App.globalBack();
               },

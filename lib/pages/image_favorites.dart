@@ -78,7 +78,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
         ? ImageFavoriteManager.search(keyword)
         : ImageFavoriteManager.getAll();
     comics = ImageFavoritesComic.fromFavorites(allFavorites);
-    
+
     // 筛选到最终列表
     comics = comics.where((ele) {
       bool isFilter = true;
@@ -90,7 +90,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
       }
       return isFilter;
     }).toList();
-    
+
     // 给列表排序
     switch (sortType) {
       case ImageFavoriteSortType.title:
@@ -121,10 +121,10 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
       searchMode = true;
     }
     sortType = ImageFavoriteSortType.values.firstWhere(
-            (e) => e.value == appdata.implicitData[4]?.toString(),
-            orElse: () => ImageFavoriteSortType.title);
-    timeFilterSelect = TimeRange.fromString(
-        appdata.implicitData[5]?.toString() ?? "");
+        (e) => e.value == appdata.implicitData[4]?.toString(),
+        orElse: () => ImageFavoriteSortType.title);
+    timeFilterSelect =
+        TimeRange.fromString(appdata.implicitData[5]?.toString() ?? "");
     numFilterSelect = int.tryParse(appdata.implicitData[6]?.toString() ?? "") ??
         numFilterList[0];
     updateImageFavorites();
@@ -325,24 +325,34 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
   }
 
   void sort() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return _ImageFavoritesDialog(
-          initSortType: sortType,
-          initTimeFilterSelect: timeFilterSelect,
-          initNumFilterSelect: numFilterSelect,
-          updateConfig: (sortType, timeFilter, numFilter) {
-            setState(() {
-              this.sortType = sortType;
-              timeFilterSelect = timeFilter;
-              numFilterSelect = numFilter;
-            });
-            sortImageFavorites();
+    // 避免与触发点击同一帧的手势冲突导致弹窗立即被遮罩关闭
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // 再额外延迟一小段时间，避免 iPad 小窗下同一次点击事件被 ModalBarrier 捕获
+      Future.delayed(const Duration(milliseconds: 120), () {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: true,
+          useRootNavigator: false,
+          builder: (context) {
+            return _ImageFavoritesDialog(
+              initSortType: sortType,
+              initTimeFilterSelect: timeFilterSelect,
+              initNumFilterSelect: numFilterSelect,
+              updateConfig: (sortType, timeFilter, numFilter) {
+                setState(() {
+                  this.sortType = sortType;
+                  timeFilterSelect = timeFilter;
+                  numFilterSelect = numFilter;
+                });
+                sortImageFavorites();
+              },
+            );
           },
         );
-      },
-    );
+      });
+    });
   }
 }
 
@@ -360,7 +370,8 @@ class _ImageFavoritesComicTile extends StatefulWidget {
   final bool multiSelectMode;
 
   @override
-  State<_ImageFavoritesComicTile> createState() => _ImageFavoritesComicTileState();
+  State<_ImageFavoritesComicTile> createState() =>
+      _ImageFavoritesComicTileState();
 }
 
 class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
@@ -368,16 +379,13 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
     // 使用第一个图片显示菜单
     var image = widget.comic.images.first;
     // 获取触摸位置
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
     final RenderBox box = context.findRenderObject() as RenderBox;
     final Offset target = box.localToGlobal(Offset.zero, ancestor: overlay);
     final Rect rect = target & box.size;
     _showImageMenu(image, rect);
   }
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -389,9 +397,11 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
         onSecondaryTap: () {
           if (!widget.multiSelectMode) {
             // 获取鼠标右键点击位置
-            final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+            final RenderBox overlay =
+                Overlay.of(context).context.findRenderObject() as RenderBox;
             final RenderBox box = context.findRenderObject() as RenderBox;
-            final Offset target = box.localToGlobal(Offset.zero, ancestor: overlay);
+            final Offset target =
+                box.localToGlobal(Offset.zero, ancestor: overlay);
             final Rect rect = target & box.size;
             // 使用第一个图片作为菜单显示对象
             final image = widget.comic.images.first;
@@ -407,7 +417,8 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
             // 跳转到漫画详情页
             var image = widget.comic.images.first;
             var type = image.id.split("-")[0];
-            _goToComicDetail(type, image.id.replaceFirst("$type-", ""), image.title, image.otherInfo);
+            _goToComicDetail(type, image.id.replaceFirst("$type-", ""),
+                image.title, image.otherInfo);
           }
         },
         child: Column(
@@ -424,30 +435,35 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                       children: [
                         Text(
                           widget.comic.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: 4),
-                       // Text(
-                          //"收藏数: ${widget.comic.images.length}".tl,
-                          //style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          //      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          //    ),
-                       // ),
+                        // Text(
+                        //"收藏数: ${widget.comic.images.length}".tl,
+                        //style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        //      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        //    ),
+                        // ),
+                        //Text(
+                        //  "收藏于: ${DateFormat('yyyy-MM-dd').format(widget.comic.time)}".tl,
+                        //  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        //       color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        //      ),
+                        //),
                         Text(
-                          "收藏于: ${DateFormat('yyyy-MM-dd').format(widget.comic.time)}".tl,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                        Text(
-                          "来源: ${_getSourceName(widget.comic.images.first.id)}".tl,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
+                          "来源: ${_getSourceName(widget.comic.images.first.id)}"
+                              .tl,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                         ),
                       ],
                     ),
@@ -462,7 +478,7 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                 ],
               ),
             ),
-            
+
             // 图片网格 - 使用LayoutBuilder和Wrap确保图片位置固定且间距紧凑
             LayoutBuilder(
               builder: (context, constraints) {
@@ -470,19 +486,22 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                 const itemWidth = 90.0; // 固定宽度
                 const itemHeight = 120.0; // 固定高度
                 const spacing = 2.0; // 间距
-                
-                final crossAxisCount = (constraints.maxWidth / (itemWidth + spacing)).floor();
-                final totalWidth = crossAxisCount * itemWidth + (crossAxisCount - 1) * spacing;
+
+                final crossAxisCount =
+                    (constraints.maxWidth / (itemWidth + spacing)).floor();
+                final totalWidth =
+                    crossAxisCount * itemWidth + (crossAxisCount - 1) * spacing;
                 final leftMargin = (constraints.maxWidth - totalWidth) / 2;
-                
+
                 return Wrap(
                   alignment: WrapAlignment.start,
                   spacing: spacing,
                   runSpacing: spacing,
                   children: List.generate(widget.comic.images.length, (index) {
                     final image = widget.comic.images[index];
-                    final isSelected = widget.selectedImageFavorites[image] == true;
-                    
+                    final isSelected =
+                        widget.selectedImageFavorites[image] == true;
+
                     return SizedBox(
                       width: itemWidth,
                       height: itemHeight,
@@ -492,16 +511,25 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                             widget.addSelected(image);
                           } else {
                             var type = image.id.split("-")[0];
-                            _readWithKey(type, image.id.replaceFirst("$type-", ""), image.ep, image.page,
-                                image.title, image.otherInfo);
+                            _readWithKey(
+                                type,
+                                image.id.replaceFirst("$type-", ""),
+                                image.ep,
+                                image.page,
+                                image.title,
+                                image.otherInfo);
                           }
                         },
                         onLongPress: () {
                           if (!widget.multiSelectMode) {
                             // 获取触摸位置
-                            final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-                            final RenderBox box = context.findRenderObject() as RenderBox;
-                            final Offset target = box.localToGlobal(Offset.zero, ancestor: overlay);
+                            final RenderBox overlay = Overlay.of(context)
+                                .context
+                                .findRenderObject() as RenderBox;
+                            final RenderBox box =
+                                context.findRenderObject() as RenderBox;
+                            final Offset target = box.localToGlobal(Offset.zero,
+                                ancestor: overlay);
                             final Rect rect = target & box.size;
                             _showImageMenu(image, rect);
                           }
@@ -509,9 +537,13 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                         onSecondaryTap: () {
                           if (!widget.multiSelectMode) {
                             // 获取鼠标右键点击位置
-                            final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-                            final RenderBox box = context.findRenderObject() as RenderBox;
-                            final Offset target = box.localToGlobal(Offset.zero, ancestor: overlay);
+                            final RenderBox overlay = Overlay.of(context)
+                                .context
+                                .findRenderObject() as RenderBox;
+                            final RenderBox box =
+                                context.findRenderObject() as RenderBox;
+                            final Offset target = box.localToGlobal(Offset.zero,
+                                ancestor: overlay);
                             final Rect rect = target & box.size;
                             _showImageMenu(image, rect);
                           }
@@ -538,7 +570,8 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                               left: 0,
                               right: 0,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 2),
                                 color: Colors.black.withOpacity(0.6),
                                 child: Text(
                                   'P${image.page}',
@@ -555,12 +588,16 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                               Positioned.fill(
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     Icons.check_circle,
-                                    color: Theme.of(context).colorScheme.onPrimary,
+                                    color:
+                                        Theme.of(context).colorScheme.onPrimary,
                                     size: 32,
                                   ),
                                 ),
@@ -573,7 +610,7 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                 );
               },
             ),
-            
+
             SizedBox(height: 8),
           ],
         ),
@@ -581,33 +618,41 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
     );
   }
 
-  void _goToComicDetail(String type, String id, String title, Map<String, dynamic> otherInfo) {
+  void _goToComicDetail(
+      String type, String id, String title, Map<String, dynamic> otherInfo) {
     switch (type) {
       case "picacg":
-        Navigator.of(context).push(MaterialPageRoute(builder: (context) => PicacgComicPage(id, otherInfo["cover"])));
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => PicacgComicPage(id, otherInfo["cover"])));
         break;
       case "ehentai":
-        Navigator.of(context).push(MaterialPageRoute(builder: (context) => EhGalleryPage.fromLink(id)));
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => EhGalleryPage.fromLink(id)));
         break;
       case "jm":
-        Navigator.of(context).push(MaterialPageRoute(builder: (context) => JmComicPage(id)));
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (context) => JmComicPage(id)));
         break;
       case "hitomi":
-        Navigator.of(context).push(MaterialPageRoute(builder: (context) => HitomiComicPage.fromLink(id)));
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => HitomiComicPage.fromLink(id)));
         break;
       case "htmanga":
-        Navigator.of(context).push(MaterialPageRoute(builder: (context) => HtComicPage(id)));
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (context) => HtComicPage(id)));
         break;
       case "nhentai":
-        Navigator.of(context).push(MaterialPageRoute(builder: (context) => NhentaiComicPage(id)));
+        Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => NhentaiComicPage(id)));
         break;
       default:
-        if(ComicSource.sources.any((s) => s.key == type)){
-          Navigator.of(context).push(MaterialPageRoute(builder: (context) => ComicPage(
-            sourceKey: type,
-            id: id,
-            cover: otherInfo["cover"],
-          )));
+        if (ComicSource.sources.any((s) => s.key == type)) {
+          Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) => ComicPage(
+                    sourceKey: type,
+                    id: id,
+                    cover: otherInfo["cover"],
+                  )));
         } else {
           showToast(message: "Unknown source $type");
         }
@@ -638,8 +683,8 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                       onTap: () {
                         App.globalBack();
                         var type = image.id.split("-")[0];
-                        _readWithKey(type, image.id.replaceFirst("$type-", ""), image.ep, image.page,
-                            image.title, image.otherInfo);
+                        _readWithKey(type, image.id.replaceFirst("$type-", ""),
+                            image.ep, image.page, image.title, image.otherInfo);
                       },
                     ),
                     ListTile(
@@ -667,8 +712,8 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                       onTap: () {
                         App.globalBack();
                         var type = image.id.split("-")[0];
-                        _readWithKey(type, image.id.replaceFirst("$type-", ""), image.ep, image.page,
-                            image.title, image.otherInfo);
+                        _readWithKey(type, image.id.replaceFirst("$type-", ""),
+                            image.ep, image.page, image.title, image.otherInfo);
                       },
                     ),
                     const SizedBox(
@@ -679,7 +724,7 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
               ),
             ));
   }
-  
+
   void _readWithKey(String key, String target, int ep, int page, String title,
       Map<String, dynamic> otherInfo) async {
     switch (key) {
@@ -754,11 +799,11 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
   /// 根据漫画ID获取漫画源名称
   String _getSourceName(String id) {
     if (id.isEmpty) return "未知";
-    
+
     // ID格式通常是 "源类型-漫画ID"，例如 "picacg-12345"
     var parts = id.split("-");
     if (parts.isEmpty) return "未知";
-    
+
     var sourceType = parts[0];
     switch (sourceType) {
       case "picacg":
@@ -779,12 +824,6 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
         return source?.name ?? sourceType;
     }
   }
-
-
-
-
-
-
 }
 
 class FavoriteImageTile extends StatelessWidget {
@@ -881,8 +920,8 @@ class FavoriteImageTile extends StatelessWidget {
 
   void onTap() {
     var type = image.id.split("-")[0];
-    _readWithKey(type, image.id.replaceFirst("$type-", ""), image.ep, image.page,
-        image.title, image.otherInfo);
+    _readWithKey(type, image.id.replaceFirst("$type-", ""), image.ep,
+        image.page, image.title, image.otherInfo);
   }
 
   void _readWithKey(String key, String target, int ep, int page, String title,
@@ -1053,129 +1092,145 @@ class _ImageFavoritesDialogState extends State<_ImageFavoritesDialog> {
   late ImageFavoriteSortType sortType;
   late TimeRange timeFilterSelect;
   late int numFilterSelect;
+  bool _allowPop = false;
 
   @override
   void initState() {
     sortType = widget.initSortType;
     timeFilterSelect = widget.initTimeFilterSelect;
     numFilterSelect = widget.initNumFilterSelect;
+    // iPad 小窗下，打开同一帧的点击可能被遮罩捕获导致立刻关闭，先阻止短时间的 pop
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted) setState(() => _allowPop = true);
+      });
+    });
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text("排序和筛选".tl),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: 400,
-        child: DefaultTabController(
-          length: 3,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TabBar(
-                tabs: [
-                  Tab(text: "排序".tl),
-                  Tab(text: "时间".tl),
-                  Tab(text: "数量".tl),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    // 排序方式选项卡
-                    SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: 16),
-                          ...ImageFavoriteSortType.values.map((e) {
-                            return RadioListTile<ImageFavoriteSortType>(
-                              value: e,
-                              groupValue: sortType,
-                              title: Text(e.displayName),
-                              onChanged: (value) {
-                                setState(() {
-                                  sortType = value!;
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    ),
-                    
-                    // 时间筛选选项卡
-                    SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: 16),
-                          ...TimeRangeType.values.map((e) {
-                            return RadioListTile<TimeRangeType>(
-                              value: e,
-                              groupValue: timeFilterSelect.type,
-                              title: Text(e.displayName),
-                              onChanged: (value) {
-                                setState(() {
-                                  timeFilterSelect = TimeRange.fromType(value!);
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    ),
-                    
-                    // 收藏数量筛选选项卡
-                    SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: 16),
-                          ...numFilterList.map((e) {
-                            return RadioListTile<int>(
-                              value: e,
-                              groupValue: numFilterSelect,
-                              title: Text(e == numFilterList[0] ? "不限" : "大于$e".tl),
-                              onChanged: (value) {
-                                setState(() {
-                                  numFilterSelect = value!;
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    ),
+    return WillPopScope(
+      onWillPop: () async => _allowPop,
+      child: AlertDialog(
+        title: Text("排序和筛选".tl),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: DefaultTabController(
+            length: 3,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TabBar(
+                  tabs: [
+                    Tab(text: "排序".tl),
+                    Tab(text: "时间".tl),
+                    Tab(text: "数量".tl),
                   ],
                 ),
-              ),
-            ],
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      // 排序方式选项卡
+                      SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(height: 16),
+                            ...ImageFavoriteSortType.values.map((e) {
+                              return RadioListTile<ImageFavoriteSortType>(
+                                value: e,
+                                groupValue: sortType,
+                                title: Text(e.displayName),
+                                onChanged: (value) {
+                                  setState(() {
+                                    sortType = value!;
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ],
+                        ),
+                      ),
+
+                      // 时间筛选选项卡
+                      SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(height: 16),
+                            ...TimeRangeType.values.map((e) {
+                              return RadioListTile<TimeRangeType>(
+                                value: e,
+                                groupValue: timeFilterSelect.type,
+                                title: Text(e.displayName),
+                                onChanged: (value) {
+                                  setState(() {
+                                    timeFilterSelect =
+                                        TimeRange.fromType(value!);
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ],
+                        ),
+                      ),
+
+                      // 收藏数量筛选选项卡
+                      SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(height: 16),
+                            ...numFilterList.map((e) {
+                              return RadioListTile<int>(
+                                value: e,
+                                groupValue: numFilterSelect,
+                                title: Text(
+                                    e == numFilterList[0] ? "不限" : "大于$e".tl),
+                                onChanged: (value) {
+                                  setState(() {
+                                    numFilterSelect = value!;
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() => _allowPop = true);
+              Navigator.pop(context);
+            },
+            child: Text("取消".tl),
+          ),
+          TextButton(
+            onPressed: () {
+              appdata.implicitData[4] = sortType.value.toString();
+              appdata.implicitData[5] = timeFilterSelect.toString();
+              appdata.implicitData[6] = numFilterSelect.toString();
+              appdata.writeData();
+              widget.updateConfig(sortType, timeFilterSelect, numFilterSelect);
+              setState(() => _allowPop = true);
+              Navigator.pop(context);
+            },
+            child: Text("确定".tl),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text("取消".tl),
-        ),
-        TextButton(
-          onPressed: () {
-            appdata.implicitData[4] = sortType.value.toString();
-            appdata.implicitData[5] = timeFilterSelect.toString();
-            appdata.implicitData[6] = numFilterSelect.toString();
-            appdata.writeData();
-            widget.updateConfig(sortType, timeFilterSelect, numFilterSelect);
-            Navigator.pop(context);
-          },
-          child: Text("确定".tl),
-        ),
-      ],
     );
   }
 }

@@ -132,8 +132,7 @@ class MainPageState extends State<MainPage> {
   }
 
   void _checkUpdates() async {
-    var s = await SharedPreferences.getInstance();
-    var lastCheck = s.getInt("lastCheckUpdate");
+    var lastCheck = await appdata.readLastCheckUpdate();
     if (lastCheck != null) {
       if (DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(lastCheck)).inDays < 1) {
         return;
@@ -143,7 +142,7 @@ class MainPageState extends State<MainPage> {
       return;
     }
     var res = await checkUpdate();
-    s.setInt("lastCheckUpdate", DateTime.now().millisecondsSinceEpoch);
+    appdata.writeLastCheckUpdate(DateTime.now().millisecondsSinceEpoch);
     if (res != true) return;
     var info = await getUpdatesInfo();
     if (info == null) return;

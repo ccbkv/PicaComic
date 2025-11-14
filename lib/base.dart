@@ -12,6 +12,7 @@ import 'package:pica_comic/tools/notification.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import 'foundation/def.dart';
 export 'foundation/def.dart';
 
@@ -128,50 +129,339 @@ class Appdata {
     "0", // 点击关闭按钮时不显示提示
     webUA, // UA
     "title", // 图片收藏排序方式
+    "timeAsc", // 按时间升序
+    "timeDesc", // 按时间降序
+    "maxFavorites", // 按收藏数量
+    "favoritesCompareComicPages", // 收藏数比上总页数
     "all", // 图片收藏时间筛选
+    "lastWeek", // 最近一周
+    "lastMonth", // 最近一个月
+    "lastHalfYear", // 最近半年
+    "lastYear", // 最近一年
     "0", // 图片收藏数量筛选
   ];
 
+  void writeFavoriteTags() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/favoriteTags.txt");
+          if (!await file.exists()) {
+            await file.create();
+          }
+          await file.writeAsString(favoriteTags.join('\n'));
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.writeFavoriteTags",
+            "Failed to write favorite tags: $e");
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      await s.setStringList("favoriteTags", favoriteTags.toList());
+    }
+  }
+
+  void readFavoriteTags() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/favoriteTags.txt");
+          if (await file.exists()) {
+            var data = (await file.readAsString()).split('\n');
+            favoriteTags = data.toSet();
+          } else {
+            writeFavoriteTags();
+          }
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readFavoriteTags",
+            "Failed to read favorite tags: $e");
+        writeFavoriteTags();
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      favoriteTags = (s.getStringList("favoriteTags") ?? []).toSet();
+    }
+  }
+
+  Future<int?> readLastCheckUpdate() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/lastCheckUpdate.txt");
+          if (await file.exists()) {
+            var content = await file.readAsString();
+            return int.tryParse(content);
+          }
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readLastCheckUpdate",
+            "Failed to read lastCheckUpdate: $e");
+      }
+      return null;
+    } else {
+      var s = await SharedPreferences.getInstance();
+      return s.getInt("lastCheckUpdate");
+    }
+  }
+
+  void writeLastCheckUpdate(int time) async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/lastCheckUpdate.txt");
+          if (!await file.exists()) {
+            await file.create();
+          }
+          await file.writeAsString(time.toString());
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.writeLastCheckUpdate",
+            "Failed to write lastCheckUpdate: $e");
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      await s.setInt("lastCheckUpdate", time);
+    }
+  }
+
+  void writeSearchHistory() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/searchHistory.txt");
+          if (!await file.exists()) {
+            await file.create();
+          }
+          await file.writeAsString(searchHistory.join('\n'));
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.writeSearchHistory",
+            "Failed to write search history: $e");
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      await s.setStringList("search", searchHistory);
+    }
+  }
+
+  void readSearchHistory() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/searchHistory.txt");
+          if (await file.exists()) {
+            var data = (await file.readAsString()).split('\n');
+            searchHistory = data;
+          } else {
+            writeSearchHistory();
+          }
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readSearchHistory",
+            "Failed to read search history: $e");
+        writeSearchHistory();
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      searchHistory = s.getStringList("search") ?? [];
+    }
+  }
+
   void writeImplicitData() async {
-    var s = await SharedPreferences.getInstance();
-    await s.setStringList("implicitData", implicitData);
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/implicitData.txt");
+          if (!await file.exists()) {
+            await file.create();
+          }
+          await file.writeAsString(implicitData.join('\n'));
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.writeImplicitData",
+            "Failed to write implicit data: $e");
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      await s.setStringList("implicitData", implicitData);
+    }
   }
 
   void readImplicitData() async {
-    try {
-      var s = await SharedPreferences.getInstance();
-      var data = s.getStringList("implicitData");
-      if (data == null) {
-        writeImplicitData();
-        return;
-      }
-      
-      // 确保implicitData数组有足够的元素
-      while (implicitData.length < data.length) {
-        implicitData.add("");
-      }
-      
-      // 安全复制数据
-      for (int i = 0; i < data.length && i < implicitData.length; i++) {
-        if (data[i] != null) {
-          implicitData[i] = data[i];
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/implicitData.txt");
+          if (await file.exists()) {
+            var data = (await file.readAsString()).split('\n');
+            while (implicitData.length < data.length) {
+              implicitData.add("");
+            }
+            for (int i = 0; i < data.length && i < implicitData.length; i++) {
+              if (data[i] != null) {
+                implicitData[i] = data[i];
+              }
+            }
+          } else {
+            writeImplicitData();
+          }
         }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readImplicitData",
+            "Failed to read implicit data: $e");
+        writeImplicitData();
       }
-    } catch (e) {
-      LogManager.addLog(LogLevel.error, "Appdata.readImplicitData", "Failed to read implicit data: $e");
-      // 发生错误时，重新初始化数据
-      writeImplicitData();
+    } else {
+      try {
+        var s = await SharedPreferences.getInstance();
+        var data = s.getStringList("implicitData");
+        if (data == null) {
+          writeImplicitData();
+          return;
+        }
+
+        // 确保implicitData数组有足够的元素
+        while (implicitData.length < data.length) {
+          implicitData.add("");
+        }
+
+        // 安全复制数据
+        for (int i = 0; i < data.length && i < implicitData.length; i++) {
+          if (data[i] != null) {
+            implicitData[i] = data[i];
+          }
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readImplicitData",
+            "Failed to read implicit data: $e");
+        // 发生错误时，重新初始化数据
+        writeImplicitData();
+      }
+    }
+  }
+
+  void writeBlockingKeyword() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/blockingKeyword.txt");
+          if (!await file.exists()) {
+            await file.create();
+          }
+          await file.writeAsString(blockingKeyword.join('\n'));
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.writeBlockingKeyword",
+            "Failed to write blocking keyword: $e");
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      await s.setStringList("blockingKeyword", blockingKeyword);
+    }
+  }
+
+  void readBlockingKeyword() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/blockingKeyword.txt");
+          if (await file.exists()) {
+            var data = (await file.readAsString()).split('\n');
+            if(data.length == 1 && data[0].isEmpty){
+              data.clear();
+            }
+            blockingKeyword = data;
+          } else {
+            writeBlockingKeyword();
+          }
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readBlockingKeyword",
+            "Failed to read blocking keyword: $e");
+        writeBlockingKeyword();
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      blockingKeyword = s.getStringList("blockingKeyword") ?? [];
+    }
+  }
+
+  void writeJmBlockingKeyword() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/jmBlockingKeyword.txt");
+          if (!await file.exists()) {
+            await file.create();
+          }
+          await file.writeAsString(jmBlockingKeyword.join('\n'));
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.writeJmBlockingKeyword",
+            "Failed to write jm blocking keyword: $e");
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      await s.setStringList("jmBlockingKeyword", jmBlockingKeyword);
+    }
+  }
+
+  void readJmBlockingKeyword() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/jmBlockingKeyword.txt");
+          if (await file.exists()) {
+            var data = (await file.readAsString()).split('\n');
+            if(data.length == 1 && data[0].isEmpty){
+              data.clear();
+            }
+            jmBlockingKeyword = data;
+          } else {
+            writeJmBlockingKeyword();
+          }
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readJmBlockingKeyword",
+            "Failed to read jm blocking keyword: $e");
+        writeJmBlockingKeyword();
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      jmBlockingKeyword = s.getStringList("jmBlockingKeyword") ?? [];
     }
   }
 
   ///屏蔽的关键词
   List<String> blockingKeyword = [];
-  
+
   ///禁漫天堂专用屏蔽关键词
   List<String> jmBlockingKeyword = [];
 
   ///是否第一次使用的判定, 用于显示提示
   List<String> firstUse = [
+    "0", //屏蔽关键词1
+    "0", //屏蔽关键词2(已废弃)
+    "0", //漫画详情页
+    "0", //是否进入过app
+    "0", //显示本地收藏夹的管理提示
+  ];
+
+  ///阅读器设置
+  List<String> readerSetting = [
     "1", //屏蔽关键词1
     "1", //屏蔽关键词2(已废弃)
     "1", //漫画详情页
@@ -203,10 +493,12 @@ class Appdata {
             st = List<String>.from(json);
           } else {
             st = [];
-            LogManager.addLog(LogLevel.warning, "Appdata.readSettings", "Settings file contains invalid data format");
+            LogManager.addLog(LogLevel.warning, "Appdata.readSettings",
+                "Settings file contains invalid data format");
           }
         } catch (e) {
-          LogManager.addLog(LogLevel.error, "Appdata.readSettings", "Failed to read settings file: $e");
+          LogManager.addLog(LogLevel.error, "Appdata.readSettings",
+              "Failed to read settings file: $e");
           st = [];
         }
       } else {
@@ -233,7 +525,8 @@ class Appdata {
         settings[13] = "0";
       }
     } catch (e) {
-      LogManager.addLog(LogLevel.error, "Appdata.readSettings", "Critical error in readSettings: $e");
+      LogManager.addLog(LogLevel.error, "Appdata.readSettings",
+          "Critical error in readSettings: $e");
     }
   }
 
@@ -254,19 +547,16 @@ class Appdata {
 
   void writeHistory() async {
     var s = await SharedPreferences.getInstance();
-    await s.setStringList("search", searchHistory);
-    await s.setStringList("favoriteTags", favoriteTags.toList());
   }
 
   Future<void> writeData([bool sync = true]) async {
+    writeImplicitData();
     if (sync) {
       Webdav.uploadData();
     }
     await updateSettings();
-    if(!App.isAndroid) {
+    if (!App.isAndroid) {
       var s = await SharedPreferences.getInstance();
-      await s.setStringList("blockingKeyword", blockingKeyword);
-      await s.setStringList("jmBlockingKeyword", jmBlockingKeyword);
       await s.setStringList("firstUse", firstUse);
     }
   }
@@ -275,12 +565,16 @@ class Appdata {
     try {
       await readSettings();
 
-      if(!App.isAndroid) {
+      readFavoriteTags();
+
+      readSearchHistory();
+
+      readBlockingKeyword();
+
+      readJmBlockingKeyword();
+
+      if (!App.isAndroid) {
         var s = await SharedPreferences.getInstance();
-        searchHistory = s.getStringList("search") ?? [];
-        favoriteTags = (s.getStringList("favoriteTags") ?? []).toSet();
-        blockingKeyword = s.getStringList("blockingKeyword") ?? [];
-        jmBlockingKeyword = s.getStringList("jmBlockingKeyword") ?? [];
         var firstUseData = s.getStringList("firstUse");
         if (firstUseData != null) {
           for (int i = 0; i < firstUseData.length && i < firstUse.length; i++) {
@@ -292,8 +586,8 @@ class Appdata {
       try {
         readImplicitData();
       } catch (e) {
-        LogManager.addLog(
-            LogLevel.error, "Appdata.readData", "Failed to read implicit data: $e");
+        LogManager.addLog(LogLevel.error, "Appdata.readData",
+            "Failed to read implicit data: $e");
         writeImplicitData();
       }
 
@@ -313,30 +607,33 @@ class Appdata {
   /// 重置应用数据为默认值
   Future<void> _resetToDefaults() async {
     try {
-      LogManager.addLog(LogLevel.info, "Appdata._resetToDefaults", "Resetting app data to defaults");
-      
+      LogManager.addLog(LogLevel.info, "Appdata._resetToDefaults",
+          "Resetting app data to defaults");
+
       // 重置所有数据为默认值
       searchHistory = [];
       favoriteTags = {};
       blockingKeyword = [];
       jmBlockingKeyword = [];
-      
+
       // 确保firstUse有默认值
       while (firstUse.length < 5) {
         firstUse.add("0");
       }
-      
+
       // 不强制设置firstUse[3]为"1"，保持默认值，确保全新安装可以显示开始界面
-      
+
       // 重置隐式数据
       writeImplicitData();
-      
+
       // 保存重置后的数据
       await writeData();
-      
-      LogManager.addLog(LogLevel.info, "Appdata._resetToDefaults", "Successfully reset app data");
+
+      LogManager.addLog(LogLevel.info, "Appdata._resetToDefaults",
+          "Successfully reset app data");
     } catch (e) {
-      LogManager.addLog(LogLevel.error, "Appdata._resetToDefaults", "Failed to reset app data: $e");
+      LogManager.addLog(LogLevel.error, "Appdata._resetToDefaults",
+          "Failed to reset app data: $e");
     }
   }
 
@@ -464,9 +761,7 @@ class _Settings {
   }
 
   String get jmImgUrlIndex =>
-      int.parse(appdata.settings[37]) < 4
-        ? appdata.settings[37]
-        : "0";
+      int.parse(appdata.settings[37]) < 4 ? appdata.settings[37] : "0";
 
   List<String> get explorePages => appdata.settings[77].split(',');
 

@@ -44,7 +44,7 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
     var loader = ComicSource.find(sourceKey)!.searchPageData!.loadPage!;
     // 对于Picacg源，传递分类参数
     if (sourceKey == "picacg" && selectedCategories.isNotEmpty) {
-      return await PicacgNetwork().search(keyword, options[0], i, 
+      return await PicacgNetwork().search(keyword, options[0], i,
           categories: selectedCategories, addToHistory: true);
     }
     return await loader(keyword, i, options);
@@ -127,9 +127,13 @@ class _SearchResultPageState extends State<_SearchResultPage> {
 
   @override
   void initState() {
+    super.initState();
+    sourceKey = widget.sourceKey;
+    keyword = widget.keyword;
+    options = widget.options;
+
     var plainKeyword = HistoryManager.getPlainSearchKeyword(widget.keyword);
     controller.text = plainKeyword;
-    keyword = widget.keyword;
 
     // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
     if (sourceKey == "jm") {
@@ -146,7 +150,6 @@ class _SearchResultPageState extends State<_SearchResultPage> {
       }
     }
     suggestionsController = _SuggestionsController(controller);
-    super.initState();
   }
 
   String _addJmBlockingKeywords(String originalKeyword) {
@@ -239,7 +242,8 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                 onPressed: showCategoryFilter,
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 ),
                 child: const Text("分类"),
               ),
@@ -260,13 +264,14 @@ class _SearchResultPageState extends State<_SearchResultPage> {
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.black, width: 1.5),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 1.5),
               ),
               child: TextButton(
                 onPressed: showCategoryFilter,
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 ),
                 child: const Text("分类过滤"),
               ),
@@ -306,8 +311,11 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                         true) {
                   var lang = int.tryParse(appdata.settings[69]) ?? 0;
                   if (lang != 0) {
-                    newKeyword +=
-                        " language:${["chinese", "english", "japanese"][lang - 1]}";
+                    newKeyword += " language:${[
+                      "chinese",
+                      "english",
+                      "japanese"
+                    ][lang - 1]}";
                   }
                 }
                 if (newKeyword == keyword) return;
@@ -338,18 +346,60 @@ class _SearchResultPageState extends State<_SearchResultPage> {
         child: _SearchPageComicList(
           keyword: keyword,
           sourceKey: sourceKey,
-          key: Key(keyword + options.toString() + sourceKey + selectedCategories.toString()),
+          key: Key(keyword +
+              options.toString() +
+              sourceKey +
+              selectedCategories.toString()),
           header: SliverPersistentHeader(
             pinned: _showFab && SmoothScrollProvider.isMouseScroll,
             floating: !SmoothScrollProvider.isMouseScroll,
             delegate: _SliverAppBarDelegate(
               minHeight: context.width > 600 ? 96.0 : 60.0,
               maxHeight: context.width > 600 ? 96.0 : 60.0,
-              child: context.width > 600 ? Column(
-                children: [
-                  SizedBox(height: 36.0),
-                  Expanded(
-                    child: FloatingSearchBar(
+              child: context.width > 600
+                  ? Column(
+                      children: [
+                        SizedBox(height: 36.0),
+                        Expanded(
+                          child: FloatingSearchBar(
+                            onSearch: (s) {
+                              suggestionsController.suggestions.clear();
+                              suggestionsController.remove();
+                              HistoryManager.addSearchHistory(s);
+                              String newKeyword = s;
+                              // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
+                              if (sourceKey == "jm") {
+                                newKeyword = _addJmBlockingKeywords(newKeyword);
+                              }
+                              if (!newKeyword.contains('language') &&
+                                  ComicSource.find(sourceKey)
+                                          ?.searchPageData
+                                          ?.enableLanguageFilter ==
+                                      true) {
+                                var lang =
+                                    int.tryParse(appdata.settings[69]) ?? 0;
+                                if (lang != 0) {
+                                  newKeyword += " language:${[
+                                    "chinese",
+                                    "english",
+                                    "japanese"
+                                  ][lang - 1]}";
+                                }
+                              }
+                              if (newKeyword == keyword) return;
+                              setState(() {
+                                keyword = newKeyword;
+                                selectedCategories = []; // 清空分类选择
+                              });
+                            },
+                            controller: controller,
+                            onChanged: onChanged,
+                            trailing: trailing,
+                          ),
+                        ),
+                      ],
+                    )
+                  : FloatingSearchBar(
                       onSearch: (s) {
                         suggestionsController.suggestions.clear();
                         suggestionsController.remove();
@@ -366,8 +416,11 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                                 true) {
                           var lang = int.tryParse(appdata.settings[69]) ?? 0;
                           if (lang != 0) {
-                            newKeyword +=
-                                " language:${["chinese", "english", "japanese"][lang - 1]}";
+                            newKeyword += " language:${[
+                              "chinese",
+                              "english",
+                              "japanese"
+                            ][lang - 1]}";
                           }
                         }
                         if (newKeyword == keyword) return;
@@ -380,39 +433,6 @@ class _SearchResultPageState extends State<_SearchResultPage> {
                       onChanged: onChanged,
                       trailing: trailing,
                     ),
-                  ),
-                ],
-              ) : FloatingSearchBar(
-                onSearch: (s) {
-                  suggestionsController.suggestions.clear();
-                  suggestionsController.remove();
-                  HistoryManager.addSearchHistory(s);
-                  String newKeyword = s;
-                  // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
-                  if (sourceKey == "jm") {
-                    newKeyword = _addJmBlockingKeywords(newKeyword);
-                  }
-                  if (!newKeyword.contains('language') &&
-                      ComicSource.find(sourceKey)
-                              ?.searchPageData
-                              ?.enableLanguageFilter ==
-                          true) {
-                    var lang = int.tryParse(appdata.settings[69]) ?? 0;
-                    if (lang != 0) {
-                      newKeyword +=
-                          " language:${["chinese", "english", "japanese"][lang - 1]}";
-                    }
-                  }
-                  if (newKeyword == keyword) return;
-                  setState(() {
-                    keyword = newKeyword;
-                    selectedCategories = []; // 清空分类选择
-                  });
-                },
-                controller: controller,
-                onChanged: onChanged,
-                trailing: trailing,
-              ),
             ),
           ),
           options: options,
@@ -518,7 +538,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
       builder: (context) => CategorySelectorDialog(
         categories: const [
           "大家都在看",
-          "大濕推薦", 
+          "大濕推薦",
           "那年今天",
           "官方都在看",
           "嗶咔漢化",

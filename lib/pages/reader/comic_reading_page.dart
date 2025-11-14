@@ -1,5 +1,6 @@
 library pica_reader;
 
+import 'package:pica_comic/tools/show_delayed_dialog.dart';
 import 'dart:async';
 import 'dart:io';
 

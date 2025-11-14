@@ -175,6 +175,29 @@ class JmComicPage extends BaseComicPage<JmComicInfo> {
       ));
 
   @override
+  void onTagLongPress(String tag) {
+    showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text("屏蔽标签".tl),
+            content: Text("要屏蔽“$tag”吗?".tl),
+            actions: [
+              TextButton(
+                  onPressed: () => App.globalBack(), child: Text("取消".tl)),
+              TextButton(
+                  onPressed: () {
+                    appdata.jmBlockingKeyword.add(tag);
+                    appdata.writeJmBlockingKeyword();
+                    App.globalBack();
+                  },
+                  child: Text("确定".tl)),
+            ],
+          );
+        });
+  }
+
+  @override
   ThumbnailsData? get thumbnailsCreator => null;
 
   @override

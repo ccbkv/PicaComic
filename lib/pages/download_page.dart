@@ -35,6 +35,7 @@ import 'package:pica_comic/network/eh_network/eh_download_model.dart';
 import 'package:pica_comic/network/jm_network/jm_download.dart';
 import 'package:pica_comic/network/picacg_network/picacg_download_model.dart';
 import 'dart:io';
+import 'package:pica_comic/tools/show_delayed_dialog.dart';
 import 'package:pica_comic/tools/translations.dart';
 import 'package:pica_comic/components/components.dart';
 
@@ -197,7 +198,7 @@ class DownloadPageLogic extends StateController {
 
   /// 标签搜索防抖计时器
   Timer? _tagDebounceTimer;
-  
+
   /// 分类搜索防抖计时器
   Timer? _categoryDebounceTimer;
 
@@ -284,20 +285,18 @@ class DownloadPageLogic extends StateController {
       print('分类关键词为空，显示所有漫画');
       filteredComics = List.from(baseComics);
     } else {
-      filteredComics = baseComics
-          .where((comic) {
-            // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
-            if (comic is DownloadedComic) {
-              return comic.comicItem.categories.any((c) =>
-                  c.toLowerCase().contains(categoryKeyword.toLowerCase()) ||
-                  c.translateTagsToCN
-                      .toLowerCase()
-                      .contains(categoryKeyword.toLowerCase()));
-            }
-            // 对于其他类型的DownloadedItem，暂时不进行分类搜索
-            return false;
-          })
-          .toList();
+      filteredComics = baseComics.where((comic) {
+        // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
+        if (comic is DownloadedComic) {
+          return comic.comicItem.categories.any((c) =>
+              c.toLowerCase().contains(categoryKeyword.toLowerCase()) ||
+              c.translateTagsToCN
+                  .toLowerCase()
+                  .contains(categoryKeyword.toLowerCase()));
+        }
+        // 对于其他类型的DownloadedItem，暂时不进行分类搜索
+        return false;
+      }).toList();
       print('找到 ${filteredComics.length} 个匹配的漫画');
     }
 
@@ -779,20 +778,20 @@ class _DownloadPageState extends State<DownloadPage> {
         if (logic.categoryKeyword.isEmpty) {
           fullResultComics = logic.baseComics;
         } else {
-          fullResultComics = logic.baseComics
-              .where((comic) {
-                // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
-                if (comic is DownloadedComic) {
-                  return comic.comicItem.categories.any((c) =>
-                      c.toLowerCase().contains(logic.categoryKeyword.toLowerCase()) ||
-                      c.translateTagsToCN
-                          .toLowerCase()
-                          .contains(logic.categoryKeyword.toLowerCase()));
-                }
-                // 对于其他类型的DownloadedItem，暂时不进行分类搜索
-                return false;
-              })
-              .toList();
+          fullResultComics = logic.baseComics.where((comic) {
+            // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
+            if (comic is DownloadedComic) {
+              return comic.comicItem.categories.any((c) =>
+                  c
+                      .toLowerCase()
+                      .contains(logic.categoryKeyword.toLowerCase()) ||
+                  c.translateTagsToCN
+                      .toLowerCase()
+                      .contains(logic.categoryKeyword.toLowerCase()));
+            }
+            // 对于其他类型的DownloadedItem，暂时不进行分类搜索
+            return false;
+          }).toList();
         }
       } else if (logic.searchMode) {
         // 普通搜索模式下使用普通搜索结果
@@ -851,20 +850,20 @@ class _DownloadPageState extends State<DownloadPage> {
         if (logic.categoryKeyword.isEmpty) {
           logic.comics = logic.baseComics.toList();
         } else {
-          logic.comics = logic.baseComics
-              .where((comic) {
-                // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
-                if (comic is DownloadedComic) {
-                  return comic.comicItem.categories.any((c) =>
-                      c.toLowerCase().contains(logic.categoryKeyword.toLowerCase()) ||
-                      c.translateTagsToCN
-                          .toLowerCase()
-                          .contains(logic.categoryKeyword.toLowerCase()));
-                }
-                // 对于其他类型的DownloadedItem，暂时不进行分类搜索
-                return false;
-              })
-              .toList();
+          logic.comics = logic.baseComics.where((comic) {
+            // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
+            if (comic is DownloadedComic) {
+              return comic.comicItem.categories.any((c) =>
+                  c
+                      .toLowerCase()
+                      .contains(logic.categoryKeyword.toLowerCase()) ||
+                  c.translateTagsToCN
+                      .toLowerCase()
+                      .contains(logic.categoryKeyword.toLowerCase()));
+            }
+            // 对于其他类型的DownloadedItem，暂时不进行分类搜索
+            return false;
+          }).toList();
         }
       } else if (logic.searchMode) {
         // 普通搜索模式下使用普通搜索结果
@@ -998,13 +997,14 @@ class _DownloadPageState extends State<DownloadPage> {
     if (logic.comics[index].type == DownloadType.other) {
       type = (logic.comics[index] as CustomDownloadedItem).sourceName;
     }
-    
+
     // 获取分类信息
     List<String>? categories;
     if (logic.comics[index].type == DownloadType.picacg) {
-      categories = (logic.comics[index] as DownloadedComic).comicItem.categories;
+      categories =
+          (logic.comics[index] as DownloadedComic).comicItem.categories;
     }
-    
+
     return Padding(
       padding: const EdgeInsets.all(2),
       child: Container(
@@ -1235,12 +1235,15 @@ class _DownloadPageState extends State<DownloadPage> {
       );
 
   Widget buildTitle(BuildContext context, DownloadPageLogic logic) {
-    if ((logic.searchMode || logic.tagSearchMode || logic.categorySearchMode) && !logic.selecting) {
+    if ((logic.searchMode || logic.tagSearchMode || logic.categorySearchMode) &&
+        !logic.selecting) {
       // 使用一个持久化的focusNode，避免每次build都创建新的
       // 控制器已经在State初始化时创建
 
       // 同步控制器文本内容
-      final currentText = logic.searchMode ? logic.keyword : (logic.tagSearchMode ? logic.tagKeyword : logic.categoryKeyword);
+      final currentText = logic.searchMode
+          ? logic.keyword
+          : (logic.tagSearchMode ? logic.tagKeyword : logic.categoryKeyword);
       if (logic.searchController?.text != currentText) {
         logic.searchController?.text = currentText;
         logic.searchController?.selection = TextSelection.fromPosition(
@@ -1260,7 +1263,9 @@ class _DownloadPageState extends State<DownloadPage> {
         focusNode: logic.searchFocusNode,
         decoration: InputDecoration(
           border: InputBorder.none,
-          hintText: logic.searchMode ? "搜索漫画名".tl : (logic.tagSearchMode ? "搜索标签".tl : "搜索分类".tl),
+          hintText: logic.searchMode
+              ? "搜索漫画名".tl
+              : (logic.tagSearchMode ? "搜索标签".tl : "搜索分类".tl),
         ),
         controller: logic.searchController,
         inputFormatters: [LowercaseEnglishInputFormatter()],
@@ -1337,7 +1342,7 @@ class _DownloadPageState extends State<DownloadPage> {
             icon: const Icon(Icons.sort),
             onPressed: () async {
               bool changed = false;
-              await showDialog(
+              await showDelayedDialog(
                   context: context,
                   builder: (context) => SimpleDialog(
                         title: Text("漫画排序模式".tl),
@@ -1399,10 +1404,20 @@ class _DownloadPageState extends State<DownloadPage> {
           child: IconButton(
             icon: const Icon(Icons.download_for_offline),
             onPressed: () {
-              showPopUpWidget(
-                App.globalContext!,
-                const DownloadingPage(),
-              );
+              // 避免与触发点击同一帧的手势冲突导致弹窗立即被遮罩关闭
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                // 再额外延迟一小段时间，避免 iPad 小窗下同一次点击事件被 ModalBarrier 捕获
+                // 在 iPad 实机上增加更长的延迟时间，确保手势冲突完全解决
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  // 使用当前页面上下文而不是全局上下文，确保上下文正确
+                  if (context.mounted) {
+                    showPopUpWidget(
+                      context,
+                      const DownloadingPage(),
+                    );
+                  }
+                });
+              });
             },
           ),
         ),
@@ -1550,7 +1565,9 @@ class _DownloadPageState extends State<DownloadPage> {
       // 始终显示搜索按钮，根据模式执行不同的搜索逻辑
       actions.add(
         Tooltip(
-          message: logic.categorySearchMode ? "分类搜索".tl : (logic.tagSearchMode ? "标签搜索".tl : "搜索".tl),
+          message: logic.categorySearchMode
+              ? "分类搜索".tl
+              : (logic.tagSearchMode ? "标签搜索".tl : "搜索".tl),
           child: IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
@@ -1924,7 +1941,9 @@ class DownloadedComicTile extends ComicTile {
       .toList();
 
   @override
-  List<String>? get categories => category?.map((e) => App.locale.languageCode == "zh" ? e.translateTagsToCN : e).toList();
+  List<String>? get categories => category
+      ?.map((e) => App.locale.languageCode == "zh" ? e.translateTagsToCN : e)
+      .toList();
 
   @override
   String get description => "${size}MB";

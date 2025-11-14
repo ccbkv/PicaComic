@@ -46,10 +46,10 @@ class _LocalSearchPageState extends StateWithController<LocalSearchPage> {
         children: [
           SizedBox(
             height:
-            UiMode.m1(context) ? MediaQuery.of(context).padding.top : null,
+                UiMode.m1(context) ? MediaQuery.of(context).padding.top : null,
           ),
           Container(
-            height: 56,
+            height: 100,
             width: double.infinity,
             decoration: BoxDecoration(
                 border: Border(
@@ -102,13 +102,15 @@ class _LocalSearchPageState extends StateWithController<LocalSearchPage> {
                           App.globalContext!,
                           "创建收藏夹".tl,
                           "从当前的搜索结果创建新的收藏夹".tl,
-                              () {
+                          () {
                             var name = LocalFavoritesManager()
                                 .createFolder("search result", true);
                             for (var comic in comics) {
-                              LocalFavoritesManager().addComic(name, comic.comic);
+                              LocalFavoritesManager()
+                                  .addComic(name, comic.comic);
                             }
-                            StateController.findOrNull<FavoritesPageController>()
+                            StateController.findOrNull<
+                                    FavoritesPageController>()
                                 ?.update();
                           },
                         );
@@ -128,7 +130,7 @@ class _LocalSearchPageState extends StateWithController<LocalSearchPage> {
                 return LocalFavoriteTile(
                   comics[index].comic,
                   comics[index].folder,
-                      () => setState(() {}),
+                  () => setState(() {}),
                   true,
                   showFolderInfo: true,
                 );

@@ -80,7 +80,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.black),
+              border: Border.all(color: Theme.of(context).colorScheme.outline),
             ),
             child: TextButton(
               onPressed: () {
@@ -115,7 +115,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
                 });
               },
               style: TextButton.styleFrom(
-                foregroundColor: Colors.black,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
               child: const Text("分类过滤"),

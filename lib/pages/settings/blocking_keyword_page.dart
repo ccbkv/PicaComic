@@ -23,13 +23,21 @@ class BlockingKeywordPageLogic extends StateController {
     currentKeywords.add(keyword);
     controller.clear();
     update();
-    appdata.writeData();
+    if (currentTab == 0) {
+      appdata.writeBlockingKeyword();
+    } else {
+      appdata.writeJmBlockingKeyword();
+    }
   }
 
   void removeKeyword(String keyword) {
     currentKeywords.remove(keyword);
     update();
-    appdata.writeData();
+    if (currentTab == 0) {
+      appdata.writeBlockingKeyword();
+    } else {
+      appdata.writeJmBlockingKeyword();
+    }
   }
 
   void toggleOrder() {
@@ -183,8 +191,7 @@ class _BlockingKeywordPageState extends State<BlockingKeywordPage>
               color: Theme.of(context).colorScheme.primary,
               size: 30,
             ),
-            content:
-                Text("关键词屏蔽不会生效于收藏夹和历史记录, 屏蔽的依据仅限加载漫画列表时能够获取到的信息".tl),
+            content: Text("关键词屏蔽不会生效于收藏夹和历史记录, 屏蔽的依据仅限加载漫画列表时能够获取到的信息".tl),
             actions: [
               TextButton(
                 onPressed: logic.dismissBanner,

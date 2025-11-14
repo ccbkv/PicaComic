@@ -1082,6 +1082,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                 // 禁漫天堂漫画源，添加到禁漫天堂专用分区
                 if (!appdata.jmBlockingKeyword.contains(text)) {
                   appdata.jmBlockingKeyword.add(text);
+                  appdata.writeJmBlockingKeyword();
                   showToast(message: "已添加到禁漫天堂屏蔽关键词".tl);
                 } else {
                   showToast(message: "禁漫天堂屏蔽关键词已存在".tl);
@@ -1090,6 +1091,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                 // 其他漫画源，添加到通用分区
                 if (!appdata.blockingKeyword.contains(text)) {
                   appdata.blockingKeyword.add(text);
+                  appdata.writeBlockingKeyword();
                   showToast(message: "已添加到通用屏蔽关键词".tl);
                 } else {
                   showToast(message: "通用屏蔽关键词已存在".tl);
@@ -1115,7 +1117,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                 res += ":$text";
               }
               appdata.favoriteTags.add(res);
-              appdata.writeHistory();
+              appdata.writeFavoriteTags();
             },
           )
       ];
@@ -1846,7 +1848,7 @@ class _FavoriteComicWidgetState extends State<FavoriteComicWidget> {
       );
     }
 
-    Widget button = Button.filled(
+  Widget button = Button.filled(
       isLoading: isAdding,
       child: Text("收藏".tl),
       onPressed: () async {

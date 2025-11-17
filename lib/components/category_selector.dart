@@ -82,10 +82,16 @@ class _CategorySelectorState extends State<CategorySelector> {
             children: [
               TextButton(
                 onPressed: _selectAll,
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 child: const Text("全选"),
               ),
               TextButton(
                 onPressed: _clearAll,
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 child: const Text("取消全选"),
               ),
             ],
@@ -211,10 +217,16 @@ class _CategorySelectorDialogState extends State<CategorySelectorDialog> {
                 children: [
                   TextButton(
                     onPressed: _selectAll,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
                     child: const Text("全选"),
                   ),
                   TextButton(
                     onPressed: _clearAll,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
                     child: const Text("取消全选"),
                   ),
                 ],

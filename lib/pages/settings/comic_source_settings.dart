@@ -66,9 +66,9 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("漫画源"),
+        title: const Text("漫画源"),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
         automaticallyImplyLeading: true,
@@ -133,13 +133,12 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (App.isDesktop)
-                Tooltip(
-                  message: "编辑",
-                  child: IconButton(
-                      onPressed: () => edit(source),
-                      icon: const Icon(Icons.edit_note)),
-                ),
+              Tooltip(
+                message: "编辑",
+                child: IconButton(
+                    onPressed: () => edit(source),
+                    icon: const Icon(Icons.edit_note)),
+              ),
               Tooltip(
                 message: "更新",
                 child: IconButton(
@@ -174,27 +173,13 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   }
 
   void edit(ComicSource source) async {
-    try {
-      await Process.run("code", [source.filePath], runInShell: true);
-      await showDialog(
-          context: App.globalContext!,
-          builder: (context) => AlertDialog(
-                title: const Text("Reload Configs"),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("cancel")),
-                  TextButton(
-                      onPressed: () async {
-                        await ComicSource.reload();
-                        MyApp.updater?.call();
-                      },
-                      child: const Text("continue")),
-                ],
-              ));
-    } catch (e) {
-      showToast(message: "Failed to launch vscode");
-    }
+    // Use built-in editor for all platforms - no VS Code dependency
+    App.globalTo(
+      () => _EditFilePage(source.filePath, () async {
+        await ComicSource.reload();
+        MyApp.updater?.call();
+      }),
+    );
   }
 
   static void update(ComicSource source) async {
@@ -294,6 +279,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   void chooseFile() async {
     const XTypeGroup typeGroup = XTypeGroup(
       extensions: <String>['js'],
+      uniformTypeIdentifiers: <String>['public.javascript-source'],
     );
     final XFile? file =
         await openFile(acceptedTypeGroups: <XTypeGroup>[typeGroup]);
@@ -519,6 +505,78 @@ void _validatePages() {
   appdata.appSettings.networkFavorites = networkFavorites;
 
   appdata.updateSettings();
+}
+
+class _EditFilePage extends StatefulWidget {
+  const _EditFilePage(this.path, this.onExit);
+
+  final String path;
+
+  final void Function() onExit;
+
+  @override
+  State<_EditFilePage> createState() => __EditFilePageState();
+}
+
+class __EditFilePageState extends State<_EditFilePage> {
+  var current = '';
+
+  @override
+  void initState() {
+    super.initState();
+    current = File(widget.path).readAsStringSync();
+  }
+
+  @override
+  void dispose() {
+    File(widget.path).writeAsStringSync(current);
+    widget.onExit();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("编辑"),
+        actions: [
+          IconButton(
+            onPressed: () async {
+              // Save and reload configs
+              await ComicSource.reload();
+              MyApp.updater?.call();
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
+            },
+            icon: const Icon(Icons.save),
+            tooltip: "保存并重新加载配置",
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(height: 0.6, color: Theme.of(context).colorScheme.outlineVariant),
+          Expanded(
+            child: TextField(
+              controller: TextEditingController(text: current),
+              onChanged: (value) => current = value,
+              maxLines: null,
+              expands: true,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.all(16),
+              ),
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 void _addAllPagesWithComicSource(ComicSource source) {

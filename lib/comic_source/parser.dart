@@ -62,6 +62,7 @@ class ComicSourceParser {
     var minAppVersion = JsEngine().runCode("this['temp'].minAppVersion");
     var url = JsEngine().runCode("this['temp'].url");
     var matchBriefIdRegex = JsEngine().runCode("this['temp'].comic.matchBriefIdRegex");
+    var enableTagsTranslate = JsEngine().runCode("this['temp'].enableTagsTranslate") ?? false;
     if(minAppVersion != null){
       if(compareSemVer(minAppVersion, appVersion.split('-').first)){
         throw ComicSourceParseException("minAppVersion $minAppVersion is required");
@@ -112,7 +113,8 @@ class ComicSourceParser {
         url ?? "",
         version ?? "1.0.0",
         commentsLoader,
-        sendCommentFunc);
+        sendCommentFunc,
+        enableTagsTranslate);
 
     await source.loadData();
 

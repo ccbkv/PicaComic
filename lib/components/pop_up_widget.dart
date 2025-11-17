@@ -1,15 +1,16 @@
 part of 'components.dart';
 
 class PopUpWidget<T> extends PopupRoute<T> {
-  PopUpWidget(this.widget);
+  PopUpWidget(this.widget, {this.dismissible = true});
 
   final Widget widget;
+  final bool dismissible;
 
   @override
   Color? get barrierColor => Colors.black54;
 
   @override
-  bool get barrierDismissible => true;
+  bool get barrierDismissible => dismissible;
 
   @override
   String? get barrierLabel => "exit";
@@ -39,9 +40,11 @@ class PopUpWidget<T> extends PopupRoute<T> {
       ),
     );
     if (App.isIOS) {
+      // 在iPad上增加更严格的手势检测条件，避免意外触发返回手势
+      bool isIPad = MediaQuery.of(context).size.shortestSide > 600;
       body = IOSBackGestureDetector(
-        enabledCallback: () => true,
-        gestureWidth: 20.0,
+        enabledCallback: () => !isIPad, // 在iPad上禁用手势检测，避免意外关闭
+        gestureWidth: isIPad ? 0.0 : 20.0, // 在iPad上设置手势宽度为0
         onStartPopGesture: () =>
             IOSBackGestureController(controller!, navigator!),
         child: body,
@@ -85,8 +88,8 @@ class PopupIndicatorWidget extends InheritedWidget {
   }
 }
 
-Future<T> showPopUpWidget<T>(BuildContext context, Widget widget) async {
-  return await Navigator.of(context).push(PopUpWidget(widget));
+Future<T> showPopUpWidget<T>(BuildContext context, Widget widget, {bool dismissible = true}) async {
+  return await Navigator.of(context).push(PopUpWidget(widget, dismissible: dismissible));
 }
 
 class PopUpWidgetScaffold extends StatefulWidget {

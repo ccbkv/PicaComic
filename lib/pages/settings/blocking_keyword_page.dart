@@ -84,38 +84,51 @@ class _BlockingKeywordPageState extends State<BlockingKeywordPage>
 
   void _showAddKeywordDialog() {
     logic.controller.clear();
+    final now = DateTime.now();
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) {
-        return SimpleDialog(
-          title: Text("添加屏蔽关键词".tl),
-          children: [
-            const SizedBox(width: 300),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              child: TextField(
-                controller: logic.controller,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  hintText: "添加关键词".tl,
+        return TapRegion(
+          onTapOutside: (_) {
+            // Workaround for https://github.com/flutter/flutter/issues/177992
+            if (DateTime.now().difference(now) < const Duration(milliseconds: 500)) {
+              return;
+            }
+            if (Navigator.canPop(dialogContext)) {
+              Navigator.pop(dialogContext);
+            }
+          },
+          child: SimpleDialog(
+            title: Text("添加屏蔽关键词".tl),
+            children: [
+              const SizedBox(width: 300),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: TextField(
+                  controller: logic.controller,
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    hintText: "添加关键词".tl,
+                  ),
+                  onEditingComplete: () {
+                    logic.addKeyword();
+                    App.globalBack();
+                  },
                 ),
-                onEditingComplete: () {
-                  logic.addKeyword();
-                  App.globalBack();
-                },
               ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: FilledButton(
-                child: Text("提交".tl),
-                onPressed: () {
-                  logic.addKeyword();
-                  App.globalBack();
-                },
-              ),
-            )
-          ],
+              const SizedBox(height: 8),
+              Center(
+                child: FilledButton(
+                  child: Text("提交".tl),
+                  onPressed: () {
+                    logic.addKeyword();
+                    App.globalBack();
+                  },
+                ),
+              )
+            ],
+          ),
         );
       },
     );

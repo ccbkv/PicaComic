@@ -10,7 +10,9 @@ class ComicTileMenuOption {
 
 abstract class ComicTile extends StatelessWidget {
   /// Show a comic brief information. Usually displayed in comic list page.
-  const ComicTile({Key? key}) : super(key: key);
+  const ComicTile({Key? key, this.sourceKey}) : super(key: key);
+
+  final String? sourceKey;
 
   Widget get image;
 
@@ -343,6 +345,7 @@ abstract class ComicTile extends StatelessWidget {
                     badge: badge,
                     tags: tags,
                     categories: categories,
+                    sourceKey: sourceKey,
                     maxLines: maxLines,
                   ),
                 ),
@@ -428,7 +431,8 @@ class _ComicDescription extends StatelessWidget {
       this.badge,
       this.maxLines = 2,
       this.tags,
-      this.categories});
+      this.categories,
+      this.sourceKey});
 
   final String title;
   final String user;
@@ -437,12 +441,25 @@ class _ComicDescription extends StatelessWidget {
   final String? badge;
   final List<String>? tags;
   final List<String>? categories;
+  final String? sourceKey;
   final int maxLines;
 
   @override
   Widget build(BuildContext context) {
     if (tags != null) {
       tags!.removeWhere((element) => element.removeAllBlank == "");
+      // Debug output for translation
+      if (sourceKey != null && tags!.isNotEmpty) {
+        var source = ComicSource.find(sourceKey!);
+        print("DEBUG: ComicTile checking translation for $sourceKey");
+        print("DEBUG: isBuiltIn: ${source?.isBuiltIn}, enableTagsTranslate: ${source?.enableTagsTranslate}, language: ${App.locale.languageCode}");
+        if (source != null && !source.isBuiltIn && source.enableTagsTranslate && App.locale.languageCode == "zh") {
+          print("DEBUG: ComicTile translation ENABLED for $sourceKey, tags: ${tags!.length}");
+          print("DEBUG: First few tags: ${tags!.take(3).toList()}");
+        } else {
+          print("DEBUG: ComicTile translation DISABLED for $sourceKey");
+        }
+      }
     }
     if (categories != null) {
       categories!.removeWhere((element) => element.removeAllBlank == "");
@@ -515,7 +532,31 @@ class _ComicDescription extends StatelessWidget {
                                         const BorderRadius.all(Radius.circular(8)),
                                   ),
                                   child: Text(
-                                    s,
+                                    (){
+                                      // Check if translation should be enabled for JS plugins
+                                      //print("DEBUG: _ComicDescription processing tag '$s', sourceKey: $sourceKey");
+                                      if (sourceKey != null) {
+                                        var source = ComicSource.find(sourceKey!);
+                                        //print("DEBUG: Found source: ${source?.name}, isBuiltIn: ${source?.isBuiltIn}, enableTagsTranslate: ${source?.enableTagsTranslate}");
+                                        if (source != null && !source.isBuiltIn && source.enableTagsTranslate && App.locale.languageCode == "zh") {
+                                          // Parse namespace:tag format for translation
+                                          if (s.contains(':')) {
+                                            var parts = s.split(':');
+                                            var namespace = parts[0];
+                                            var tagText = parts.sublist(1).join(':');
+                                            var translated = TagsTranslation.translationTagWithNamespace(tagText, namespace);
+                                           // print("DEBUG: ComicTile translating tag '$s' -> '$translated'");
+                                            return translated;
+                                          } else {
+                                            // For tags without namespace, try direct translation
+                                            var translated = TagsTranslation.translationTagWithNamespace(s, "tag");
+                                           // print("DEBUG: ComicTile translating tag without namespace '$s' -> '$translated'");
+                                            return translated;
+                                          }
+                                        }
+                                      }
+                                      return s;
+                                    }(),
                                     style: const TextStyle(fontSize: 12),
                                   ),
                                 ),
@@ -578,7 +619,31 @@ class _ComicDescription extends StatelessWidget {
                                         const BorderRadius.all(Radius.circular(8)),
                                   ),
                                   child: Text(
-                                    s,
+                                    (){
+                                      // Check if translation should be enabled for JS plugins
+                                      //print("DEBUG: _ComicDescription processing TAG '$s', sourceKey: $sourceKey");
+                                      if (sourceKey != null) {
+                                        var source = ComicSource.find(sourceKey!);
+                                       // print("DEBUG: Found source: ${source?.name}, isBuiltIn: ${source?.isBuiltIn}, enableTagsTranslate: ${source?.enableTagsTranslate}");
+                                        if (source != null && !source.isBuiltIn && source.enableTagsTranslate && App.locale.languageCode == "zh") {
+                                          // Parse namespace:tag format for translation
+                                          if (s.contains(':')) {
+                                            var parts = s.split(':');
+                                            var namespace = parts[0];
+                                            var tagText = parts.sublist(1).join(':');
+                                            var translated = TagsTranslation.translationTagWithNamespace(tagText, namespace);
+                                            //print("DEBUG: ComicTile translating TAG '$s' -> '$translated'");
+                                            return translated;
+                                          } else {
+                                            // For tags without namespace, try direct translation
+                                            var translated = TagsTranslation.translationTagWithNamespace(s, "tag");
+                                           // print("DEBUG: ComicTile translating TAG without namespace '$s' -> '$translated'");
+                                            return translated;
+                                          }
+                                        }
+                                      }
+                                      return s;
+                                    }(),
                                     style: const TextStyle(fontSize: 12),
                                   ),
                                 ),
@@ -717,7 +782,7 @@ class NormalComicTile extends ComicTile {
       this.badgeName,
       this.headers,
       this.tags,
-      this.sourceKey,
+      super.sourceKey,
       super.key});
 
   final String description_;
@@ -728,7 +793,6 @@ class NormalComicTile extends ComicTile {
   final void Function()? onLongTap;
   final String? badgeName;
   final Map<String, String>? headers;
-  final String? sourceKey;
 
   @override
   final List<String>? tags;
@@ -861,6 +925,9 @@ class ComicTilePlaceholder extends StatelessWidget {
 
 class CustomComicTile extends ComicTile {
   const CustomComicTile(this.comic, {super.key, this.addonMenuOptions});
+  
+  @override
+  String? get sourceKey => comic.sourceKey;
 
   final CustomComic comic;
 
@@ -1132,6 +1199,7 @@ class _BlockingPaneState extends State<_BlockingPane> {
         appdata.blockingKeyword.add(word);
       }
     }
+    appdata.writeBlockingKeyword();
     appdata.writeData();
     for (var c in StateController.findAll<ComicsPageLogic>()) {
       c.update();

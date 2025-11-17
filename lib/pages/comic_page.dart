@@ -234,6 +234,23 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
   }
 
   @override
+  void onThumbnailTapped(int index) async {
+    var history = await History.findOrCreate(data!);
+    App.globalTo(
+      () => ComicReadingPage(
+        CustomReadingData(
+          data!.target,
+          data!.title,
+          ComicSource.find(sourceKey)!,
+          data!.chapters,
+        ),
+        index + 1,
+        history.ep,
+      ),
+    );
+  }
+
+  @override
   String? get title => data?.title;
 
   @override
@@ -715,7 +732,18 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
   Widget? get buildMoreInfo => null;
 
   /// translation tags to CN
-  bool get enableTranslationToCN => false;
+  bool get enableTranslationToCN {
+    var source = ComicSource.find(sourceKey);
+    // For JS plugins, check if enableTagsTranslate is true
+    if (source != null && !source.isBuiltIn && source.enableTagsTranslate) {
+      var shouldTranslate = App.locale.languageCode == "zh";
+     // print("DEBUG: JS Plugin $sourceKey enableTagsTranslate=${source.enableTagsTranslate}, language=${App.locale.languageCode}, shouldTranslate=$shouldTranslate");
+      return shouldTranslate;
+    }
+    // For built-in sources, use the default behavior
+   // print("DEBUG: Built-in source $sourceKey or enableTagsTranslate=false");
+    return false;
+  }
 
   String? get subTitle => null;
 
@@ -1172,8 +1200,11 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
               child: enableTranslationToCN
                   ? (title
                   ? label(text.translateTagsCategoryToCN)
-                  : label(TagsTranslation.translationTagWithNamespace(
-                  text, key)))
+                  : label((){
+                      var translated = TagsTranslation.translationTagWithNamespace(text, key);
+                      //print("DEBUG: Translating tag '$key:$text' -> '$translated'");
+                      return translated;
+                    }()))
                   : label(text),
             ),
           ),
@@ -1397,7 +1428,10 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
 
     _logic.colorIndex = 0;
 
+    //print("DEBUG: Building info cards for source $sourceKey, tags: ${tags?.keys}, enableTranslationToCN: $enableTranslationToCN");
+    
     for (var key in tags!.keys) {
+     // print("DEBUG: Processing tag category '$key' with ${tags![key]!.length} tags");
       yield Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
         child: Wrap(

@@ -638,6 +638,7 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
             builder: (context) => HitomiComicPage.fromLink(id)));
         break;
       case "htmanga":
+      case "htManga":
         Navigator.of(context)
             .push(MaterialPageRoute(builder: (context) => HtComicPage(id)));
         break;
@@ -815,6 +816,7 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
       case "hitomi":
         return "Hitomi";
       case "htmanga":
+      case "htManga":
         return "HTManga";
       case "nhentai":
         return "NHentai";
@@ -1023,9 +1025,9 @@ class _ImageProvider extends BaseImageProvider<_ImageProvider> {
 
   @override
   Future<Uint8List> load(StreamController<ImageChunkEvent> chunkEvents) async {
-    if (File(image.imagePath).existsSync()) {
-      return await File("${App.dataPath}/images/${image.imagePath}")
-          .readAsBytes();
+    var localFile = File("${App.dataPath}/images/${image.imagePath}");
+    if (localFile.existsSync()) {
+      return await localFile.readAsBytes();
     } else {
       var type = image.id.split("-")[0];
       Stream<DownloadProgress> stream;
@@ -1043,7 +1045,20 @@ class _ImageProvider extends BaseImageProvider<_ImageProvider> {
               HitomiFile.fromMap(image.otherInfo["hitomi"][image.page - 1]),
               image.otherInfo["galleryId"]);
         default:
-          stream = ImageManager().getImage(image.otherInfo["url"]);
+          var sourceKey = type;
+          var comicId = image.id.replaceFirst("$type-", "");
+          var eps = image.otherInfo["eps"];
+          String epId;
+          if (eps is Map) {
+            epId = (eps.keys.elementAtOrNull(image.ep - 1)?.toString()) ??
+                comicId;
+          } else if (eps is List) {
+            epId = (eps.elementAtOrNull(image.ep - 1)?.toString()) ?? comicId;
+          } else {
+            epId = comicId;
+          }
+          stream = ImageManager()
+              .getCustomImage(image.otherInfo["url"], comicId, epId, sourceKey);
       }
       DownloadProgress? finishProgress;
       await for (var progress in stream) {

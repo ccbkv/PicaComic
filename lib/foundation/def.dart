@@ -20,26 +20,26 @@ const String webUA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
 
 //App版本
-const appVersion = "4.3.0";
+const appVersion = "4.3.1";
 
 //定义宽屏设备的临界值
 const changePoint = 600;
 const changePoint2 = 1300;
 
 List<MaterialAccentColor> get colors => [
-  Colors.redAccent,
-  Colors.pinkAccent,
-  Colors.purpleAccent,
-  Colors.indigoAccent,
-  Colors.blueAccent,
-  Colors.cyanAccent,
-  Colors.tealAccent,
-  Colors.greenAccent,
-  Colors.limeAccent,
-  Colors.yellowAccent,
-  Colors.amberAccent,
-  Colors.orangeAccent,
-];
+      Colors.redAccent,
+      Colors.pinkAccent,
+      Colors.purpleAccent,
+      Colors.indigoAccent,
+      Colors.blueAccent,
+      Colors.cyanAccent,
+      Colors.tealAccent,
+      Colors.greenAccent,
+      Colors.limeAccent,
+      Colors.yellowAccent,
+      Colors.amberAccent,
+      Colors.orangeAccent,
+    ];
 
 const builtInSources = [
   "picacg",

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pica_comic/network/hitomi_network/hitomi_main_network.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/tools/translations.dart';
+import '../../base.dart';
 import '../../foundation/app.dart';
 import '../../network/hitomi_network/hitomi_models.dart';
 import 'package:pica_comic/components/components.dart';
@@ -51,7 +52,10 @@ class HitomiHomePageLogic extends StateController {
           message = r.errorMessage;
           return false;
         }
-        hitomiComics.add(r.data);
+        var brief = r.data;
+        if (!appdata.appSettings.fullyHideBlockedWorks || isBlocked(brief) == null) {
+          hitomiComics.add(brief);
+        }
       }
       return true;
     }
@@ -102,6 +106,36 @@ class HitomiHomePageComics extends StatelessWidget {
               withAppbar: false,
             );
           } else {
+            if (logic.hitomiComics.isEmpty) {
+              if (logic.comics != null && logic.comics!.toLoad < logic.comics!.total) {
+                Future.microtask(() => logic.loadNextPage(url));
+                return const CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: ListLoadingIndicator(),
+                    )
+                  ],
+                );
+              } else {
+                return const CustomScrollView(
+                  slivers: [
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off, size: 56),
+                            SizedBox(height: 12),
+                            Text("无匹配结果"),
+                          ],
+                        ),
+                      ),
+                    )
+                  ],
+                );
+              }
+            }
             return CustomScrollView(
               slivers: [
                 SliverGridComics(

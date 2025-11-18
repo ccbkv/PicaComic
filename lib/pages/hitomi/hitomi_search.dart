@@ -6,6 +6,7 @@ import 'package:pica_comic/network/hitomi_network/hitomi_main_network.dart';
 import 'package:pica_comic/network/hitomi_network/hitomi_models.dart';
 import 'package:shimmer_animation/shimmer_animation.dart';
 
+import '../../base.dart';
 import '../../foundation/app.dart';
 import '../../network/res.dart';
 
@@ -22,26 +23,66 @@ class SearchPageComicList extends StatefulWidget {
 }
 
 class _SearchPageComicListState
-    extends LoadingState<SearchPageComicList, List<int>> {
+    extends LoadingState<SearchPageComicList, List<HitomiComicBrief>> {
   @override
-  Widget buildContent(BuildContext context, List<int> data) {
+  Widget buildContent(BuildContext context, List<HitomiComicBrief> data) {
+    if (data.isEmpty) {
+      return SmoothCustomScrollView(
+        slivers: [
+          widget.head,
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.search_off, size: 56),
+                  SizedBox(height: 12),
+                  Text("无匹配结果"),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return SmoothCustomScrollView(
       slivers: [
         widget.head,
-        SliverGrid(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) => HitomiComicTileDynamicLoading(data[index]),
-            childCount: data.length,
-          ),
-          gridDelegate: SliverGridDelegateWithComics(),
+        SliverGridComics(
+          comics: data,
+          sourceKey: "hitomi",
         ),
       ],
     );
   }
 
   @override
-  Future<Res<List<int>>> loadData() {
-    return HiNetwork().search(widget.keyword);
+  Future<Res<List<HitomiComicBrief>>> loadData() async {
+    var res = await HiNetwork().search(widget.keyword);
+    if (res.error) return Res(null, errorMessage: res.errorMessage!);
+    var ids = res.data;
+    const int batchSize = 12;
+    const int targetCount = 60; // render ~60 items initially
+    const int maxPreload = 180; // cap preload to avoid long waiting
+    var briefs = <HitomiComicBrief>[];
+    for (var i = 0; i < ids.length && i < maxPreload; i += batchSize) {
+      var end = i + batchSize > ids.length ? ids.length : i + batchSize;
+      var batch = ids.sublist(i, end);
+      var futures = batch.map((id) => HiNetwork().getComicInfoBrief(id.toString())).toList();
+      var results = await Future.wait(futures);
+      for (var r in results) {
+        if (!r.error) {
+          var brief = r.data;
+          if (!appdata.appSettings.fullyHideBlockedWorks || isBlocked(brief) == null) {
+            briefs.add(brief);
+            if (briefs.length >= targetCount) break;
+          }
+        }
+      }
+      if (briefs.length >= targetCount) break;
+    }
+    return Res(briefs);
   }
 }
 

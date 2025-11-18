@@ -1009,7 +1009,7 @@ Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
   if (source == null) {
     throw "Comic Source $sourceKey Not Found";
   }
-  if (!appdata.appSettings.fullyHideBlockedWorks || sourceKey == 'hitomi') {
+  if (!appdata.appSettings.fullyHideBlockedWorks) {
     var blockWord = isBlocked(item);
     if (blockWord != null) {
       return Stack(
@@ -1064,14 +1064,25 @@ String? isBlocked(BaseComic item) {
       if (tag == word) {
         return word;
       }
+      var normalized = tag.replaceFirst(" ♀", "").replaceFirst(" ♂", "");
+      if (normalized == word) {
+        return word;
+      }
       if (tag.contains(':')) {
-        tag = tag.split(':')[1];
-        if (tag == word) {
+        var parts = tag.split(':');
+        var right = parts.sublist(1).join(':');
+        var rightNorm = right.replaceFirst(" ♀", "").replaceFirst(" ♂", "");
+        if (right == word || rightNorm == word) {
           return word;
         }
       }
-      if (item.enableTagsTranslation && tag.translateTagsToCN == word) {
-        return word;
+      if (item.enableTagsTranslation) {
+        if (tag.translateTagsToCN == word) {
+          return word;
+        }
+        if (normalized.translateTagsToCN == word) {
+          return word;
+        }
       }
     }
   }

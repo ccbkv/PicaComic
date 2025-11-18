@@ -23,10 +23,12 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
   @override
   final String id;
 
-  @override
-  final String? cover;
+  final String? _cover;
 
-  const PicacgComicPage(this.id, this.cover, {super.key});
+  const PicacgComicPage(this.id, this._cover, {super.key});
+
+  @override
+  String? get cover => _cover ?? data?.thumbUrl;
 
   @override
   ActionFunc? get onLike => () {

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:pica_comic/tools/extensions.dart';
@@ -72,14 +73,20 @@ class LogManager {
   }
 
   static File? logFile;
+  static final List<String> _buffer = <String>[];
+  static Timer? _flushTimer;
 
   static void writeLog(LogLevel level, String title, String content) {
-    if(logFile != null) {
-      logFile!.writeAsString(
-        "${DateTime.now().toIso8601String()} ${level.name}\n$title: $content\n\n",
-        mode: FileMode.append,
-      );
-    }
+    if (logFile == null) return;
+    _buffer.add(
+        "${DateTime.now().toIso8601String()} ${level.name}\n$title: $content\n\n");
+    _flushTimer?.cancel();
+    _flushTimer = Timer(const Duration(milliseconds: 500), () {
+      if (_buffer.isEmpty || logFile == null) return;
+      final data = _buffer.join();
+      _buffer.clear();
+      logFile!.writeAsString(data, mode: FileMode.append);
+    });
   }
 }
 
@@ -108,8 +115,10 @@ class Log {
 
   @override
   bool operator ==(Object other) {
-    if (other is! Log)  return false;
-    return other.level == level && other.title == title && other.content == content;
+    if (other is! Log) return false;
+    return other.level == level &&
+        other.title == title &&
+        other.content == content;
   }
 
   @override

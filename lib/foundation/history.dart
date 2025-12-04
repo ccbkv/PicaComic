@@ -331,24 +331,62 @@ class HistoryManager {
   }
 
   ///退出阅读器时调用此函数, 修改阅读位置
+  Timer? _debounceTimer;
+  History? _pendingHistory;
+  bool _pendingUpdateMePage = false;
+
   Future<void> saveReadHistory(History history,
       [bool updateMePage = true]) async {
+    _pendingHistory = History.fromMap(history.toMap());
+    _pendingUpdateMePage = _pendingUpdateMePage || updateMePage;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      final h = _pendingHistory;
+      if (h == null) return;
+      _db.execute("""
+          update history
+          set time = ${DateTime.now().millisecondsSinceEpoch}, ep = ?, page = ?, readEpisode = ?, max_page = ?
+          where target == ?;
+      """, [
+        h.ep,
+        h.page,
+        h.readEpisode.join(','),
+        h.maxPage,
+        h.target
+      ]);
+      if (_pendingUpdateMePage) {
+        scheduleMicrotask(() {
+          StateController.findOrNull(tag: "me_page")?.update();
+        });
+      }
+      _pendingUpdateMePage = false;
+      _pendingHistory = null;
+    });
+  }
+
+  void flushSave() {
+    final h = _pendingHistory;
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    if (h == null) return;
     _db.execute("""
         update history
         set time = ${DateTime.now().millisecondsSinceEpoch}, ep = ?, page = ?, readEpisode = ?, max_page = ?
         where target == ?;
     """, [
-      history.ep,
-      history.page,
-      history.readEpisode.join(','),
-      history.maxPage,
-      history.target
+      h.ep,
+      h.page,
+      h.readEpisode.join(','),
+      h.maxPage,
+      h.target
     ]);
-    if (updateMePage) {
+    if (_pendingUpdateMePage) {
       scheduleMicrotask(() {
         StateController.findOrNull(tag: "me_page")?.update();
       });
     }
+    _pendingUpdateMePage = false;
+    _pendingHistory = null;
   }
 
   void clearHistory() {
@@ -476,6 +514,7 @@ class HistoryManager {
       appdata.searchHistory.remove(plainKeyword);
     }
     appdata.searchHistory.add(plainKeyword);
+    appdata.writeSearchHistory();
     appdata.writeHistory();
   }
 }

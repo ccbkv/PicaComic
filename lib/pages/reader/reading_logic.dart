@@ -171,6 +171,7 @@ class ComicReadingPageLogic extends StateController {
     index = 1;
     pageController = PageController(initialPage: 1);
     isLoading = true;
+    requestedLoadingItems = [];
     update();
   }
 
@@ -253,6 +254,7 @@ class ComicReadingPageLogic extends StateController {
     tools = false;
     index = 1;
     pageController = PageController(initialPage: 1);
+    requestedLoadingItems = [];
     clearPhotoViewControllers();
     update();
   }
@@ -264,6 +266,7 @@ class ComicReadingPageLogic extends StateController {
     tools = false;
     this.index = 1;
     pageController = PageController(initialPage: 1);
+    requestedLoadingItems = [];
     clearPhotoViewControllers();
     update();
   }
@@ -287,6 +290,7 @@ class ComicReadingPageLogic extends StateController {
     tools = false;
     pageController = PageController(initialPage: 1);
     index = 1;
+    requestedLoadingItems = [];
     clearPhotoViewControllers();
     update();
   }
@@ -329,6 +333,7 @@ class ComicReadingPageLogic extends StateController {
     isLoading = true;
     tools = false;
     showSettings = false;
+    requestedLoadingItems = [];
     update();
   }
 

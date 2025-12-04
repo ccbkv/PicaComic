@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
@@ -237,7 +238,9 @@ class FavoriteItem {
 
   @override
   bool operator ==(Object other) {
-    return other is FavoriteItem && other.target == target && other.type == type;
+    return other is FavoriteItem &&
+        other.target == target &&
+        other.type == type;
   }
 
   @override
@@ -246,7 +249,7 @@ class FavoriteItem {
   @override
   String toString() {
     var s = "FavoriteItem: $name $author $coverPath $hashCode $tags";
-    if(s.length > 100) {
+    if (s.length > 100) {
       return s.substring(0, 100);
     }
     return s;
@@ -294,6 +297,10 @@ class LocalFavoritesManager {
 
   late Database _db;
 
+  final Set<String> _pendingTargets = {};
+  final Map<String, FavoriteType> _pendingTypes = {};
+  Timer? _debounceTimer;
+
   Future<void> init() async {
     _db = sqlite3.open("${App.dataPath}/local_favorite.db");
     _checkAndCreate();
@@ -322,7 +329,7 @@ class LocalFavoritesManager {
     }
     tables.remove('folder_sync');
     tables.remove('folder_order');
-    if(tables.isEmpty)  return;
+    if (tables.isEmpty) return;
     var testTable = tables.first;
     // 检查type是否是主键
     var res = _db.select("""
@@ -477,7 +484,8 @@ class LocalFavoritesManager {
         if (!folderNames.contains(comic.folder)) {
           createFolder(comic.folder);
         }
-        if (!comicExists(comic.folder, comic.comic.target, comic.comic.type.key)) {
+        if (!comicExists(
+            comic.folder, comic.comic.target, comic.comic.type.key)) {
           addComic(comic.folder, comic.comic);
           LogManager.addLog(LogLevel.info, "LocalFavoritesManager",
               "add comic ${comic.comic.target} to ${comic.folder}");
@@ -565,7 +573,7 @@ class LocalFavoritesManager {
     if (!tables.contains(folderName)) {
       return 0;
     }
-    
+
     return _db.select("""
       select count(*) as c
       from "$folderName"
@@ -599,7 +607,7 @@ class LocalFavoritesManager {
     if (!tables.contains(folder)) {
       return 0;
     }
-    
+
     return _db.select("""
         SELECT MAX(display_order) AS max_value
         FROM "$folder";
@@ -612,7 +620,7 @@ class LocalFavoritesManager {
     if (!tables.contains(folder)) {
       return 0;
     }
-    
+
     return _db.select("""
         SELECT MIN(display_order) AS min_value
         FROM "$folder";
@@ -625,7 +633,7 @@ class LocalFavoritesManager {
     if (!tables.contains(folder)) {
       return [];
     }
-    
+
     var rows = _db.select("""
         select * from "$folder"
         ORDER BY display_order;
@@ -639,7 +647,7 @@ class LocalFavoritesManager {
     if (!tables.contains(folder)) {
       return;
     }
-    
+
     _db.execute("""
       update "$folder"
       set tags = '$tag,' || tags
@@ -651,13 +659,13 @@ class LocalFavoritesManager {
   List<FavoriteItemWithFolderInfo> allComics() {
     var res = <FavoriteItemWithFolderInfo>[];
     final tables = _getTablesWithDB();
-    
+
     for (final folder in folderNames) {
       // 检查表是否存在
       if (!tables.contains(folder)) {
         continue;
       }
-      
+
       var comics = _db.select("""
         select * from "$folder";
       """);
@@ -715,7 +723,7 @@ class LocalFavoritesManager {
     if (!tables.contains(folder)) {
       return false;
     }
-    
+
     var res = _db.select("""
       select * from "$folder"
       where target == ? and type == ?;
@@ -729,7 +737,7 @@ class LocalFavoritesManager {
     if (!tables.contains(folder)) {
       throw Exception("Table '$folder' does not exist");
     }
-    
+
     var res = _db.select("""
       select * from "$folder"
       where target == ? and type == ?;
@@ -748,13 +756,13 @@ class LocalFavoritesManager {
     if (!folderNames.contains(folder)) {
       throw Exception("Folder does not exists");
     }
-    
+
     // 检查表是否存在
     final tables = _getTablesWithDB();
     if (!tables.contains(folder)) {
       throw Exception("Table '$folder' does not exist");
     }
-    
+
     var res = _db.select("""
       select * from "$folder"
       where target == '${comic.target}';
@@ -858,13 +866,13 @@ class LocalFavoritesManager {
 
   void deleteComicWithTarget(String folder, String target, FavoriteType type) {
     _modifiedAfterLastCache = true;
-    
+
     // 检查表是否存在
     final tables = _getTablesWithDB();
     if (!tables.contains(folder)) {
       return; // 如果表不存在，直接返回
     }
-    
+
     _db.execute("""
       delete from "$folder"
       where target == ? and type == ?;
@@ -914,51 +922,63 @@ class LocalFavoritesManager {
 
   void onReadEnd(String target, FavoriteType type) async {
     _modifiedAfterLastCache = true;
-    bool isModified = false;
-    for (final folder in folderNames) {
-      // 检查表是否存在
-      final tables = _getTablesWithDB();
-      if (!tables.contains(folder)) {
-        continue; // 跳过不存在的表
-      }
-      
-      var rows = _db.select("""
-        select * from "$folder"
-        where target == ? and type == ?;
-      """, [target, type.key]);
-      if (rows.isNotEmpty) {
-        isModified = true;
-        var newTime = DateTime.now()
-            .toIso8601String()
-            .replaceFirst("T", " ")
-            .substring(0, 19);
-        String updateLocationSql = "";
-        if (appdata.settings[54] == "1") {
-          int maxValue = _db.select("""
-            SELECT MAX(display_order) AS max_value
-            FROM "$folder";
-          """).firstOrNull?["max_value"] ?? 0;
-          updateLocationSql = "display_order = ${maxValue + 1},";
-        } else if (appdata.settings[54] == "2") {
-          int minValue = _db.select("""
-            SELECT MIN(display_order) AS min_value
-            FROM "$folder";
-          """).firstOrNull?["min_value"] ?? 0;
-          updateLocationSql = "display_order = ${minValue - 1},";
+    _pendingTargets.add(target);
+    _pendingTypes[target] = type;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () async {
+      if (_pendingTargets.isEmpty) return;
+      final targets = List<String>.from(_pendingTargets);
+      _pendingTargets.clear();
+      bool isModified = false;
+      _db.execute("BEGIN TRANSACTION;");
+      for (final t in targets) {
+        final type = _pendingTypes[t]!;
+        for (final folder in folderNames) {
+          final tables = _getTablesWithDB();
+          if (!tables.contains(folder)) {
+            continue;
+          }
+          var rows = _db.select("""
+            select * from "$folder"
+            where target == ? and type == ?;
+          """, [t, type.key]);
+          if (rows.isNotEmpty) {
+            isModified = true;
+            var newTime = DateTime.now()
+                .toIso8601String()
+                .replaceFirst("T", " ")
+                .substring(0, 19);
+            String updateLocationSql = "";
+            if (appdata.settings[54] == "1") {
+              int maxValue = _db.select("""
+                SELECT MAX(display_order) AS max_value
+                FROM "$folder";
+              """).firstOrNull?["max_value"] ?? 0;
+              updateLocationSql = "display_order = ${maxValue + 1},";
+            } else if (appdata.settings[54] == "2") {
+              int minValue = _db.select("""
+                SELECT MIN(display_order) AS min_value
+                FROM "$folder";
+              """).firstOrNull?["min_value"] ?? 0;
+              updateLocationSql = "display_order = ${minValue - 1},";
+            }
+            _db.execute("""
+                UPDATE "$folder"
+                SET 
+                  $updateLocationSql
+                  time = '$newTime'
+                WHERE target == '${t.toParam}';
+              """);
+          }
         }
-        _db.execute("""
-            UPDATE "$folder"
-            SET 
-              $updateLocationSql
-              time = '$newTime'
-            WHERE target == '${target.toParam}';
-          """);
+        _pendingTypes.remove(t);
       }
-    }
-    if (isModified) {
-      updateUI();
-    }
-    saveData();
+      _db.execute("COMMIT;");
+      if (isModified) {
+        updateUI();
+      }
+      saveData();
+    });
   }
 
   String folderToJsonString(String folderName) {
@@ -967,7 +987,7 @@ class LocalFavoritesManager {
     if (!tables.contains(folderName)) {
       return '{"error": "Table does not exist"}';
     }
-    
+
     var data = <String, dynamic>{};
     data["info"] = "Generated by PicaComic.";
     data["website"] = "https://github.com/ccbkv/PicaComic";
@@ -1012,7 +1032,7 @@ class LocalFavoritesManager {
       if (!tables.contains(table)) {
         continue; // 跳过不存在的表
       }
-      
+
       keyword = "%$keyword%";
       var res = _db.select("""
         SELECT * FROM "$table" 
@@ -1083,6 +1103,13 @@ class LocalFavoritesManager {
       update "$folder"
       set name = ?, author = ?, cover_path = ?, tags = ?
       where target == ? and type == ?;
-    """, [comic.name, comic.author, comic.coverPath, comic.tags.join(","), comic.target, comic.type.key]);
+    """, [
+      comic.name,
+      comic.author,
+      comic.coverPath,
+      comic.tags.join(","),
+      comic.target,
+      comic.type.key
+    ]);
   }
 }

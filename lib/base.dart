@@ -120,6 +120,7 @@ class Appdata {
     "gold-usergeneratedcontent.net", //87 hitomi cdn url
     "0",
     "2.0.11", //89 jm app version
+    "0",
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步
@@ -509,7 +510,7 @@ class Appdata {
         settings[i] = st[i];
       }
 
-      while (settings.length < 90) {
+      while (settings.length < 91) {
         settings.add("0");
       }
 
@@ -591,7 +592,7 @@ class Appdata {
         writeImplicitData();
       }
 
-      while (settings.length < 90) {
+      while (settings.length < 91) {
         settings.add("0");
       }
 

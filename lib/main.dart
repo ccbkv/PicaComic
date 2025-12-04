@@ -36,7 +36,7 @@ void main(List<String> args) {
       LogManager.addLog(LogLevel.error, "Unhandled Exception",
           "${details.exception}\n${details.stack}");
     };
-    
+
     setNetworkProxy();
     runApp(const MyApp());
     if (App.isDesktop) {
@@ -101,23 +101,27 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // 安全检查settings数组
     bool enableAuth = false;
     try {
-      enableAuth = appdata.settings.length > 13 ? appdata.settings[13] == "1" : false;
+      enableAuth =
+          appdata.settings.length > 13 ? appdata.settings[13] == "1" : false;
     } catch (e) {
-      LogManager.addLog(LogLevel.error, "MyApp.didChangeAppLifecycleState", "Error checking auth settings: $e");
+      LogManager.addLog(LogLevel.error, "MyApp.didChangeAppLifecycleState",
+          "Error checking auth settings: $e");
       enableAuth = false;
     }
-    
+
     if (App.isAndroid) {
       try {
-        bool highRefreshRate = appdata.settings.length > 38 ? appdata.settings[38] == "1" : false;
+        bool highRefreshRate =
+            appdata.settings.length > 38 ? appdata.settings[38] == "1" : false;
         if (highRefreshRate) {
           FlutterDisplayMode.setHighRefreshRate();
         }
       } catch (e) {
-        LogManager.addLog(LogLevel.error, "MyApp.didChangeAppLifecycleState", "Error checking refresh rate settings: $e");
+        LogManager.addLog(LogLevel.error, "MyApp.didChangeAppLifecycleState",
+            "Error checking refresh rate settings: $e");
       }
     }
-    
+
     setNetworkProxy();
     scheduleMicrotask(() {
       if (state == AppLifecycleState.hidden && enableAuth) {
@@ -148,35 +152,43 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     MyApp.updater = () => setState(() => forceRebuild = true);
     time = DateTime.now();
     TagsTranslation.readData();
-    
+
     // 安全检查Android高刷新率设置
     if (App.isAndroid) {
       try {
-        bool highRefreshRate = appdata.settings.length > 38 ? appdata.settings[38] == "1" : false;
+        bool highRefreshRate =
+            appdata.settings.length > 38 ? appdata.settings[38] == "1" : false;
         if (highRefreshRate) {
           FlutterDisplayMode.setHighRefreshRate();
         }
       } catch (e) {
-        LogManager.addLog(LogLevel.error, "MyApp.initState", "Error setting high refresh rate: $e");
+        LogManager.addLog(LogLevel.error, "MyApp.initState",
+            "Error setting high refresh rate: $e");
       }
     }
-    
+
     listenMouseSideButtonToBack();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WidgetsBinding.instance.addObserver(this);
     notifications.init();
-    
+
     // 安全检查截图阻止设置
     try {
-      bool shouldBlockScreenshot = appdata.settings.length > 12 ? appdata.settings[12] == "1" : false;
+      bool shouldBlockScreenshot =
+          appdata.settings.length > 12 ? appdata.settings[12] == "1" : false;
       if (shouldBlockScreenshot) {
         blockScreenshot();
       }
     } catch (e) {
-      LogManager.addLog(LogLevel.error, "MyApp.initState", "Error setting screenshot block: $e");
+      LogManager.addLog(LogLevel.error, "MyApp.initState",
+          "Error setting screenshot block: $e");
     }
-    
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 200 * 1024 * 1024;
+
+    if (App.isIOS) {
+      PaintingBinding.instance.imageCache.maximumSizeBytes = 200 * 1024 * 1024;
+    } else {
+      PaintingBinding.instance.imageCache.maximumSizeBytes = 200 * 1024 * 1024;
+    }
     super.initState();
   }
 
@@ -188,34 +200,40 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   (ColorScheme, ColorScheme) _generateColorSchemes(
       ColorScheme? light, ColorScheme? dark) {
     Color? color;
-    
+
     // 安全检查主题设置
     try {
-      int themeIndex = appdata.settings.length > 27 ? int.parse(appdata.settings[27]) : 0;
+      int themeIndex =
+          appdata.settings.length > 27 ? int.parse(appdata.settings[27]) : 0;
       if (themeIndex != 0) {
         color = colors[themeIndex - 1];
       } else {
         color = light?.primary ?? Colors.blueAccent;
       }
     } catch (e) {
-      LogManager.addLog(LogLevel.error, "MyApp._generateColorSchemes", "Error getting theme color: $e");
+      LogManager.addLog(LogLevel.error, "MyApp._generateColorSchemes",
+          "Error getting theme color: $e");
       color = light?.primary ?? Colors.blueAccent;
     }
-    
+
     final lightScheme = ColorScheme.fromSeed(seedColor: color);
-    final darkScheme = ColorScheme.fromSeed(seedColor: color, brightness: Brightness.dark);
-    
+    final darkScheme =
+        ColorScheme.fromSeed(seedColor: color, brightness: Brightness.dark);
+
     // 安全检查纯黑色模式设置
     try {
-      bool pureBlackMode = appdata.settings.length > 84 ? appdata.settings[84] == "1" : false;
+      bool pureBlackMode =
+          appdata.settings.length > 84 ? appdata.settings[84] == "1" : false;
       if (pureBlackMode) {
-        final modifiedDarkScheme = darkScheme.copyWith(surface: Colors.black).harmonized();
+        final modifiedDarkScheme =
+            darkScheme.copyWith(surface: Colors.black).harmonized();
         return (lightScheme, modifiedDarkScheme);
       }
     } catch (e) {
-      LogManager.addLog(LogLevel.error, "MyApp._generateColorSchemes", "Error checking pure black mode: $e");
+      LogManager.addLog(LogLevel.error, "MyApp._generateColorSchemes",
+          "Error checking pure black mode: $e");
     }
-    
+
     return (lightScheme, darkScheme);
   }
 
@@ -231,7 +249,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // 检查firstUse[3]的值
       return appdata.firstUse.length > 3 ? appdata.firstUse[3] != "1" : true;
     } catch (e) {
-      LogManager.addLog(LogLevel.error, "MyApp._checkFirstUse", "Error checking firstUse: $e");
+      LogManager.addLog(LogLevel.error, "MyApp._checkFirstUse",
+          "Error checking firstUse: $e");
       return true; // 发生错误时，显示欢迎页面
     }
   }
@@ -284,7 +303,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   );
                 } else if (snapshot.hasError) {
                   // 发生错误，显示欢迎页面
-                  LogManager.addLog(LogLevel.error, "MyApp.onGenerateRoute", "Error checking firstUse: ${snapshot.error}");
+                  LogManager.addLog(LogLevel.error, "MyApp.onGenerateRoute",
+                      "Error checking firstUse: ${snapshot.error}");
                   return const WelcomePage();
                 } else {
                   // 根据firstUse[3]的值决定显示哪个页面

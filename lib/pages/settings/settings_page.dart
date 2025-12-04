@@ -406,6 +406,28 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               width: 140,
             ),
           ),
+          if (App.isIOS)
+            ListTile(
+              leading: const Icon(Icons.tab),
+              title: Text("启用iOS原生底部导航栏,iOS26或以上有液態玻璃".tl),
+              subtitle: Text("使用原生UITabBar效果".tl),
+              trailing: Switch(
+                value: (() {
+                  while (appdata.settings.length <= 90) {
+                    appdata.settings.add("0");
+                  }
+                  return appdata.settings[90] == "1";
+                })(),
+                onChanged: (b) {
+                  while (appdata.settings.length <= 90) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[90] = b ? "1" : "0";
+                  appdata.updateSettings();
+                  MyApp.updater?.call();
+                },
+              ),
+            ),
           if (appdata.settings[32] == "0" || appdata.settings[32] == "2")
             ListTile(
               leading: const Icon(Icons.remove_red_eye),
@@ -478,11 +500,11 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         ListTile(
           title: Text("本地漫画的存储路径".tl),
           subtitle: Text(DownloadManager().path ?? "", softWrap: false),
-
           trailing: IconButton(
             icon: const Icon(Icons.copy),
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: DownloadManager().path ?? ""));
+              Clipboard.setData(
+                  ClipboardData(text: DownloadManager().path ?? ""));
               context.showMessage(message: "路径已复制到剪贴板".tl);
             },
           ),
@@ -490,7 +512,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
         if (App.isDesktop || App.isAndroid)
           ListTile(
-           // leading: const Icon(Icons.folder),
+            // leading: const Icon(Icons.folder),
             title: Text("设置下载目录".tl),
             onTap: () => setDownloadFolder(),
             trailing: TextButton(
@@ -498,8 +520,6 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               child: Text('设置'.tl),
             ),
           ),
-
-
 
         ListTile(
           title: Text("缓存大小".tl),
@@ -520,19 +540,17 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
             setState(() {});
           },
         ),
-    
 
- 
-         ListTile(
-          title: Text("缓存限制".tl),
-          subtitle: Text('${bytesLengthToReadableSize(CacheManager().limitSize)}'),
-          onTap: setCacheLimit,
-          //trailing: const Icon(Icons.arrow_right),
-          trailing: TextButton(
-            onPressed: setCacheLimit,
-            child: Text('设置'.tl),
-         )),
- 
+        ListTile(
+            title: Text("缓存限制".tl),
+            subtitle:
+                Text('${bytesLengthToReadableSize(CacheManager().limitSize)}'),
+            onTap: setCacheLimit,
+            //trailing: const Icon(Icons.arrow_right),
+            trailing: TextButton(
+              onPressed: setCacheLimit,
+              child: Text('设置'.tl),
+            )),
 
         // ListTile(
         //   leading: const Icon(Icons.sd_storage_outlined),
@@ -543,7 +561,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         ListTile(
           //leading: const Icon(Icons.delete_forever),
           title: Text("删除所有数据".tl),
-         // trailing: const Icon(Icons.arrow_right),
+          // trailing: const Icon(Icons.arrow_right),
           onTap: () => clearUserData(context),
           trailing: TextButton(
             onPressed: () => clearUserData(context),
@@ -552,7 +570,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         ),
 
         ListTile(
-         // leading: const Icon(Icons.sim_card_download),
+          // leading: const Icon(Icons.sim_card_download),
           title: Text("导出用户数据".tl),
           onTap: () => exportDataSetting(context),
           trailing: TextButton(
@@ -561,7 +579,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           ),
         ),
         ListTile(
-         // leading: const Icon(Icons.data_object),
+          // leading: const Icon(Icons.data_object),
           title: Text("导入用户数据".tl),
           onTap: () => importDataSetting(context),
           trailing: TextButton(
@@ -570,7 +588,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           ),
         ),
         ListTile(
-         // leading: const Icon(Icons.sync),
+          // leading: const Icon(Icons.sync),
           title: Text("数据同步".tl),
           onTap: () => syncDataSettings(context),
           trailing: TextButton(
@@ -581,7 +599,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
         if (App.isAndroid)
           ListTile(
-          //  leading: const Icon(Icons.screenshot),
+            //  leading: const Icon(Icons.screenshot),
             title: Text("阻止屏幕截图".tl),
             subtitle: Text("需要重启App以应用更改".tl),
             trailing: Switch(
@@ -599,7 +617,6 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           leading: const Icon(Icons.person_outline),
         ),
 
-  
         ListTile(
           title: Text("语言".tl),
           //leading: const Icon(Icons.language),
@@ -627,7 +644,6 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           //icon: const Icon(Icons.security),
         ),
 
-
         if (App.isAndroid)
           ListTile(
             title: Text("应用链接".tl),
@@ -640,9 +656,9 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           ),
         //if (kDebugMode)
         //  const ListTile(
-         //   title: Text("De.bug"),
-       //     onTap: debug,
-       //   ),
+        //   title: Text("De.bug"),
+        //     onTap: debug,
+        //   ),
         Padding(
             padding:
                 EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
@@ -734,7 +750,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     final Widget body = switch (currentPage) {
       -1 => const SizedBox(),
       0 => buildExploreSettings(context, false),
-     // 1 => const ComicSourceSettings(),
+      // 1 => const ComicSourceSettings(),
       1 => const ReadingSettings(false),
       2 => buildAppearanceSettings(),
       3 => const LocalFavoritesSettings(),
@@ -759,17 +775,17 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
                     : IconButton(
                         icon: const Icon(Icons.arrow_back),
                         onPressed: () {
-                      // 检查是否在移动端模式下
-                      if (!enableTwoViews) {
-                        // 在移动端模式下，只返回到主设置页面
-                        setState(() => currentPage = -1);
-                      } else {
-                        // 在双视图模式下，执行原有逻辑
-                        setState(() => currentPage = -1);
-                        widget.onPop?.call();
-                        Navigator.of(context).pop();
-                      }
-                    },
+                          // 检查是否在移动端模式下
+                          if (!enableTwoViews) {
+                            // 在移动端模式下，只返回到主设置页面
+                            setState(() => currentPage = -1);
+                          } else {
+                            // 在双视图模式下，执行原有逻辑
+                            setState(() => currentPage = -1);
+                            widget.onPop?.call();
+                            Navigator.of(context).pop();
+                          }
+                        },
                       )),
             SliverToBoxAdapter(
               child: body,

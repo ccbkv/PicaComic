@@ -440,20 +440,28 @@ extension ImageExt on ComicReadingPage {
     if (logic.requestedLoadingItems.length != logic.length) {
       logic.requestedLoadingItems = List.filled(logic.length + 1, false);
     }
-    int precacheNum = int.parse(appdata.settings[28]) + index;
+    int ahead = int.parse(appdata.settings[28]);
+    if (App.isIOS) {
+      ahead = ahead.clamp(0, 2);
+    }
+    int precacheNum = ahead + index;
     for (; index < precacheNum; index++) {
       if (index >= logic.urls.length || logic.requestedLoadingItems[index]) {
         return;
       }
       precacheImage(createImageProvider(type, logic, index, target), context);
+      logic.requestedLoadingItems[index] = true;
     }
     if (!ImageManager.haveTask) {
-      precacheNum += 3;
+      if (!App.isIOS) {
+        precacheNum += 3;
+      }
       for (; index < precacheNum; index++) {
         if (index >= logic.urls.length || logic.requestedLoadingItems[index]) {
           return;
         }
         precacheImage(createImageProvider(type, logic, index, target), context);
+        logic.requestedLoadingItems[index] = true;
       }
     }
   }

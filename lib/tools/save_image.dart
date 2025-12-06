@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:pica_comic/components/components.dart';
@@ -15,7 +16,7 @@ void saveImage(File file) async {
   var data = await file.readAsBytes();
   var type = detectFileType(data);
   var fileName = file.name;
-  if(!fileName.contains('.')) {
+  if (!fileName.contains('.')) {
     fileName += type.ext;
   }
   if (App.isAndroid || App.isIOS) {
@@ -42,10 +43,14 @@ void saveImage(File file) async {
 }
 
 Future<String> persistentCurrentImage(File file) async {
-  var newFile = File("${App.dataPath}/images/${file.path.split('/').last})}");
+  final data = await file.readAsBytes();
+  final type = detectFileType(data);
+  final hash = md5.convert(data).toString();
+  final fileName = "$hash${type.ext})}";
+  final newFile = File("${App.dataPath}/images/$fileName");
   if (!(await newFile.exists())) {
     newFile.createSync(recursive: true);
-    newFile.writeAsBytesSync(await file.readAsBytes());
+    newFile.writeAsBytesSync(data);
   }
   return newFile.path;
 }

@@ -977,6 +977,7 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
     }
   }
 
+
   void _showMenu(String folder, Offset location) {
     showMenu(
         context: App.globalContext!,
@@ -991,10 +992,49 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
             },
           ),
           PopupMenuItem(
+            child: Text("排序".tl),
+            onTap: () {
+              App.globalBack();
+              App.globalTo(() => LocalFavoritesFolder(folder))
+                  .then((value) => controller.update());
+            },
+          ),
+          PopupMenuItem(
             child: Text("重命名".tl),
             onTap: () {
               App.globalBack();
               rename(folder);
+            },
+          ),
+          PopupMenuItem(
+            child: Text("检查漫画存活".tl),
+            onTap: () {
+              App.globalBack();
+              checkFolder(folder).then((value) {
+                controller.update();
+              });
+            },
+          ),
+          PopupMenuItem(
+            child: Text("导出".tl),
+            onTap: () {
+              App.globalBack();
+              export(folder);
+            },
+          ),
+          PopupMenuItem(
+            child: Text("下载全部".tl),
+            onTap: () {
+              App.globalBack();
+              addDownload(folder);
+            },
+          ),
+          PopupMenuItem(
+            child: Text("更新漫画信息".tl),
+            onTap: () {
+              App.globalBack();
+              var comics = LocalFavoritesManager().getAllComics(folder);
+              UpdateFavoritesInfoDialog.show(comics, folder);
             },
           ),
         ]);
@@ -1008,9 +1048,38 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
             deleteFolder(folder);
           }),
       DesktopMenuEntry(
+          text: "排序".tl,
+          onClick: () {
+            App.globalTo(() => LocalFavoritesFolder(folder))
+                .then((value) => controller.update());
+          }),
+      DesktopMenuEntry(
           text: "重命名".tl,
           onClick: () {
             rename(folder);
+          }),
+      DesktopMenuEntry(
+          text: "检查漫画存活".tl,
+          onClick: () {
+            checkFolder(folder).then((value) {
+              controller.update();
+            });
+          }),
+      DesktopMenuEntry(
+          text: "导出".tl,
+          onClick: () {
+            export(folder);
+          }),
+      DesktopMenuEntry(
+          text: "下载全部".tl,
+          onClick: () {
+            addDownload(folder);
+          }),
+      DesktopMenuEntry(
+          text: "更新漫画信息".tl,
+          onClick: () {
+            var comics = LocalFavoritesManager().getAllComics(folder);
+            UpdateFavoritesInfoDialog.show(comics, folder);
           }),
     ]);
   }
@@ -1035,6 +1104,30 @@ mixin class _LocalFavoritesManager {
         context: App.globalContext!,
         builder: (context) => RenameFolderDialog(folder));
     StateController.find<FavoritesPageController>().update();
+  }
+
+  void export(String folder) async {
+    var controller = showLoadingDialog(
+      App.globalContext!,
+      onCancel: () {},
+      message: "正在导出".tl,
+    );
+    try {
+      await exportStringDataAsFile(
+          LocalFavoritesManager().folderToJsonString(folder), "$folder.json");
+      controller.close();
+    } catch (e, s) {
+      controller.close();
+      showToast(message: e.toString());
+      log("$e\n$s", "IO", LogLevel.error);
+    }
+  }
+
+  void addDownload(String folder) {
+    for (var comic in LocalFavoritesManager().getAllComics(folder)) {
+      comic.addDownload();
+    }
+    showToast(message: "已添加下载任务".tl);
   }
 }
 

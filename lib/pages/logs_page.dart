@@ -13,12 +13,47 @@ class LogsPage extends StatefulWidget {
 }
 
 class _LogsPageState extends State<LogsPage> {
+  String logLevelToShow = "all";
+
+
   @override
   Widget build(BuildContext context) {
+       var logToShow = logLevelToShow == "all"
+        ? LogManager.logs
+        : LogManager.logs.where((log) => log.level.name == logLevelToShow).toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text("Logs"),
         actions: [
+             IconButton(
+              onPressed: () => setState(() {
+                    final RelativeRect position = RelativeRect.fromLTRB(
+                      MediaQuery.of(context).size.width,
+                      MediaQuery.of(context).padding.top + kToolbarHeight,
+                      0.0,
+                      0.0,
+                    );
+                    showMenu(context: context, position: position, items: [
+                      PopupMenuItem(
+                          child: Text("all"),
+                          onTap: () => setState(() => logLevelToShow = "all")
+                      ),
+                      PopupMenuItem(
+                          child: Text("info"),
+                          onTap: () => setState(() => logLevelToShow = "info")
+                      ),
+                      PopupMenuItem(
+                          child: Text("warning"),
+                          onTap: () => setState(() => logLevelToShow = "warning")
+                      ),
+                      PopupMenuItem(
+                          child: Text("error"),
+                          onTap: () => setState(() => logLevelToShow = "error")
+                      ),
+                    ]);
+              }),
+              icon: const Icon(Icons.filter_list_outlined)
+          ),       
           IconButton(onPressed: ()=>setState(() {
             final RelativeRect position = RelativeRect.fromLTRB(
               MediaQuery.of(context).size.width,
@@ -49,9 +84,9 @@ class _LogsPageState extends State<LogsPage> {
       body: ListView.builder(
         reverse: true,
         controller: ScrollController(),
-        itemCount: LogManager.logs.length,
+        itemCount: logToShow.length,
         itemBuilder: (context, index){
-          index =  LogManager.logs.length - index - 1;
+          var log = logToShow[logToShow.length - index - 1];
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: SelectionArea(
@@ -67,7 +102,7 @@ class _LogsPageState extends State<LogsPage> {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(5, 0, 5, 1),
-                          child: Text(LogManager.logs[index].title),
+                          child: Text(log.title),
                         ),
                       ),
                       const SizedBox(width: 3,),
@@ -77,22 +112,22 @@ class _LogsPageState extends State<LogsPage> {
                             Theme.of(context).colorScheme.error,
                             Theme.of(context).colorScheme.errorContainer,
                             Theme.of(context).colorScheme.primaryContainer
-                          ][LogManager.logs[index].level.index],
+                          ][log.level.index],
                           borderRadius: const BorderRadius.all(Radius.circular(16)),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(5, 0, 5, 1),
                           child: Text(
-                            LogManager.logs[index].level.name,
-                            style: TextStyle(color: LogManager.logs[index].level.index==0?Colors.white:Colors.black),),
+                            log.level.name,
+                            style: TextStyle(color: log.level.index==0?Colors.white:Colors.black),),
                         ),
                       ),
                     ],
                   ),
-                  Text(LogManager.logs[index].content),
-                  Text(LogManager.logs[index].time.toString().replaceAll(RegExp(r"\.\w+"), "")),
+                  Text(log.content),
+                  Text(log.time.toString().replaceAll(RegExp(r"\.\w+"), "")),
                   TextButton(onPressed: (){
-                    Clipboard.setData(ClipboardData(text: LogManager.logs[index].content));
+                    Clipboard.setData(ClipboardData(text: log.content));
                   }, child: Text("复制".tl)),
                   const Divider(),
                 ],

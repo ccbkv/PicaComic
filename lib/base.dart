@@ -506,8 +506,12 @@ class Appdata {
         st = [];
       }
 
-      for (int i = 0; i < st.length && i < settings.length; i++) {
-        settings[i] = st[i];
+      for (int i = 0; i < st.length; i++) {
+        if (i < settings.length) {
+          settings[i] = st[i];
+        } else {
+          settings.add(st[i]);
+        }
       }
 
       while (settings.length < 91) {

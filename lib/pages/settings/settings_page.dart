@@ -14,6 +14,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/base.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:pica_comic/comic_source/built_in/picacg.dart';
 import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/comic_source/built_in/jm.dart';
@@ -44,6 +45,8 @@ import '../../tools/debug.dart';
 import '../../tools/io.dart';
 import '../welcome_page.dart';
 import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/tools/font_manager.dart';
+import 'package:pica_comic/pages/settings/font_management_page.dart';
 
 part "reading_settings.dart";
 part "picacg_settings.dart";
@@ -392,6 +395,66 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               },
               width: 140,
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.font_download),
+            title: Text("字体".tl),
+            trailing: Select(
+              initialValue: (() {
+                while (appdata.settings.length <= 95) {
+                  appdata.settings.add("");
+                }
+                var font = appdata.settings[95];
+                if (font.isEmpty) return 0;
+                var index = FontManager().availableFonts.indexOf(font);
+                return index == -1 ? 0 : index + 1;
+              })(),
+              values: ["Default"] + FontManager().availableFonts,
+              onChange: (i) {
+                while (appdata.settings.length <= 95) {
+                  appdata.settings.add("");
+                }
+                if (i == 0) {
+                  appdata.settings[95] = "";
+                } else {
+                  appdata.settings[95] = FontManager().availableFonts[i - 1];
+                }
+                appdata.updateSettings();
+                MyApp.updater?.call();
+              },
+              width: 140,
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.add_circle_outline),
+            title: Text("导入字体".tl),
+            onTap: () async {
+              FilePickerResult? result = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['ttf', 'otf'],
+              );
+
+              if (result != null && result.files.single.path != null) {
+                var name =
+                    await FontManager().addFont(result.files.single.path!);
+                if (name != null) {
+                  setState(() {});
+                }
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.folder_open),
+            title: Text("字体管理器".tl),
+            //  subtitle: FutureBuilder<String?>(
+            //  future: FontManager().getFontsDir(),
+            //  builder: (context, snapshot) {
+            //  return Text(snapshot.data ?? "");
+            //   },
+            // ),
+            onTap: () {
+              App.to(context, () => const FontManagementPage());
+            },
           ),
           ListTile(
             leading: const Icon(Icons.dark_mode),

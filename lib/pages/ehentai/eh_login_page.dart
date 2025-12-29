@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:pica_comic/base.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/pages/ehentai/eh_user_cookie_parser.dart';
 import 'package:pica_comic/pages/webview.dart';
@@ -109,17 +110,20 @@ class _EhLoginPageState extends State<EhLoginPage> {
                       switchInCurve: Curves.easeInOut,
                       switchOutCurve: Curves.easeInOut,
                       child: cookieParserController.visible
-                          ? _buildCookieParserButtonGroup(cookieParserController)
+                          ? _buildCookieParserButtonGroup(
+                              cookieParserController)
                           : TextButton(
-                        onPressed: () {
-                          if (cookieParserController.visible) return;
-                          cookieParserController.show();
-                          setState(() {});
-                        },
-                        child: Text('通过 cookie 身份信息快速填写'.tl),
-                      ),
+                              onPressed: () {
+                                if (cookieParserController.visible) return;
+                                cookieParserController.show();
+                                setState(() {});
+                              },
+                              child: Text('通过 cookie 身份信息快速填写'.tl),
+                            ),
                     ),
-                    const SizedBox(height: 8,),
+                    const SizedBox(
+                      height: 8,
+                    ),
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
@@ -229,6 +233,11 @@ class _EhLoginPageState extends State<EhLoginPage> {
                 "https://forums.e-hentai.org/index.php?act=Login&CODE=00",
             onTitleChange: (title, controller) async {
               if (title == "E-Hentai Forums") {
+                var ua = await controller.getUA();
+                if (ua != null) {
+                  appdata.implicitData[3] = ua;
+                  appdata.writeImplicitData();
+                }
                 var cookies1 =
                     await controller.getCookies("https://e-hentai.org") ?? {};
                 var cookies2 =
@@ -251,10 +260,13 @@ class _EhLoginPageState extends State<EhLoginPage> {
           initialUrl: "https://forums.e-hentai.org/index.php?act=Login&CODE=00",
           onTitleChange: (url, webview) async {
             if (url == "E-Hentai Forums") {
-              var cookies1 =
-                  await webview.getCookies("https://e-hentai.org");
-              var cookies2 =
-                  await webview.getCookies("https://exhentai.org");
+              var ua = webview.userAgent;
+              if (ua != null) {
+                appdata.implicitData[3] = ua;
+                appdata.writeImplicitData();
+              }
+              var cookies1 = await webview.getCookies("https://e-hentai.org");
+              var cookies2 = await webview.getCookies("https://exhentai.org");
               webview.close();
               var cookies = <String, String>{};
               cookies1.forEach((key, value) {
@@ -302,8 +314,9 @@ class _EhLoginPageState extends State<EhLoginPage> {
         .cookieJar
         .saveFromResponse(Uri.parse("https://exhentai.org"), cookies);
 
-    EhNetwork().getUserName().then((b) {
-      if(!mounted)  return;
+    // EhNetwork().getUserName().then((b) {
+    EhNetwork().validateCookies().then((b) {
+      if (!mounted) return;
       if (b) {
         context.pop();
         showToast(message: "登录成功".tl);

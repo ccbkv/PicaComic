@@ -145,8 +145,10 @@ final ehentai = ComicSource.named(
     allowReLogin: false,
     onLogin: (BuildContext context) async {
       await context.to(() => const EhLoginPage());
-      var cookies = EhNetwork().cookieJar.loadForRequest(Uri.parse("https://e-hentai.org"));
-      if(!cookies.any((e) => e.name == 'ipb_member_id')) {
+      var cookies = EhNetwork()
+          .cookieJar
+          .loadForRequest(Uri.parse("https://e-hentai.org"));
+      if (!cookies.any((e) => e.name == 'ipb_member_id')) {
         return;
       }
       var ehentai = ComicSource.find('ehentai')!;
@@ -163,8 +165,9 @@ final ehentai = ComicSource.named(
     },
     infoItems: [
       AccountInfoItem(
-        title: "用户名",
-        data: () => ComicSource.find('ehentai')!.data['name'] ?? '',
+        title: "已登录",
+        // title: "用户名",
+        // data: () => ComicSource.find('ehentai')!.data['name'] ?? '',
       ),
       AccountInfoItem(
         title: "",
@@ -238,11 +241,9 @@ class _EhGalleryTile extends ComicTile {
           continue;
         }
         if (App.locale.languageCode != "zh") {
-          res.add(
-              splits[1].length > 32
-                  ? "${splits[1].substring(0,20)}..."
-                  : splits[1]
-          );
+          res.add(splits[1].length > 32
+              ? "${splits[1].substring(0, 20)}..."
+              : splits[1]);
           continue;
         }
         var lowLevelKey = ["character", "artist", "cosplayer", "group"];

@@ -15,18 +15,21 @@ import 'package:flutter/services.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/tools/extensions.dart';
 
-extension TagsTranslation on String{
+extension TagsTranslation on String {
   static final Map<String, Map<String, String>> _data = {};
 
-  static Future<void> readData() async{
+  static Future<void> readData() async {
     var fileName = App.locale.countryCode == 'TW'
         ? "assets/tags_tw.json"
         : "assets/tags.json";
     var data = await rootBundle.load(fileName);
-    List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    const JsonDecoder().convert(const Utf8Decoder().convert(bytes)).forEach((key, value){
+    List<int> bytes =
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    const JsonDecoder()
+        .convert(const Utf8Decoder().convert(bytes))
+        .forEach((key, value) {
       _data[key] = {};
-      value.forEach((key1, value1){
+      value.forEach((key1, value1) {
         _data[key]?[key1] = value1;
       });
     });
@@ -37,31 +40,41 @@ extension TagsTranslation on String{
   }
 
   /// 对tag进行处理后进行翻译: 代表'或'的分割符'|', namespace.
-  static String _translateTags(String tag){
+  static String _translateTags(String tag) {
     if (tag.contains('|')) {
       var splits = tag.split(' | ');
-      return enTagsTranslations[splits[0]]??enTagsTranslations[splits[1]]??tag;
-    } else if(tag.contains(':')) {
+      return enTagsTranslations[splits[0]] ??
+          enTagsTranslations[splits[1]] ??
+          tag;
+    } else if (tag.contains(':')) {
       var splits = tag.split(':');
-      if(_haveNamespace(splits[0])) {
+      if (_haveNamespace(splits[0])) {
         return translationTagWithNamespace(splits[1], splits[0]);
       } else {
         return tag;
       }
     } else {
-      return enTagsTranslations[tag]??tag;
+      return enTagsTranslations[tag] ?? tag;
     }
   }
 
   /// translate tag's text to chinese
-  String get translateTagsToCN => _translateTags(this);
+  /// *hitomi: exclude gender symbol
+  String get translateTagsToCN {
+    if (endsWith(" ♀")) {
+      return "${_translateTags(replaceLast(" ♀", ''))} ♀";
+    } else if (contains(" ♂")) {
+      return "${_translateTags(replaceLast(" ♂", ''))} ♂";
+    }
+    return _translateTags(this);
+  }
 
-  static String translationTagWithNamespace(String text, String namespace){
+  static String translationTagWithNamespace(String text, String namespace) {
     text = text.toLowerCase();
-    if(text != "reclass" && text.endsWith('s')){
+    if (text != "reclass" && text.endsWith('s')) {
       text.replaceLast('s', '');
     }
-    return switch(namespace){
+    return switch (namespace) {
       "male" => maleTags[text] ?? text,
       "female" => femaleTags[text] ?? text,
       "mixed" => mixedTags[text] ?? text,
@@ -77,23 +90,24 @@ extension TagsTranslation on String{
     };
   }
 
-  String _categoryTextDynamic(String c){
-    if(App.locale.languageCode == "zh"){
+  String _categoryTextDynamic(String c) {
+    if (App.locale.languageCode == "zh") {
       return translateTagsCategoryToCN;
-    }else{
+    } else {
       return this;
     }
   }
 
   String get categoryTextDynamic => _categoryTextDynamic(this);
 
-  String get translateTagsCategoryToCN => tagsCategoryTranslations[this]??this;
+  String get translateTagsCategoryToCN =>
+      tagsCategoryTranslations[this] ?? this;
 
-  get tagsCategoryTranslations => switch(App.locale.countryCode){
-    "CN" => tagsCategoryTranslationsCN,
-    "TW" => tagsCategoryTranslationsTW,
-    _ => tagsCategoryTranslationsCN
-  };
+  get tagsCategoryTranslations => switch (App.locale.countryCode) {
+        "CN" => tagsCategoryTranslationsCN,
+        "TW" => tagsCategoryTranslationsTW,
+        _ => tagsCategoryTranslationsCN
+      };
 
   static const tagsCategoryTranslationsCN = {
     "language": "语言",
@@ -103,6 +117,7 @@ extension TagsTranslation on String{
     "mixed": "混合",
     "other": "其它",
     "parody": "原作",
+    "Series": "原作",
     "character": "角色",
     "group": "团队",
     "cosplayer": "Coser",
@@ -125,6 +140,7 @@ extension TagsTranslation on String{
     "mixed": "混合",
     "other": "其他",
     "parody": "原作",
+    "Series": "原作",
     "character": "角色",
     "group": "團隊",
     "cosplayer": "Coser",
@@ -143,23 +159,27 @@ extension TagsTranslation on String{
 
   static Map<String, String> get femaleTags => _data["female"] ?? const {};
 
-  static Map<String, String> get languageTranslations => _data["language"] ?? const {};
+  static Map<String, String> get languageTranslations =>
+      _data["language"] ?? const {};
 
   static Map<String, String> get parodyTags => _data["parody"] ?? const {};
 
-  static Map<String, String> get characterTranslations => _data["character"] ?? const {};
+  static Map<String, String> get characterTranslations =>
+      _data["character"] ?? const {};
 
   static Map<String, String> get otherTags => _data["other"] ?? const {};
 
   static Map<String, String> get mixedTags => _data["mixed"] ?? const {};
 
-  static Map<String, String> get characterTags => _data["character"] ?? const {};
+  static Map<String, String> get characterTags =>
+      _data["character"] ?? const {};
 
   static Map<String, String> get artistTags => _data["artist"] ?? const {};
 
   static Map<String, String> get groupTags => _data["group"] ?? const {};
 
-  static Map<String, String> get cosplayerTags => _data["cosplayer"] ?? const {};
+  static Map<String, String> get cosplayerTags =>
+      _data["cosplayer"] ?? const {};
 
   static Map<String, String> get reclassTags => _data["reclass"] ?? const {};
 
@@ -167,29 +187,41 @@ extension TagsTranslation on String{
   ///
   /// Not include artists and group
   static MultipleMap<String, String> get enTagsTranslations => MultipleMap([
-    maleTags, femaleTags, languageTranslations, parodyTags, characterTranslations,
-    otherTags, mixedTags
-  ]);
+        maleTags,
+        femaleTags,
+        languageTranslations,
+        parodyTags,
+        characterTranslations,
+        otherTags,
+        mixedTags
+      ]);
 }
 
-extension MapExtensions<S,T> on Map<S,T>{
+extension MapExtensions<S, T> on Map<S, T> {}
 
+enum TranslationType {
+  female,
+  male,
+  mixed,
+  language,
+  other,
+  group,
+  artist,
+  cosplayer,
+  parody,
+  character,
+  reclass
 }
 
-enum TranslationType{
-  female, male, mixed, language, other, group, artist, cosplayer, parody,
-  character, reclass
-}
-
-class MultipleMap<S, T>{
+class MultipleMap<S, T> {
   final List<Map<S, T>> maps;
 
   MultipleMap(this.maps);
 
-  T? operator[](S key) {
-    for (var map in maps){
+  T? operator [](S key) {
+    for (var map in maps) {
       var value = map[key];
-      if(value != null){
+      if (value != null) {
         return value;
       }
     }

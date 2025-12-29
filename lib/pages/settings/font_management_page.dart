@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/app.dart';
+import 'package:pica_comic/main.dart';
 import 'package:pica_comic/tools/font_manager.dart';
 import 'package:pica_comic/tools/translations.dart';
 
@@ -32,7 +34,8 @@ class _FontManagementPageState extends State<FontManagementPage> {
         var files = await dir.list().toList();
         fonts = files.whereType<File>().toList();
         // Sort by name
-        fonts.sort((a, b) => a.uri.pathSegments.last.compareTo(b.uri.pathSegments.last));
+        fonts.sort((a, b) =>
+            a.uri.pathSegments.last.compareTo(b.uri.pathSegments.last));
       }
     }
     setState(() {
@@ -54,6 +57,9 @@ class _FontManagementPageState extends State<FontManagementPage> {
                   itemCount: fonts.length,
                   itemBuilder: (context, index) {
                     var file = fonts[index];
+                    if (!file.existsSync()) {
+                      return const SizedBox();
+                    }
                     var name = file.uri.pathSegments.last;
                     return ListTile(
                       leading: const Icon(Icons.font_download),
@@ -75,6 +81,12 @@ class _FontManagementPageState extends State<FontManagementPage> {
                               TextButton(
                                 onPressed: () async {
                                   App.globalBack();
+                                  var fontName = name.split('.').first;
+                                  if (appdata.settings[95] == fontName) {
+                                    appdata.settings[95] = "";
+                                    appdata.updateSettings();
+                                    MyApp.updater?.call();
+                                  }
                                   await file.delete();
                                   await FontManager().scanFonts();
                                   loadFonts();

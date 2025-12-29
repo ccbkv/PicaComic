@@ -38,7 +38,18 @@ class _SelectState extends State<Select> {
   bool isHover = false;
 
   @override
+  void didUpdateWidget(covariant Select oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != oldWidget.initialValue) {
+      value = widget.initialValue;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (value != null && value! >= widget.values.length) {
+      value = 0;
+    }
     if (value != null && value! < 0) value = null;
     return MouseRegion(
       onEnter: (_) => setState(() => isHover = true),

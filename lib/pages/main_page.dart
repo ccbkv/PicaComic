@@ -94,19 +94,13 @@ class MainPageState extends State<MainPage> {
   }
 
   List<Widget> get _pages => [
-    const MePage(
-      key: PageStorageKey('me'),
-    ),
-    FavoritesPage(
-      key: PageStorageKey('favorites'),
-    ),
-    ExplorePage(
-      key: PageStorageKey('explore'),
-    ),
-    const AllCategoryPage(
-      key: PageStorageKey('categories'),
-    ),
-  ];
+        const MePage(),
+        FavoritesPage(),
+        ExplorePage(
+          key: Key(appdata.appSettings.explorePages.length.toString()),
+        ),
+        const AllCategoryPage(),
+      ];
 
   void _login() {
     network.updateProfile().then((res) {

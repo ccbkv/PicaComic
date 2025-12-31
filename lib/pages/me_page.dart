@@ -138,68 +138,75 @@ class MePage extends StatelessWidget {
   }
 
   Widget buildHistory(BuildContext context) {
-    var history = HistoryManager().getRecent();
-    return InkWell(
-      onTap: () => context.to(() => const HistoryPage()),
-      mouseCursor: SystemMouseCursors.click,
-      borderRadius: BorderRadius.circular(12),
-      child: Card.outlined(
-        margin: EdgeInsets.zero,
-        color: Colors.transparent,
-        child: Container(
-          margin: EdgeInsets.zero,
-          width: double.infinity,
-          child: Column(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.history),
-                title: Text("${"历史记录".tl}(${HistoryManager().count()})"),
-                trailing: const Icon(Icons.chevron_right),
-                mouseCursor: SystemMouseCursors.click,
-              ),
-              SizedBox(
-                height: 128,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: history.length,
-                  itemBuilder: (context, index) {
-                    return InkWell(
-                      onTap: () =>
-                          toComicPageWithHistory(context, history[index]),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        width: 96,
-                        height: 128,
-                        margin: const EdgeInsets.symmetric(horizontal: 8),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          color:
-                              Theme.of(context).colorScheme.secondaryContainer,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: AnimatedImage(
-                          image: CachedImageProvider(
-                            history[index].cover,
-                            sourceKey: history[index].type.comicSource?.key,
-                          ),
-                          width: 96,
-                          height: 128,
-                          fit: BoxFit.cover,
-                          filterQuality: FilterQuality.medium,
-                        ),
+    return StateBuilder<SimpleController>(
+        tag: "me_page",
+        init: SimpleController(),
+        builder: (controller) {
+          var history = HistoryManager().getRecent();
+          return InkWell(
+            onTap: () => context.to(() => const HistoryPage()),
+            mouseCursor: SystemMouseCursors.click,
+            borderRadius: BorderRadius.circular(12),
+            child: Card.outlined(
+              margin: EdgeInsets.zero,
+              color: Colors.transparent,
+              child: Container(
+                margin: EdgeInsets.zero,
+                width: double.infinity,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.history),
+                      title: Text("${"历史记录".tl}(${HistoryManager().count()})"),
+                      trailing: const Icon(Icons.chevron_right),
+                      mouseCursor: SystemMouseCursors.click,
+                    ),
+                    SizedBox(
+                      height: 128,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: history.length,
+                        itemBuilder: (context, index) {
+                          return InkWell(
+                            onTap: () =>
+                                toComicPageWithHistory(context, history[index]),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 96,
+                              height: 128,
+                              margin: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondaryContainer,
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: AnimatedImage(
+                                image: CachedImageProvider(
+                                  history[index].cover,
+                                  sourceKey:
+                                      history[index].type.comicSource?.key,
+                                ),
+                                width: 96,
+                                height: 128,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.medium,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
+                    ).paddingHorizontal(8),
+                    const SizedBox(
+                      height: 12,
+                    )
+                  ],
                 ),
-              ).paddingHorizontal(8),
-              const SizedBox(
-                height: 12,
-              )
-            ],
-          ),
-        ),
-      ),
-    );
+              ),
+            ),
+          );
+        });
   }
 
   Widget buildAccount(double width) {

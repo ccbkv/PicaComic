@@ -2,7 +2,7 @@ part of pica_settings;
 
 class MultiPagesFilter extends StatefulWidget {
   const MultiPagesFilter(this.title, this.settingsIndex, this.pages,
-      {super.key});
+      {super.key, this.onChange});
 
   final String title;
 
@@ -10,6 +10,8 @@ class MultiPagesFilter extends StatefulWidget {
 
   // key - showName
   final Map<String, String> pages;
+
+  final VoidCallback? onChange;
 
   @override
   State<MultiPagesFilter> createState() => _MultiPagesFilterState();
@@ -136,5 +138,6 @@ class _MultiPagesFilterState extends State<MultiPagesFilter> {
   void updateSetting() {
     appdata.settings[widget.settingsIndex] = keys.join(",");
     appdata.updateSettings();
+    widget.onChange?.call();
   }
 }

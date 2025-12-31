@@ -102,6 +102,14 @@ class NaviPaneState extends State<NaviPane>
       _kBottomBarHeight + MediaQuery.of(context).padding.bottom;
 
   void onNavigatorStateChange() {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      if (mounted) setState(() {});
+    }
     onRebuild(context);
   }
 
@@ -172,36 +180,51 @@ class NaviPaneState extends State<NaviPane>
   @override
   Widget build(BuildContext context) {
     onRebuild(context);
-    return _NaviPopScope(
-      action: () {
-        if (App.mainNavigatorKey!.currentState!.canPop()) {
+    bool internalCanPop = widget.observer.routes.length > 1;
+    bool rootCanPop = Navigator.of(context).canPop();
+    return PopScope(
+      canPop: !internalCanPop && !rootCanPop,
+      onPopInvoked: (didPop) async {
+        if (didPop) {
+          return;
+        }
+        if (internalCanPop) {
           App.mainNavigatorKey!.currentState!.maybePop();
-        } else {
+        } else if (rootCanPop) {
           SystemNavigator.pop();
         }
       },
-      popGesture: App.isIOS && context.width >= changePoint,
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, child) {
-          final value = controller.value;
-          return Stack(
-            children: [
-              Positioned(
-                left: _kFoldedSideBarWidth * ((value - 2.0).clamp(-1.0, 0.0)),
-                top: 0,
-                bottom: 0,
-                child: buildLeft(),
-              ),
-              Positioned.fill(
-                left: _kFoldedSideBarWidth * ((value - 1).clamp(0, 1)) +
-                    (_kSideBarWidth - _kFoldedSideBarWidth) *
-                        ((value - 2).clamp(0, 1)),
-                child: buildMainView(),
-              ),
-            ],
-          );
+      child: _NaviPopScope(
+        action: () {
+          if (App.mainNavigatorKey!.currentState!.canPop()) {
+            App.mainNavigatorKey!.currentState!.maybePop();
+          } else {
+            SystemNavigator.pop();
+          }
         },
+        popGesture: App.isIOS && context.width >= changePoint,
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (context, child) {
+            final value = controller.value;
+            return Stack(
+              children: [
+                Positioned(
+                  left: _kFoldedSideBarWidth * ((value - 2.0).clamp(-1.0, 0.0)),
+                  top: 0,
+                  bottom: 0,
+                  child: buildLeft(),
+                ),
+                Positioned.fill(
+                  left: _kFoldedSideBarWidth * ((value - 1).clamp(0, 1)) +
+                      (_kSideBarWidth - _kFoldedSideBarWidth) *
+                          ((value - 2).clamp(0, 1)),
+                  child: buildMainView(),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

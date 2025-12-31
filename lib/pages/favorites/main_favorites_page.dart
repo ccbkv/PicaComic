@@ -14,6 +14,7 @@ import "package:pica_comic/tools/translations.dart";
 
 import "../../network/net_fav_to_local.dart";
 import "../../tools/io_tools.dart";
+import "../settings/settings_page.dart";
 import "local_favorites.dart";
 import "local_search_page.dart";
 import "network_favorite_page.dart";
@@ -455,6 +456,57 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                                           .onSurface,
                                     ),
                                   ),
+                                  const Spacer(),
+                                  Builder(
+                                    builder: (context) => IconButton(
+                                      icon: const Icon(Icons.more_horiz),
+                                      onPressed: () {
+                                        final renderBox = context
+                                            .findRenderObject() as RenderBox;
+                                        final offset = renderBox
+                                            .localToGlobal(Offset.zero);
+                                        showDesktopMenu(
+                                          context,
+                                          Offset(offset.dx, offset.dy),
+                                          [
+                                            DesktopMenuEntry(
+                                              icon: Icons.add,
+                                              text: '创建收藏夹'.tl,
+                                              onClick: () {
+                                                Future.delayed(
+                                                    const Duration(
+                                                        milliseconds: 0), () {
+                                                  // Navigator.of(buildContext)
+                                                  //     .pop();
+                                                  showDialog(
+                                                          context: App
+                                                              .globalContext!,
+                                                          builder: (context) =>
+                                                              const CreateFolderDialog())
+                                                      .then((value) =>
+                                                          controller.update());
+                                                });
+                                              },
+                                            ),
+                                            DesktopMenuEntry(
+                                              icon: Icons.reorder,
+                                              text: '排序'.tl,
+                                              onClick: () {
+                                                Future.delayed(
+                                                    const Duration(
+                                                        milliseconds: 0), () {
+                                                  // Navigator.of(buildContext)
+                                                  //     .pop();
+                                                  App.globalTo(() =>
+                                                      const _FoldersReorderPage());
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -487,6 +539,19 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                                           .onSurface,
                                     ),
                                   ),
+                                  const Spacer(),
+                                  IconButton(
+                                    icon: const Icon(Icons.settings, size: 20),
+                                    onPressed: () {
+                                      showPopUpWidget(
+                                          App.globalContext!,
+                                          MultiPagesFilter(
+                                              "网络收藏页面".tl,
+                                              68,
+                                              networkFavorites(),
+                                              onChange: controller.update));
+                                    },
+                                  ),
                                 ],
                               ),
                             ),
@@ -513,28 +578,6 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              // 新建收藏夹按钮
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(buildContext).pop(); // 关闭抽屉
-                                    showDialog(
-                                      context: App.globalContext!,
-                                      builder: (context) =>
-                                          const CreateFolderDialog(),
-                                    ).then((value) => controller.update());
-                                  },
-                                  icon: const Icon(
-                                      Icons.create_new_folder_outlined,
-                                      size: 16),
-                                  label: const Text("新建",
-                                      style: TextStyle(fontSize: 12)),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 6),
-                                  ),
-                                ),
-                              ),
                               const SizedBox(width: 8),
                               // 搜索按钮
                               Expanded(
@@ -555,23 +598,7 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          // 第二行按钮
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.of(buildContext).pop(); // 关闭抽屉
-                                App.globalTo(() => const _FoldersReorderPage());
-                              },
-                              icon: const Icon(Icons.reorder, size: 16),
-                              label: const Text("排序收藏夹",
-                                  style: TextStyle(fontSize: 12)),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 6),
-                              ),
-                            ),
-                          ),
+
                         ],
                       ),
                     ),
@@ -618,6 +645,46 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const Spacer(),
+              Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.more_horiz),
+                  onPressed: () {
+                    final renderBox = context.findRenderObject() as RenderBox;
+                    final offset = renderBox.localToGlobal(Offset.zero);
+                    showDesktopMenu(
+                      context,
+                      Offset(offset.dx, offset.dy),
+                      [
+                        DesktopMenuEntry(
+                          icon: Icons.add,
+                          text: '创建收藏夹'.tl,
+                          onClick: () {
+                            Future.delayed(const Duration(milliseconds: 0), () {
+                              // Navigator.of(context).pop();
+                              showDialog(
+                                      context: App.globalContext!,
+                                      builder: (context) =>
+                                          const CreateFolderDialog())
+                                  .then((value) => controller.update());
+                            });
+                          },
+                        ),
+                        DesktopMenuEntry(
+                          icon: Icons.reorder,
+                          text: '排序'.tl,
+                          onClick: () {
+                            Future.delayed(const Duration(milliseconds: 0), () {
+                              // Navigator.of(context).pop();
+                              App.globalTo(() => const _FoldersReorderPage());
+                            });
+                          },
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -675,6 +742,19 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.settings, size: 20),
+                        onPressed: () {
+                          showPopUpWidget(
+                              App.globalContext!,
+                              MultiPagesFilter(
+                                  "网络收藏页面".tl,
+                                  68,
+                                  networkFavorites(),
+                                  onChange: controller.update));
+                        },
                       ),
                     ],
                   ),
@@ -889,25 +969,14 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 创建新收藏夹按钮
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                showDialog(
-                        context: context,
-                        builder: (context) => const CreateFolderDialog())
-                    .then((value) => controller.update());
-              },
-              icon: const Icon(Icons.create_new_folder_outlined, size: 18),
-              label: Text("新建收藏夹".tl),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-              ),
-            ),
-          ),
           const SizedBox(height: 8),
           // 搜索按钮
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -921,19 +990,7 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
           ),
           const SizedBox(height: 8),
           // 排序按钮
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                context.to(() => const _FoldersReorderPage());
-              },
-              icon: const Icon(Icons.reorder, size: 18),
-              label: Text("排序".tl),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-              ),
-            ),
-          ),
+
         ],
       ),
     );

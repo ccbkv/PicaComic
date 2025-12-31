@@ -99,7 +99,6 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
   final icons = <IconData>[
     Icons.explore,
-    Icons.source,
     Icons.book,
     Icons.color_lens,
     Icons.collections_bookmark_rounded,

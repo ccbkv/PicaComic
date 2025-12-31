@@ -386,14 +386,17 @@ class MenuButton extends StatelessWidget {
   const MenuButton({
     super.key,
     required this.entries,
+    this.icon,
   });
 
   final List<DesktopMenuEntry> entries;
 
+  final Icon? icon;
+
   @override
   Widget build(BuildContext context) {
     return Button.icon(
-      icon: const Icon(Icons.more_vert),
+      icon: icon ?? const Icon(Icons.more_vert),
       onPressed: () {
         final renderBox = context.findRenderObject() as RenderBox;
         final offset = renderBox.localToGlobal(Offset.zero);

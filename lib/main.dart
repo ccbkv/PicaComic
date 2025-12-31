@@ -350,16 +350,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 shortcuts: {
                   LogicalKeySet(LogicalKeyboardKey.escape): VoidCallbackIntent(
                     () {
-                      // 检查当前是否在主页、收藏夹、发现或分类页面
-                      final navigator = App.mainNavigatorKey?.currentState;
-                      if (navigator != null && navigator.canPop()) {
-                        // 只有在导航栈中有页面时才执行pop
-                        navigator.pop();
-                      } else if (App.canPop) {
-                        // 如果全局导航栈可以pop，则执行全局pop
+                      final globalNavigator = App.navigatorKey.currentState;
+                      if (globalNavigator != null && globalNavigator.canPop()) {
                         App.globalBack();
+                      } else {
+                        final mainNavigator = App.mainNavigatorKey?.currentState;
+                        if (mainNavigator != null && mainNavigator.canPop()) {
+                          mainNavigator.pop();
+                        }
                       }
-                      // 在主页、收藏夹、发现或分类页面时不执行任何操作，避免黑屏
                     },
                   ),
                 },

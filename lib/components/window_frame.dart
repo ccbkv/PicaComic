@@ -201,14 +201,19 @@ class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
   @override
   void initState() {
     windowManager.addListener(this);
+    _updateState();
+    Future.delayed(const Duration(milliseconds: 200), _updateState);
+    super.initState();
+  }
+
+  void _updateState() {
     windowManager.isMaximized().then((value) {
-      if (value) {
+      if (mounted && isMaximized != value) {
         setState(() {
-          isMaximized = true;
+          isMaximized = value;
         });
       }
     });
-    super.initState();
   }
 
   @override
@@ -231,6 +236,15 @@ class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
       isMaximized = false;
     });
     super.onWindowUnmaximize();
+  }
+
+  @override
+  void onWindowEnterFullScreen() {}
+
+  @override
+  void onWindowLeaveFullScreen() {
+    _updateState();
+    Future.delayed(const Duration(milliseconds: 300), _updateState);
   }
 
   @override
@@ -264,6 +278,9 @@ class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
               hoverColor: hoverColor,
               onPressed: () {
                 windowManager.unmaximize();
+                setState(() {
+                  isMaximized = false;
+                });
               },
             )
           else
@@ -274,6 +291,9 @@ class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
               hoverColor: hoverColor,
               onPressed: () {
                 windowManager.maximize();
+                setState(() {
+                  isMaximized = true;
+                });
               },
             ),
           WindowButton(

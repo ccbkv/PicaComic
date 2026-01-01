@@ -374,8 +374,9 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
         // 保存原始context的引用，用于按钮点击事件
         final originalContext = context;
 
-        return SlideTransition(
-          position: Tween<Offset>(
+        return StateBuilder<FavoritesPageController>(
+          builder: (controller) => SlideTransition(
+            position: Tween<Offset>(
             begin: const Offset(-1.0, 0.0), // 从左侧开始
             end: Offset.zero,
           ).animate(CurvedAnimation(
@@ -476,8 +477,6 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                                                 Future.delayed(
                                                     const Duration(
                                                         milliseconds: 0), () {
-                                                  // Navigator.of(buildContext)
-                                                  //     .pop();
                                                   showDialog(
                                                           context: App
                                                               .globalContext!,
@@ -495,8 +494,6 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                                                 Future.delayed(
                                                     const Duration(
                                                         milliseconds: 0), () {
-                                                  // Navigator.of(buildContext)
-                                                  //     .pop();
                                                   App.globalTo(() =>
                                                       const _FoldersReorderPage());
                                                 });
@@ -607,7 +604,7 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
               ),
             ),
           ),
-        );
+        ));
       },
       transitionBuilder: (context, animation, secondaryAnimation, child) {
         return child;
@@ -663,7 +660,6 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                           text: '创建收藏夹'.tl,
                           onClick: () {
                             Future.delayed(const Duration(milliseconds: 0), () {
-                              // Navigator.of(context).pop();
                               showDialog(
                                       context: App.globalContext!,
                                       builder: (context) =>
@@ -677,7 +673,6 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
                           text: '排序'.tl,
                           onClick: () {
                             Future.delayed(const Duration(milliseconds: 0), () {
-                              // Navigator.of(context).pop();
                               App.globalTo(() => const _FoldersReorderPage());
                             });
                           },

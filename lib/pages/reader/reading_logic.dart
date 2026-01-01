@@ -343,6 +343,10 @@ class ComicReadingPageLogic extends StateController {
     const channel = MethodChannel("pica_comic/full_screen");
     channel.invokeMethod("set", !isFullScreen);
     isFullScreen = !isFullScreen;
+    if(App.isDesktop){
+      windowManager.setFullScreen(isFullScreen);
+    }
+    WindowFrame.of(App.globalContext!).setWindowFrame(!isFullScreen);
     focusNode.requestFocus();
 
     if(isFullScreen){

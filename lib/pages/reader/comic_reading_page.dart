@@ -16,6 +16,7 @@ import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/components/custom_slider.dart';
 import 'package:pica_comic/components/scrollable_list/src/item_positions_listener.dart';
 import 'package:pica_comic/components/scrollable_list/src/scrollable_positioned_list.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:pica_comic/components/window_frame.dart';
 import 'package:pica_comic/foundation/image_loader/base_image_provider.dart';
 import 'package:pica_comic/foundation/image_loader/file_image_loader.dart';

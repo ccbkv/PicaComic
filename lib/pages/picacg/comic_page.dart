@@ -206,19 +206,31 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
               ),
               Expanded(
                 flex: 3,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(15, 10, 0, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data!.creator.name,
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w600),
+                child: InkWell(
+                  onTap: () {
+                    context.to(
+                      () => CategoryComicsPage(
+                        category: data!.creator.id,
+                        param: "ca",
+                        categoryKey: "picacg",
+                        displayTitle: data!.creator.name,
                       ),
-                      Text(
-                          "${data!.time.substring(0, 10)} ${data!.time.substring(11, 19)}更新")
-                    ],
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(15, 10, 0, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data!.creator.name,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                            "${data!.time.substring(0, 10)} ${data!.time.substring(11, 19)}更新")
+                      ],
+                    ),
                   ),
                 ),
               ),

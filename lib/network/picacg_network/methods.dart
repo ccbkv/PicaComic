@@ -354,7 +354,7 @@ class PicacgNetwork {
             res["data"]["comic"]["_creator"]["avatar"]["path"];
       }
       var creator = Profile(
-          res["data"]["comic"]["_id"],
+          res["data"]["comic"]["_creator"]["_id"],
           url,
           "",
           res["data"]["comic"]["_creator"]["exp"],

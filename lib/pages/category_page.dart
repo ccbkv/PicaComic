@@ -193,13 +193,22 @@ class CategoryPage extends StatelessWidget {
       children.add(Padding(
         padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
         child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
+            for (var buttonData in data.buttons)
+              buildTag(buttonData.label.tl, (p0, p1) => buttonData.onTap()),
+            if (data.enableRankingPage && findComicSourceKey() == "picacg")
+              buildTag("骑士榜".tl, (p0, p1) {
+                context.to(() => RankingPage(
+                      sourceKey: findComicSourceKey(),
+                      initialOptionValue: "creator",
+                    ));
+              }),
             if (data.enableRankingPage)
               buildTag("排行榜".tl, (p0, p1) {
                 context.to(() => RankingPage(sourceKey: findComicSourceKey()));
               }),
-            for (var buttonData in data.buttons)
-              buildTag(buttonData.label.tl, (p0, p1) => buttonData.onTap())
           ],
         ),
       ));

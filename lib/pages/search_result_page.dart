@@ -473,7 +473,8 @@ class _SearchResultPageState extends State<_SearchResultPage> {
   }
 
   void changeSource() {
-    var sources = ComicSource.sources.where((e) => e.searchPageData != null);
+    var sources =
+        ComicSource.sources.where((e) => e.searchPageData != null).toList();
     String? sourceKey = this.sourceKey;
     showDialog(
       useSafeArea: false,
@@ -485,16 +486,38 @@ class _SearchResultPageState extends State<_SearchResultPage> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                for (var source in sources)
-                  RadioListTile<String>(
-                    title: Text(source.name),
-                    value: source.key,
-                    groupValue: sourceKey,
-                    onChanged: (value) {
-                      setState(() {
-                        sourceKey = value;
-                      });
-                    },
+                for (int i = 0; i < sources.length; i += 2)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 180,
+                        child: RadioListTile<String>(
+                          title: Text(sources[i].name),
+                          value: sources[i].key,
+                          groupValue: sourceKey,
+                          onChanged: (value) {
+                            setState(() {
+                              sourceKey = value;
+                            });
+                          },
+                        ),
+                      ),
+                      if (i + 1 < sources.length)
+                        SizedBox(
+                          width: 180,
+                          child: RadioListTile<String>(
+                            title: Text(sources[i + 1].name),
+                            value: sources[i + 1].key,
+                            groupValue: sourceKey,
+                            onChanged: (value) {
+                              setState(() {
+                                sourceKey = value;
+                              });
+                            },
+                          ),
+                        ),
+                    ],
                   )
               ],
             ),

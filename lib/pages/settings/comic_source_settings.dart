@@ -261,7 +261,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
                 TextButton(
                     onPressed: () {
                       showPopUpWidget(
-                          context, _ComicSourceList(handleAddSource));
+                          context, _ComicSourceList(handleAddSource, onClose: () => Navigator.of(context).pop()));
                     },
                     child: Text("浏览列表".tl)),
                 const Spacer(),
@@ -332,9 +332,10 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
 }
 
 class _ComicSourceList extends StatefulWidget {
-  const _ComicSourceList(this.onAdd);
+  const _ComicSourceList(this.onAdd, {this.onClose});
 
   final Future<void> Function(String) onAdd;
+  final VoidCallback? onClose;
 
   @override
   State<_ComicSourceList> createState() => _ComicSourceListState();
@@ -363,8 +364,8 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     return Scaffold(
       appBar: AppBar(
         title: Text("漫画源".tl),
-        actions: const [
-          IconButton(onPressed: App.globalBack, icon: Icon(Icons.close)),
+        actions: [
+          IconButton(onPressed: widget.onClose ?? App.globalBack, icon: const Icon(Icons.close)),
         ],
       ),
       body: buildBody(),

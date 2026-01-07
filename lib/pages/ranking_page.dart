@@ -7,9 +7,10 @@ import "package:pica_comic/tools/translations.dart";
 import 'package:pica_comic/network/base_comic.dart';
 
 class RankingPage extends StatefulWidget {
-  const RankingPage({required this.sourceKey, super.key});
+  const RankingPage({required this.sourceKey, this.initialOptionValue, super.key});
 
   final String sourceKey;
+  final String? initialOptionValue;
 
   @override
   State<RankingPage> createState() => _RankingPageState();
@@ -26,6 +27,10 @@ class _RankingPageState extends State<RankingPage> {
         data = source.categoryComicsData!;
         options = data.rankingData!.options;
         optionValue = options.keys.first;
+        if (widget.initialOptionValue != null &&
+            options.containsKey(widget.initialOptionValue)) {
+          optionValue = widget.initialOptionValue!;
+        }
         return;
       }
     }

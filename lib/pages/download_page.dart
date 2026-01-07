@@ -1404,20 +1404,10 @@ class _DownloadPageState extends State<DownloadPage> {
           child: IconButton(
             icon: const Icon(Icons.download_for_offline),
             onPressed: () {
-              // 避免与触发点击同一帧的手势冲突导致弹窗立即被遮罩关闭
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                // 再额外延迟一小段时间，避免 iPad 小窗下同一次点击事件被 ModalBarrier 捕获
-                // 在 iPad 实机上增加更长的延迟时间，确保手势冲突完全解决
-                Future.delayed(const Duration(milliseconds: 300), () {
-                  // 使用当前页面上下文而不是全局上下文，确保上下文正确
-                  if (context.mounted) {
-                    showPopUpWidget(
-                      context,
-                      const DownloadingPage(),
-                    );
-                  }
-                });
-              });
+              showPopUpWidget(
+                App.globalContext!,
+                const DownloadingPage(),
+              );
             },
           ),
         ),

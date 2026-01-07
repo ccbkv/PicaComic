@@ -71,6 +71,16 @@ class _PicacgSettingsState extends State<PicacgSettings> {
           ),
           title: Text("收藏夹漫画排序模式".tl),
         ),
+
+
+
+
+
+        ListTile(
+          leading: const Icon(Icons.comment),
+          title: Text("我的评论".tl),
+          onTap: () => App.to(context, () => const UserCommentsPage()),
+        ),
         ListTile(
           leading: const Icon(Icons.circle_outlined),
           title: Text("显示头像框".tl),

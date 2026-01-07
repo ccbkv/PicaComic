@@ -12,6 +12,7 @@ class CategoryComicsPage extends StatefulWidget {
     required this.category,
     this.param,
     required this.categoryKey,
+    this.displayTitle,
     super.key,
   });
 
@@ -20,6 +21,8 @@ class CategoryComicsPage extends StatefulWidget {
   final String? param;
 
   final String categoryKey;
+
+  final String? displayTitle;
 
   @override
   State<CategoryComicsPage> createState() => _CategoryComicsPageState();
@@ -73,9 +76,12 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     
     return Scaffold(
       appBar: Appbar(
-        title: Text(selectedCategories.length > 1 
-            ? "${selectedCategories.length}个分类" 
-            : selectedCategories.firstOrNull ?? widget.category),
+        title: Text(
+          widget.displayTitle ??
+              (selectedCategories.length > 1
+                  ? "${selectedCategories.length}个分类"
+                  : selectedCategories.firstOrNull ?? widget.category),
+        ),
         actions: [
           Container(
             decoration: BoxDecoration(

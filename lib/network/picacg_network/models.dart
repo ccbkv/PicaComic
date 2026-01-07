@@ -271,3 +271,33 @@ class GameInfo{
   int comments;
   GameInfo(this.id,this.name,this.description,this.icon,this.publisher,this.screenshots,this.link,this.isLiked,this.likes,this.comments);
 }
+
+class UserComment {
+  String id;
+  String content;
+  String comicId;
+  String comicTitle;
+  String time;
+  int likesCount;
+  int commentsCount;
+  bool isLiked;
+
+  UserComment(this.id, this.content, this.comicId, this.comicTitle, this.time, this.likesCount, this.commentsCount, this.isLiked);
+
+  UserComment.fromJson(Map<String, dynamic> json)
+      : id = json["_id"],
+        content = json["content"],
+        comicId = json["_comic"]["_id"],
+        comicTitle = json["_comic"]["title"],
+        time = json["created_at"],
+        likesCount = json["likesCount"],
+        commentsCount = json["commentsCount"],
+        isLiked = json["isLiked"];
+}
+
+class UserCommentsResponse {
+  List<UserComment> comments;
+  int pages;
+  int page;
+  UserCommentsResponse(this.comments, this.pages, this.page);
+}

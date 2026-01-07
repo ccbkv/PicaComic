@@ -638,6 +638,33 @@ class PicacgNetwork {
     return Res(comics, subData: 1);
   }
 
+  Future<Res<List<ComicItemBrief>>> getKnightLeaderboard() async {
+    var response = await get("$apiUrl/comics/knight-leaderboard",
+        expiredTime: CacheExpiredTime.no);
+    if (response.error) {
+      return Res(null, errorMessage: response.errorMessage);
+    }
+    var res = response.data;
+    var comics = <ComicItemBrief>[];
+    for (int i = 0; i < res["data"]["users"].length; i++) {
+      try {
+        var user = res["data"]["users"][i];
+        var title = user["name"] ?? "Unknown";
+        var author = "${user["title"] ?? ""} Lv${user["level"] ?? 0}";
+        var likes = user["exp"] ?? 0;
+        var cover = (user["avatar"]?["fileServer"] ?? "") +
+            "/static/" +
+            (user["avatar"]?["path"] ?? "");
+        var id = "creator:${user["_id"]}";
+        var tags = <String>[];
+        tags.addAll(List<String>.from(user["characters"] ?? []));
+        var si = ComicItemBrief(title, author, likes, cover, id, tags);
+        comics.add(si);
+      } finally {}
+    }
+    return Res(comics, subData: 1);
+  }
+
   Future<Res<String>> register(
       String ans1,
       String ans2,
@@ -1078,6 +1105,25 @@ class PicacgNetwork {
       }
     }
     return Res(comics);
+  }
+
+  Future<Res<UserCommentsResponse>> getUserComments(int page) async {
+    var res = await get("$apiUrl/users/my-comments?page=$page");
+    if (res.error) {
+      return Res(null, errorMessage: res.errorMessage);
+    }
+    var data = res.data;
+    if (data["data"] == null || data["data"]["comments"] == null) {
+      return Res(null, errorMessage: "Invalid Data");
+    }
+    var commentsData = data["data"]["comments"];
+    var docs = commentsData["docs"];
+    List<UserComment> comments = [];
+    for (var doc in docs) {
+      comments.add(UserComment.fromJson(doc));
+    }
+    return Res(UserCommentsResponse(
+        comments, commentsData["pages"], int.parse(commentsData["page"].toString())));
   }
 }
 

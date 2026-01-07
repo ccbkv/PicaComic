@@ -13,6 +13,9 @@ import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/picacg/collections_page.dart';
 import 'package:pica_comic/pages/picacg/comic_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
+import 'package:pica_comic/pages/pre_search_page.dart';
+import 'package:pica_comic/pages/category_comics_page.dart';
+import 'package:pica_comic/pages/settings/user_comments_page.dart';
 import 'package:pica_comic/tools/translations.dart';
 
 import '../comic_source.dart';
@@ -87,6 +90,16 @@ final picacg = ComicSource.named(
         },
       ),
       AccountInfoItem(title: "简介", data: () => network.user?.slogan ?? ''),
+      AccountInfoItem(
+        title: "我的评论",
+        onTap: () {
+          App.mainNavigatorKey?.currentContext?.to(
+            () => const UserCommentsPage(),
+          );
+          App.globalBack();
+        },
+      ),
+
     ],
   ),
   initData: (s) {
@@ -133,15 +146,18 @@ final picacg = ComicSource.named(
         return PicacgNetwork().getLatest(page);
       }
       
-      // 支持多分类选择
       String categories = category;
-      // 确定搜索类型，默认'c'为分类，'a'为作者
-      String type = param == "a" ? "a" : "c";
-      
+      String type = param == "a"
+          ? "a"
+          : (param == "ca" ? "ca" : "c");
+      var sort = options[0];
+      if (type == "ca" && sort == "dd") {
+        sort = "ld";
+      }
       return PicacgNetwork().getCategoryComics(
         categories,
         page,
-        options[0],
+        sort,
         type,
       );
     },
@@ -161,9 +177,13 @@ final picacg = ComicSource.named(
         "H24": "24小时",
         "D7": "7天",
         "D30": "30天",
+        "creator": "骑士榜",
       },
-      load: (options, page) {
-        return PicacgNetwork().getLeaderboard(options);
+      load: (option, page) {
+        if (option == "creator") {
+          return PicacgNetwork().getKnightLeaderboard();
+        }
+        return PicacgNetwork().getLeaderboard(option);
       },
     ),
   ),
@@ -210,7 +230,9 @@ class _PicComicTile extends ComicTile {
       );
 
   @override
-  ActionFunc? get read => () async {
+  ActionFunc? get read => comic.id.startsWith("creator:")
+      ? null
+      : () async {
         bool cancel = false;
         var dialog = showLoadingDialog(
           App.globalContext!,
@@ -252,6 +274,18 @@ class _PicComicTile extends ComicTile {
 
   @override
   void onTap_() {
+    if (comic.id.startsWith("creator:")) {
+      final creatorId = comic.id.substring("creator:".length);
+      App.mainNavigatorKey!.currentContext!.to(
+        () => CategoryComicsPage(
+          category: creatorId,
+          param: "ca",
+          categoryKey: "picacg",
+          displayTitle: comic.title,
+        ),
+      );
+      return;
+    }
     App.mainNavigatorKey!.currentContext!.to(
       () => ComicPage(
         sourceKey: "picacg",

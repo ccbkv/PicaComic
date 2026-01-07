@@ -161,6 +161,19 @@ class _JmSettingsState extends State<JmSettings> {
           onTap: () => JmSettings.updateApiDomains(true),
           trailing: const Icon(Icons.arrow_right),
         ),
+
+
+
+
+
+
+
+
+
+
+
+
+        
         ListTile(
           leading: const Icon(Icons.today),
           title: Text("每日签到".tl),

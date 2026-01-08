@@ -169,6 +169,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
       ComicSource.sources.remove(source);
       _validatePages();
       MyApp.updater?.call();
+      StateController.findOrNull(tag: "me_page_sources")?.update();
     });
   }
 
@@ -203,6 +204,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     }
     await ComicSource.reload();
     MyApp.updater?.call();
+    StateController.findOrNull(tag: "me_page_sources")?.update();
   }
 
   Widget buildCard(BuildContext context) {
@@ -328,6 +330,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     _addAllPagesWithComicSource(comicSource);
     appdata.updateSettings();
     MyApp.updater?.call();
+    StateController.findOrNull(tag: "me_page_sources")?.update();
   }
 }
 
@@ -459,6 +462,7 @@ class _BuiltInSourcesState extends State<_BuiltInSources> {
             context.findAncestorStateOfType<_ComicSourceSettingsState>()
                 ?.setState(() {});
           }
+          StateController.findOrNull(tag: "me_page_sources")?.update();
         },
       ),
     );
@@ -546,6 +550,7 @@ class __EditFilePageState extends State<_EditFilePage> {
               // Save and reload configs
               await ComicSource.reload();
               MyApp.updater?.call();
+              StateController.findOrNull(tag: "me_page_sources")?.update();
               if (context.mounted) {
                 Navigator.pop(context);
               }

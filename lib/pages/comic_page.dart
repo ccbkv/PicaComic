@@ -1322,6 +1322,8 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                           await downloadManager.delete([downloadedId]);
                           showToast(message: "已删除".tl);
                           logic.update();
+                          StateController.findOrNull(tag: "me_page_downloads")
+                              ?.update();
                         },
                         child: Text("删除".tl),
                       ),

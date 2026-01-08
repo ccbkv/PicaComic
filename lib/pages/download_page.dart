@@ -1082,18 +1082,20 @@ class _DownloadPageState extends State<DownloadPage> {
                   logic.comics[index].read();
                 },
               ),
-              DesktopMenuEntry(
-                text: "删除".tl,
-                onClick: () {
-                  showConfirmDialog(context, "确认删除".tl, "此操作无法撤销, 是否继续?".tl,
-                      () {
-                    downloadManager.delete([logic.comics[index].id]);
-                    logic.comics.removeAt(index);
-                    logic.selected.removeAt(index);
-                    logic.update();
-                  });
-                },
-              ),
+                  DesktopMenuEntry(
+                    text: "删除".tl,
+                    onClick: () {
+                      showConfirmDialog(context, "确认删除".tl, "此操作无法撤销, 是否继续?".tl,
+                          () {
+                        downloadManager.delete([logic.comics[index].id]);
+                        logic.comics.removeAt(index);
+                        logic.selected.removeAt(index);
+                        logic.update();
+                        StateController.findOrNull(tag: "me_page_downloads")
+                            ?.update();
+                      });
+                    },
+                  ),
               DesktopMenuEntry(
                 text: "导出".tl,
                 onClick: () =>
@@ -1222,6 +1224,8 @@ class _DownloadPageState extends State<DownloadPage> {
                             }
                             await downloadManager.delete(comics);
                             logic.refresh();
+                            StateController.findOrNull(tag: "me_page_downloads")
+                                ?.update();
                           },
                           child: Text("确认".tl)),
                     ],

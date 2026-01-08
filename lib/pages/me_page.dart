@@ -210,85 +210,113 @@ class MePage extends StatelessWidget {
   }
 
   Widget buildAccount(double width) {
-    var accounts = findAccounts();
+    return StateBuilder<SimpleController>(
+      tag: "me_page_accounts",
+      init: SimpleController(),
+      builder: (controller) {
+        var accounts = findAccounts();
 
-    Widget buildItem(String name) {
-      return Container(
-        height: 24,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(App.globalContext!).colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          name,
-          style: const TextStyle(fontSize: 12),
-        ).paddingTop(4),
-      );
-    }
+        Widget buildItem(String name) {
+          return Container(
+            height: 24,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(App.globalContext!).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              name,
+              style: const TextStyle(fontSize: 12),
+            ).paddingTop(4),
+          );
+        }
 
-    return _MePageCard(
-      icon: const Icon(Icons.switch_account),
-      title: "账号管理".tl,
-      description: "已登录 @a 个账号".tlParams({"a": accounts.length.toString()}),
-      onTap: () => showPopUpWidget(App.globalContext!, const AccountsPage()),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: accounts.map((e) => buildItem(e)).toList(),
-      ).paddingHorizontal(12).paddingBottom(12),
+        return _MePageCard(
+          icon: const Icon(Icons.switch_account),
+          title: "账号管理".tl,
+          description:
+              "已登录 @a 个账号".tlParams({"a": accounts.length.toString()}),
+          onTap: () => showPopUpWidget(App.globalContext!, const AccountsPage()),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: accounts.map((e) => buildItem(e)).toList(),
+          ).paddingHorizontal(12).paddingBottom(12),
+        );
+      },
     );
   }
 
   Widget buildDownload(BuildContext context, double width) {
-    return _MePageCard(
-      icon: const Icon(Icons.download_for_offline),
-      title: "已下载".tl,
-      description:
-          "共 @a 部漫画".tlParams({"a": DownloadManager().total.toString()}),
-      onTap: () => context.to(() => const DownloadPage()),
+    return StateBuilder<SimpleController>(
+      tag: "me_page_downloads",
+      init: SimpleController(),
+      builder: (controller) {
+        return _MePageCard(
+          icon: const Icon(Icons.download_for_offline),
+          title: "已下载".tl,
+          description: "共 @a 部漫画"
+              .tlParams({"a": DownloadManager().total.toString()}),
+          onTap: () => context.to(() => const DownloadPage()),
+        );
+      },
     );
   }
 
   
 
   Widget buildImageFavorite(BuildContext context, double width) {
-    return _MePageCard(
-      icon: const Icon(Icons.image),
-      title: "图片收藏".tl,
-      description:
-          "@a 条图片收藏".tlParams({"a": ImageFavoriteManager.length.toString()}),
-      onTap: () => context.to(() => const ImageFavoritesPage()),
+    return StateBuilder<SimpleController>(
+      tag: "me_page",
+      init: SimpleController(),
+      builder: (controller) {
+        return _MePageCard(
+          icon: const Icon(Icons.image),
+          title: "图片收藏".tl,
+          description: "@a 条图片收藏"
+              .tlParams({"a": ImageFavoriteManager.length.toString()}),
+          onTap: () => context.to(() => const ImageFavoritesPage()),
+        );
+      },
     );
   }
 
   Widget buildComicSource(BuildContext context, double width) {
-    var comicSources = ComicSource.sources;
-    Widget buildItem(String name) {
-      return Container(
-        height: 24,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(App.globalContext!).colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          name,
-          style: const TextStyle(fontSize: 12),
-        ).paddingTop(4),
-      );
-    }
+    return StateBuilder<SimpleController>(
+      tag: "me_page_sources",
+      init: SimpleController(),
+      builder: (controller) {
+        var comicSources = ComicSource.sources;
+        Widget buildItem(String name) {
+          return Container(
+            height: 24,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color:
+                  Theme.of(App.globalContext!).colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              name,
+              style: const TextStyle(fontSize: 12),
+            ).paddingTop(4),
+          );
+        }
 
-    return _MePageCard(
-      icon: const Icon(Icons.dashboard_customize),
-      title: "漫画源".tl,
-      description: "共 @a 个漫画源".tlParams({"a": comicSources.length.toString()}),
-      onTap: () => App.mainNavigatorKey?.currentContext?.to(() => const ComicSourceSettings()),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: comicSources.map((e) => buildItem(e.name.tl)).toList(),
-      ).paddingHorizontal(12).paddingBottom(12),
+        return _MePageCard(
+          icon: const Icon(Icons.dashboard_customize),
+          title: "漫画源".tl,
+          description: "共 @a 个漫画源"
+              .tlParams({"a": comicSources.length.toString()}),
+          onTap: () => App.mainNavigatorKey?.currentContext
+              ?.to(() => const ComicSourceSettings()),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: comicSources.map((e) => buildItem(e.name.tl)).toList(),
+          ).paddingHorizontal(12).paddingBottom(12),
+        );
+      },
     );
   }
 

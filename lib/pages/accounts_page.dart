@@ -79,6 +79,7 @@ class AccountsPage extends StatelessWidget {
               element.saveData();
             }
             logic.update();
+            StateController.findOrNull(tag: "me_page_accounts")?.update();
           },
         );
       }
@@ -99,23 +100,24 @@ class AccountsPage extends StatelessWidget {
           yield ListTile(
             title: Text("重新登录".tl),
             subtitle: Text("如果登录失效点击此处".tl),
-            onTap: () async {
-              if (element.data["account"] == null) {
-                showToast(message: "无数据".tl);
-                return;
-              }
-              logic._reLogin[element.key] = true;
-              logic.update();
-              final List account = element.data["account"];
-              var res = await element.account!.login!(account[0], account[1]);
-              if (res.error) {
-                showToast(message: res.errorMessage!);
-              } else {
-                showToast(message: "重新登录成功".tl);
-              }
-              logic._reLogin[element.key] = false;
-              logic.update();
-            },
+          onTap: () async {
+            if (element.data["account"] == null) {
+              showToast(message: "无数据".tl);
+              return;
+            }
+            logic._reLogin[element.key] = true;
+            logic.update();
+            final List account = element.data["account"];
+            var res = await element.account!.login!(account[0], account[1]);
+            if (res.error) {
+              showToast(message: res.errorMessage!);
+            } else {
+              showToast(message: "重新登录成功".tl);
+            }
+            logic._reLogin[element.key] = false;
+            logic.update();
+            StateController.findOrNull(tag: "me_page_accounts")?.update();
+          },
             trailing: loading
                 ? const SizedBox.square(
                     dimension: 24,
@@ -133,6 +135,7 @@ class AccountsPage extends StatelessWidget {
             element.account?.logout();
             element.saveData();
             logic.update();
+            StateController.findOrNull(tag: "me_page_accounts")?.update();
           },
           trailing: const Icon(Icons.logout),
         );
@@ -238,6 +241,7 @@ class _LoginPageState extends State<_LoginPage> {
         });
       } else {
         showToast(message: "登录成功".tl, icon: const Icon(Icons.check));
+        StateController.findOrNull(tag: "me_page_accounts")?.update();
         if(mounted) {
           context.pop();
         }

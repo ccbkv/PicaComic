@@ -110,7 +110,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                   appdata.history.clearHistory();
                                   setState(() => comics.clear());
                                   isModified = true;
-                                  StateController.find(tag: "me_page").update();
+                                  StateController.find(tag: "me_page_history").update();
                                   App.globalBack();
                                 },
                                 child: Text("清除".tl)),
@@ -195,7 +195,7 @@ class _HistoryPageState extends State<HistoryPage> {
                             comics.removeWhere((element) =>
                                 element.target == comics_[i].target);
                           });
-                          StateController.find(tag: "me_page").update();
+                          StateController.find(tag: "me_page_history").update();
                           App.globalBack();
                         },
                         child: Text("删除".tl)),

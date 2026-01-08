@@ -139,7 +139,7 @@ class MePage extends StatelessWidget {
 
   Widget buildHistory(BuildContext context) {
     return StateBuilder<SimpleController>(
-        tag: "me_page",
+        tag: "me_page_history",
         init: SimpleController(),
         builder: (controller) {
           var history = HistoryManager().getRecent();

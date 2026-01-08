@@ -356,7 +356,7 @@ class HistoryManager {
       ]);
       if (_pendingUpdateMePage) {
         scheduleMicrotask(() {
-          StateController.findOrNull(tag: "me_page")?.update();
+          StateController.findOrNull(tag: "me_page_history")?.update();
         });
       }
       _pendingUpdateMePage = false;
@@ -382,7 +382,7 @@ class HistoryManager {
     ]);
     if (_pendingUpdateMePage) {
       scheduleMicrotask(() {
-        StateController.findOrNull(tag: "me_page")?.update();
+        StateController.findOrNull(tag: "me_page_history")?.update();
       });
     }
     _pendingUpdateMePage = false;

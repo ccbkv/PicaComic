@@ -43,7 +43,7 @@
                 <data android:scheme="https"/>
                 <data android:host="nhentai.net"/>
                 <data android:scheme="https"/>
-                <data android:host=".la"/>
+                <data android:host="hitomi.la"/>
             </intent-filter>
             <meta-data 
                 android:name="flutter_deeplinking_enabled"

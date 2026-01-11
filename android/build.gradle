@@ -1,16 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompile
 
 allprojects {
-    afterEvaluate {
-        tasks.withType(AbstractKotlinCompile).configureEach {
-            kotlinOptions {
-                jvmTarget = "11"
-            }
-        }
-    }
-    tasks.withType(JavaCompile).configureEach {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+    tasks.withType(AbstractKotlinCompile).configureEach {
     }
     repositories {
         google()
@@ -22,20 +13,6 @@ rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
-
-subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty("android")) {
-            project.android {
-                compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_11
-                    targetCompatibility JavaVersion.VERSION_11
-                }
-            }
-        }
-    }
-}
-
 subprojects {
     project.evaluationDependsOn(':app')
 }

@@ -932,8 +932,7 @@ class EhNetwork {
 
   ///搜索e-hentai
   Future<Res<Galleries>> search(String keyword,
-      {int? fCats, int? startPages, int? endPages, int? minStars}) async {
-    keyword = keyword.replaceAll(RegExp(r"\s+"), " ").trim();
+      {int? fCats, int? startPages, int? endPages, int? minStars, int? expunged}) async {    keyword = keyword.replaceAll(RegExp(r"\s+"), " ").trim();
     if (keyword.contains(" | ")) {
       var keywords = _splitKeyword(keyword);
       var newKeywords = <String>[];
@@ -969,6 +968,9 @@ class EhNetwork {
     if (minStars != null) {
       requestUrl += "&f_srdd=$minStars";
     }
+        if (expunged != null && expunged == 1) {
+      requestUrl += "&f_sh=on";
+        }
     var res = await getGalleries(requestUrl);
     Future.delayed(const Duration(microseconds: 500), () {
       try {

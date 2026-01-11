@@ -71,6 +71,7 @@ class HtmangaNetwork {
         } catch (e2) {
           return Res(null, errorMessage: e.toString());
         }
+
       } else {
         return Res(null, errorMessage: e.toString());
       }
@@ -94,6 +95,14 @@ class HtmangaNetwork {
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.receiveTimeout) {
         return const Res(null, errorMessage: "连接超时");
+      } else if (e.response?.statusCode == 403 && url.contains("www.wnacg.com")) {
+        String newUrl = url.replaceAll("www.wnacg.com", "wnacg.com");
+        try {
+          var res = await dio.post(newUrl, data: data);
+          return Res(res.data);
+        } catch (e2) {
+          return Res(null, errorMessage: e.toString());
+        }
       } else {
         return Res(null, errorMessage: e.toString());
       }

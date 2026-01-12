@@ -1050,38 +1050,69 @@ Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
 
 /// return the first blocked keyword, or null if not blocked
 String? isBlocked(BaseComic item) {
-  for (var word in appdata.blockingKeyword) {
-    if (item.title.contains(word)) {
-      return word;
+  for (var keyword in appdata.blockingKeyword) {
+    var mode = 0; // 0:all, 1:title, 2:uploader, 3:tag
+    var word = keyword.trim();
+
+    if (word.startsWith("title:")) {
+      mode = 1;
+      word = word.substring(6).trim();
+    } else if (word.startsWith("uploader:")) {
+      mode = 2;
+      word = word.substring(9).trim();
+    } else if (word.startsWith("tag:")) {
+      mode = 3;
+      word = word.substring(4).trim();
     }
-    if (item.subTitle.contains(word)) {
-      return word;
-    }
-    if (item.description.contains(word)) {
-      return word;
-    }
-    for (var tag in item.tags) {
-      if (tag == word) {
-        return word;
-      }
-      var normalized = tag.replaceFirst(" ♀", "").replaceFirst(" ♂", "");
-      if (normalized == word) {
-        return word;
-      }
-      if (tag.contains(':')) {
-        var parts = tag.split(':');
-        var right = parts.sublist(1).join(':');
-        var rightNorm = right.replaceFirst(" ♀", "").replaceFirst(" ♂", "");
-        if (right == word || rightNorm == word) {
-          return word;
+
+    if (word.isEmpty) continue;
+
+    switch (mode) {
+      case 0:
+        if (item.title.contains(word) ||
+            item.subTitle.contains(word) ||
+            item.description.contains(word)) {
+          return keyword;
         }
-      }
-      if (item.enableTagsTranslation) {
-        if (tag.translateTagsToCN == word) {
-          return word;
+        break;
+      case 1:
+        if (item.title.contains(word)) {
+          return keyword;
         }
-        if (normalized.translateTagsToCN == word) {
-          return word;
+        break;
+      case 2:
+        if (item.subTitle.contains(word)) {
+          return keyword;
+        }
+        break;
+      case 3:
+        break;
+    }
+
+    if (mode == 0 || mode == 3) {
+      for (var tag in item.tags) {
+        if (tag == word) {
+          return keyword;
+        }
+        var normalized = tag.replaceFirst(" ♀", "").replaceFirst(" ♂", "");
+        if (normalized == word) {
+          return keyword;
+        }
+        if (tag.contains(':')) {
+          var parts = tag.split(':');
+          var right = parts.sublist(1).join(':');
+          var rightNorm = right.replaceFirst(" ♀", "").replaceFirst(" ♂", "");
+          if (right == word || rightNorm == word) {
+            return keyword;
+          }
+        }
+        if (item.enableTagsTranslation) {
+          if (tag.translateTagsToCN == word) {
+            return keyword;
+          }
+          if (normalized.translateTagsToCN == word) {
+            return keyword;
+          }
         }
       }
     }
@@ -1153,22 +1184,22 @@ class _BlockingPaneState extends State<_BlockingPane> {
   }
 
   Iterable<Widget> buildTags() sync* {
-    yield buildTag(widget.comic.title);
-    yield buildTag(widget.comic.subTitle);
+    yield buildTag(widget.comic.title, "title:");
+    yield buildTag(widget.comic.subTitle, "uploader:");
     for (var tag in widget.comic.tags ?? []) {
-      yield buildTag(tag);
+      yield buildTag(tag, "tag:");
     }
   }
 
-  bool _isExisted(String text) {
-    if (text.contains(':')) {
+  bool _isExisted(String text, String prefix) {
+    if (prefix == "tag:" && text.contains(':')) {
       text = text.split(':')[1];
     }
-    return controller.text.split(';').contains(text);
+    return controller.text.split(';').contains(prefix + text);
   }
 
-  Widget buildTag(String text) {
-    var isExisted = _isExisted(text);
+  Widget buildTag(String text, String prefix) {
+    var isExisted = _isExisted(text, prefix);
     if (isExisted) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1180,11 +1211,11 @@ class _BlockingPaneState extends State<_BlockingPane> {
       );
     }
     return GestureDetector(
-      onTap: () => handleText(text),
+      onTap: () => handleText(text, prefix),
       child: HoverBox(
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          key: Key(text),
+          key: Key(prefix + text),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -1196,11 +1227,11 @@ class _BlockingPaneState extends State<_BlockingPane> {
     );
   }
 
-  void handleText(String text) {
-    if (text.contains(':')) {
+  void handleText(String text, String prefix) {
+    if (prefix == "tag:" && text.contains(':')) {
       text = text.split(':')[1];
     }
-    controller.text += "$text;";
+    controller.text += "$prefix$text;";
     setState(() {});
   }
 

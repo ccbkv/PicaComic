@@ -484,8 +484,9 @@ class HistoryManager {
   /// Get plain search keyword from a keyword that may be polluted.
   static String getPlainSearchKeyword(String keyword) {
     // remove language filter
-    final languagePattern = RegExp(r'\s*language:\w+');
-    var result = keyword.replaceAll(languagePattern, '').trim();
+    // final languagePattern = RegExp(r'\s*language:\w+');
+    // var result = keyword.replaceAll(languagePattern, '').trim();
+    var result = keyword;
 
     // remove jm blocking keywords
     if (appdata.jmBlockingKeyword.isNotEmpty) {
@@ -505,15 +506,14 @@ class HistoryManager {
     return result;
   }
 
-  /// Add search history, keyword will be cleaned before adding.
+  /// Add search history
   static void addSearchHistory(String keyword) {
-    final plainKeyword = getPlainSearchKeyword(keyword.trim());
-    if (plainKeyword.isEmpty) return;
+    if (keyword.trim().isEmpty) return;
 
-    if (appdata.searchHistory.contains(plainKeyword)) {
-      appdata.searchHistory.remove(plainKeyword);
+    if (appdata.searchHistory.contains(keyword)) {
+      appdata.searchHistory.remove(keyword);
     }
-    appdata.searchHistory.add(plainKeyword);
+    appdata.searchHistory.add(keyword);
     appdata.writeSearchHistory();
     appdata.writeHistory();
   }

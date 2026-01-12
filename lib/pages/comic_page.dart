@@ -1117,8 +1117,9 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                 }
               } else {
                 // 其他漫画源，添加到通用分区
-                if (!appdata.blockingKeyword.contains(text)) {
-                  appdata.blockingKeyword.add(text);
+                var keyword = "tag:$text";
+                if (!appdata.blockingKeyword.contains(keyword)) {
+                  appdata.blockingKeyword.add(keyword);
                   appdata.writeBlockingKeyword();
                   showToast(message: "已添加到通用屏蔽关键词".tl);
                 } else {

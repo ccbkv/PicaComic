@@ -172,7 +172,7 @@ class PreSearchPage extends StatelessWidget {
   void search([String? s, String? type]) {
     var keyword = (s ?? controller.text).trim();
 
-    HistoryManager.addSearchHistory(keyword);
+    HistoryManager.addSearchHistory(s ?? controller.text);
 
     if (searchController.language != null &&
         searchController.searchPageData.enableLanguageFilter) {

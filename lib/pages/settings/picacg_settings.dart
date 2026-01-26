@@ -71,11 +71,6 @@ class _PicacgSettingsState extends State<PicacgSettings> {
           ),
           title: Text("收藏夹漫画排序模式".tl),
         ),
-
-
-
-
-
         ListTile(
           leading: const Icon(Icons.comment),
           title: Text("我的评论".tl),

@@ -255,9 +255,7 @@ class _HitomiSearchGridDelegate extends SliverGridDelegate {
     const maxCrossAxisExtent = 650.0;
     final width = constraints.crossAxisExtent;
     var crossAxisCount = (width / maxCrossAxisExtent).ceil();
-    final itemWidth = width / crossAxisCount;
-    final bool isSmall = itemWidth < 600.0;
-    final itemHeight = (isSmall ? 230.0 : 200.0) * scale; 
+    final itemHeight = 164.0 * scale; 
     
     return SliverGridRegularTileLayout(
       crossAxisCount: crossAxisCount,

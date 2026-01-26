@@ -54,7 +54,7 @@ class HtmangaNetwork {
       } else if (e.response?.statusCode == 403 && url.contains("www.wnacg.com")) {
         // 当使用带www的域名请求失败时，尝试使用不带www的域名重新请求
         //修复绅士漫画源无法使用
-        String newUrl = url.replaceAll("www.wnacg.com", "wnacg.com");
+        String newUrl = url.replaceAll("www.wnacg.com", "www.wnacg05.cc");
         try {
           var res = await dio.get(
               newUrl,
@@ -96,7 +96,7 @@ class HtmangaNetwork {
           e.type == DioExceptionType.receiveTimeout) {
         return const Res(null, errorMessage: "连接超时");
       } else if (e.response?.statusCode == 403 && url.contains("www.wnacg.com")) {
-        String newUrl = url.replaceAll("www.wnacg.com", "wnacg.com");
+        String newUrl = url.replaceAll("www.wnacg.com", "www.wnacg05.cc");
         try {
           var res = await dio.post(newUrl, data: data);
           return Res(res.data);

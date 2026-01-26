@@ -100,8 +100,6 @@ dependencies:
   file_picker: ^10.3.8
   math_expressions: ^2.6.0
   auto_route: ^11.1.0
-  flutter_background_service: ^5.1.0
-  wakelock_plus: ^1.4.0
 
 dev_dependencies:
   flutter_test:

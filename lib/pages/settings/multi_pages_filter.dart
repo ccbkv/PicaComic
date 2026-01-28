@@ -94,6 +94,20 @@ class _MultiPagesFilterState extends State<MultiPagesFilter> {
           icon: const Icon(Icons.delete)),
     );
 
+    if (App.isFluent) {
+      return fluent.ListTile(
+        title: Text(widget.pages[key] ?? "(Invalid) $key"),
+        key: Key(key),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            removeButton,
+            const Icon(Icons.drag_handle),
+          ],
+        ),
+      );
+    }
+
     return ListTile(
       title: Text(widget.pages[key] ?? "(Invalid) $key"),
       key: Key(key),
@@ -114,6 +128,40 @@ class _MultiPagesFilterState extends State<MultiPagesFilter> {
         canAdd[key] = value;
       }
     });
+    if (App.isFluent) {
+      fluent.showDialog(
+        context: context,
+        builder: (context) {
+          return fluent.ContentDialog(
+            title: const Text("Add"),
+            content: SizedBox(
+              height: 300,
+              child: ListView(
+                children: canAdd.entries
+                    .map((e) => fluent.ListTile(
+                          title: Text(e.value),
+                          onPressed: () {
+                            App.back(context);
+                            setState(() {
+                              keys.add(e.key);
+                            });
+                            updateSetting();
+                          },
+                        ))
+                    .toList(),
+              ),
+            ),
+            actions: [
+              fluent.Button(
+                onPressed: () => App.back(context),
+                child: Text("取消".tl),
+              )
+            ],
+          );
+        },
+      );
+      return;
+    }
     showDialog(
         context: context,
         builder: (context) {

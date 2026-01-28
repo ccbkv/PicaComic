@@ -6,6 +6,7 @@ import "package:pica_comic/foundation/app.dart";
 import 'package:pica_comic/network/base_comic.dart';
 import "package:pica_comic/network/res.dart";
 import "package:pica_comic/tools/translations.dart";
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class CategoryComicsPage extends StatefulWidget {
   const CategoryComicsPage({
@@ -74,6 +75,94 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
         .firstWhere((e) => e.categoryData?.key == widget.categoryKey);
     final categories = _getCategories(source);
     
+    if (App.isFluent) {
+      return fluent.ScaffoldPage(
+        header: fluent.PageHeader(
+          title: Text(
+            widget.displayTitle ??
+                (selectedCategories.length > 1
+                    ? "${selectedCategories.length}个分类"
+                    : selectedCategories.firstOrNull ?? widget.category),
+          ),
+          commandBar: widget.param != "ca" ? fluent.CommandBar(
+            primaryItems: [
+              fluent.CommandBarButton(
+                label: const Text("分类过滤"),
+                icon: const Icon(fluent.FluentIcons.filter),
+                onPressed: () {
+                  Future.delayed(Duration.zero, () {
+                    if (mounted) {
+                      fluent.showDialog(
+                        context: context,
+                        builder: (context) => CategorySelectorDialog(
+                          categories: categories,
+                          initialSelectedCategories: selectedCategories,
+                          onCategoriesSelected: (newSelectedCategories) {
+                            setState(() {
+                              selectedCategories = newSelectedCategories;
+                            });
+                          },
+                        ),
+                      );
+                    }
+                  });
+                },
+              ),
+            ],
+          ) : null,
+        ),
+        content: Column(
+          children: [
+            if (selectedCategories.length > 1) ...[
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: selectedCategories.map((category) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: fluent.FluentTheme.of(context).accentColor.normal,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(category, style: const TextStyle(color: Colors.white)),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedCategories.remove(category);
+                              });
+                            },
+                            child: const Icon(fluent.FluentIcons.clear, size: 12, color: Colors.white),
+                          )
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+            Expanded(
+              child: _CategoryComicsList(
+                key: ValueKey(
+                    "${selectedCategories.join(',')} with $optionsValue"),
+                loader: data.load,
+                category: selectedCategories.join(','),
+                options: optionsValue,
+                param: widget.param,
+                header: buildOptions(),
+                sourceKey: source.key,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: Appbar(
         title: Text(
@@ -224,6 +313,18 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
 
   Widget buildOptionItem(
       String text, String value, int group, BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ToggleButton(
+        checked: value == optionsValue[group],
+        onChanged: (b) {
+          if (value == optionsValue[group]) return;
+          setState(() {
+            optionsValue[group] = value;
+          });
+        },
+        child: Text(text),
+      );
+    }
     return OptionChip(
       text: text,
       isSelected: value == optionsValue[group],

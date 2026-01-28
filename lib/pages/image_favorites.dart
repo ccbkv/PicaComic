@@ -27,6 +27,7 @@ import 'reader/comic_reading_page.dart';
 import 'picacg/comic_page.dart';
 import 'nhentai/comic_page.dart';
 import 'comic_page.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class ImageFavoritesPage extends StatefulWidget {
   const ImageFavoritesPage({super.key, this.initialKeyword});
@@ -131,12 +132,64 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
     super.initState();
   }
 
+  ModalRoute? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _route) {
+      _route?.animation?.removeStatusListener(_handleStatusChange);
+      _route = route;
+      _route?.animation?.addStatusListener(_handleStatusChange);
+    }
+  }
+
+  void _handleStatusChange(AnimationStatus status) {
+    if (status == AnimationStatus.reverse) {
+      if (App.isFluent) {
+        App.mainAppbarActions.value = null;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _route?.animation?.removeStatusListener(_handleStatusChange);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return StateBuilder(
       tag: "image_favorites_page",
       init: SimpleController(),
+      dispose: (_) {
+        if (App.isFluent) {
+          App.mainAppbarActions.value = null;
+        }
+      },
       builder: (controller) {
+        if (App.isFluent) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            var route = ModalRoute.of(context);
+            if (mounted && route != null && route.isCurrent) {
+              if (route.animation?.status == AnimationStatus.reverse) {
+                return;
+              }
+              App.mainAppbarActions.value = _buildFluentCommandBar();
+            }
+          });
+          return fluent.ScaffoldPage(
+            header: fluent.PageHeader(
+              title: multiSelectMode
+                  ? Text("已选择 @a 项".tlParams(
+                      {"a": selectedImageFavorites.length.toString()}))
+                  : null,
+            ),
+            content: buildPage(),
+          );
+        }
         if (UiMode.m1(context)) {
           return Scaffold(
             appBar: AppBar(
@@ -162,6 +215,86 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
         }
       },
     );
+  }
+
+  Widget _buildFluentCommandBar() {
+    if (searchMode) {
+      return fluent.CommandBar(
+        primaryItems: [
+          fluent.CommandBarButton(
+            icon: const Icon(fluent.FluentIcons.cancel),
+            label: Text("退出搜索".tl),
+            onPressed: () {
+              setState(() {
+                searchMode = false;
+                controller.clear();
+                updateImageFavorites();
+              });
+            },
+          )
+        ],
+      );
+    } else if (multiSelectMode) {
+      return fluent.CommandBar(
+        mainAxisAlignment: MainAxisAlignment.end,
+        primaryItems: [
+          fluent.CommandBarButton(
+            icon: const Icon(fluent.FluentIcons.select_all),
+            label: Text("全选".tl),
+            onPressed: selectAll,
+          ),
+          fluent.CommandBarButton(
+            icon: const Icon(fluent.FluentIcons.clear_selection),
+            label: Text("取消选择".tl),
+            onPressed: deSelect,
+          ),
+          fluent.CommandBarButton(
+            icon: const Icon(fluent.FluentIcons.delete),
+            label: Text("删除".tl),
+            onPressed: deleteSelected,
+          ),
+          fluent.CommandBarButton(
+            icon: const Icon(fluent.FluentIcons.cancel),
+            label: Text("退出多选".tl),
+            onPressed: () {
+              setState(() {
+                multiSelectMode = false;
+                selectedImageFavorites.clear();
+              });
+            },
+          )
+        ],
+      );
+    } else {
+      return fluent.CommandBar(
+        mainAxisAlignment: MainAxisAlignment.end,
+        primaryItems: [
+          fluent.CommandBarButton(
+            icon: const Icon(fluent.FluentIcons.search),
+            label: Text("搜索".tl),
+            onPressed: () {
+              setState(() {
+                searchMode = true;
+              });
+            },
+          ),
+          fluent.CommandBarButton(
+            icon: const Icon(fluent.FluentIcons.sort),
+            label: Text("排序".tl),
+            onPressed: sort,
+          ),
+          fluent.CommandBarButton(
+            icon: const Icon(fluent.FluentIcons.multi_select),
+            label: Text("多选".tl),
+            onPressed: () {
+              setState(() {
+                multiSelectMode = true;
+              });
+            },
+          )
+        ],
+      );
+    }
   }
 
   List<Widget> _buildAppBarActions() {
@@ -233,17 +366,29 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
       return Column(
         children: [
           Padding(
-            padding: EdgeInsets.all(16),
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                hintText: "搜索图片收藏".tl,
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: (value) {
-                updateImageFavorites();
-              },
-            ),
+            padding: const EdgeInsets.all(16),
+            child: App.isFluent
+                ? fluent.TextBox(
+                    controller: controller,
+                    placeholder: "搜索图片收藏".tl,
+                    prefix: const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Icon(fluent.FluentIcons.search),
+                    ),
+                    onChanged: (value) {
+                      updateImageFavorites();
+                    },
+                  )
+                : TextField(
+                    controller: controller,
+                    decoration: InputDecoration(
+                      hintText: "搜索图片收藏".tl,
+                      prefixIcon: const Icon(Icons.search),
+                    ),
+                    onChanged: (value) {
+                      updateImageFavorites();
+                    },
+                  ),
           ),
           Expanded(child: _buildComicsList()),
         ],
@@ -389,6 +534,215 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: fluent.Card(
+          padding: EdgeInsets.zero,
+          child: GestureDetector(
+            onLongPress: _onLongPress,
+            onSecondaryTap: () {
+              if (!widget.multiSelectMode) {
+                final RenderBox overlay =
+                    Overlay.of(context).context.findRenderObject() as RenderBox;
+                final RenderBox box = context.findRenderObject() as RenderBox;
+                final Offset target =
+                    box.localToGlobal(Offset.zero, ancestor: overlay);
+                final Rect rect = target & box.size;
+                final image = widget.comic.images.first;
+                _showImageMenu(image, rect);
+              }
+            },
+            onTap: () {
+              if (widget.multiSelectMode) {
+                for (var ele in widget.comic.images) {
+                  widget.addSelected(ele);
+                }
+              } else {
+                var image = widget.comic.images.first;
+                var type = image.id.split("-")[0];
+                _goToComicDetail(type, image.id.replaceFirst("$type-", ""),
+                    image.title, image.otherInfo);
+              }
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.comic.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "来源: ${_getSourceName(widget.comic.images.first.id)}"
+                                  .tl,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (widget.comic.maxPageFromEp > 0)
+                        Text(
+                          "${widget.comic.images.length}/${widget.comic.maxPageFromEp}",
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: fluent.FluentTheme.of(context).accentColor,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const itemWidth = 90.0;
+                    const itemHeight = 120.0;
+                    const spacing = 2.0;
+
+                    final crossAxisCount =
+                        (constraints.maxWidth / (itemWidth + spacing)).floor();
+                    final totalWidth = crossAxisCount * itemWidth +
+                        (crossAxisCount - 1) * spacing;
+                    final leftMargin = (constraints.maxWidth - totalWidth) / 2;
+
+                    return Container(
+                      padding: EdgeInsets.only(left: leftMargin, bottom: 8),
+                      child: Wrap(
+                        alignment: WrapAlignment.start,
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children:
+                            List.generate(widget.comic.images.length, (index) {
+                          final image = widget.comic.images[index];
+                          final isSelected =
+                              widget.selectedImageFavorites[image] == true;
+
+                          return SizedBox(
+                            width: itemWidth,
+                            height: itemHeight,
+                            child: GestureDetector(
+                              onTap: () {
+                                if (widget.multiSelectMode) {
+                                  widget.addSelected(image);
+                                } else {
+                                  var type = image.id.split("-")[0];
+                                  _readWithKey(
+                                      type,
+                                      image.id.replaceFirst("$type-", ""),
+                                      image.ep,
+                                      image.page,
+                                      image.title,
+                                      image.otherInfo);
+                                }
+                              },
+                              onLongPress: () {
+                                if (!widget.multiSelectMode) {
+                                  final RenderBox overlay = Overlay.of(context)
+                                      .context
+                                      .findRenderObject() as RenderBox;
+                                  final RenderBox box =
+                                      context.findRenderObject() as RenderBox;
+                                  final Offset target = box.localToGlobal(
+                                      Offset.zero,
+                                      ancestor: overlay);
+                                  final Rect rect = target & box.size;
+                                  _showImageMenu(image, rect);
+                                }
+                              },
+                              onSecondaryTap: () {
+                                if (!widget.multiSelectMode) {
+                                  final RenderBox overlay = Overlay.of(context)
+                                      .context
+                                      .findRenderObject() as RenderBox;
+                                  final RenderBox box =
+                                      context.findRenderObject() as RenderBox;
+                                  final Offset target = box.localToGlobal(
+                                      Offset.zero,
+                                      ancestor: overlay);
+                                  final Rect rect = target & box.size;
+                                  _showImageMenu(image, rect);
+                                }
+                              },
+                              child: Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Container(
+                                      width: itemWidth,
+                                      height: itemHeight,
+                                      color: fluent.FluentTheme.of(context).resources.solidBackgroundFillColorBase,
+                                      child: Image(
+                                        image: _ImageProvider(image),
+                                        fit: BoxFit.cover,
+                                        width: itemWidth,
+                                        height: itemHeight,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 2),
+                                      color: Colors.black.withOpacity(0.6),
+                                      child: Text(
+                                        'P${image.page}',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Positioned.fill(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: fluent.FluentTheme.of(context).accentColor.withOpacity(0.3),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Icon(
+                                          fluent.FluentIcons.check_mark,
+                                          color: Colors.white,
+                                          size: 32,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Card(
       margin: EdgeInsets.all(8),
       child: InkWell(

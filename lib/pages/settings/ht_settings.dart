@@ -97,6 +97,10 @@ class _HtSettingsState extends State<HtSettings> {
       if (!choose.contains("https://")) {
         choose = "https://$choose";
       }
+      if(!choose.isURL){
+        showToast(message: "Invalid URL");
+        return;
+      }
       appdata.settings[31] = choose;
       appdata.updateSettings();
       setState(() {});
@@ -104,7 +108,7 @@ class _HtSettingsState extends State<HtSettings> {
   }
 
   Future<String?> _manualInputApiHost(BuildContext context) async {
-    var controller = TextEditingController(text: "www.wnacg05.cc");
+    var controller = TextEditingController(text: appdata.settings[31].replaceFirst("https://", ""));
     return await showDialog<String>(
       context: context,
       builder: (BuildContext context) {

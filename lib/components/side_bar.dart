@@ -666,6 +666,60 @@ String? validateFolderName(String newFolderName) {
 Future<void> sortFolders() async {
   var folders = LocalFavoritesManager().folderNames;
 
+  if (App.isFluent) {
+    await fluent.showDialog(
+      context: App.globalContext!,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return fluent.ContentDialog(
+            title: Text("排序".tl),
+            content: SizedBox(
+              width: 300,
+              height: 400,
+              child: ReorderableListView.builder(
+                onReorder: (oldIndex, newIndex) {
+                  if (oldIndex < newIndex) {
+                    newIndex--;
+                  }
+                  setState(() {
+                    var item = folders.removeAt(oldIndex);
+                    folders.insert(newIndex, item);
+                  });
+                },
+                itemCount: folders.length,
+                itemBuilder: (context, index) {
+                  return fluent.ListTile(
+                    key: ValueKey(folders[index]),
+                    title: Text(folders[index]),
+                    leading: const Icon(Icons.drag_handle),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              fluent.Button(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text("取消".tl),
+              ),
+              fluent.FilledButton(
+                onPressed: () {
+                  Map<String, int> folderOrder = {};
+                  for (int i = 0; i < folders.length; i++) {
+                    folderOrder[folders[i]] = i;
+                  }
+                  LocalFavoritesManager().updateOrder(folderOrder);
+                  Navigator.of(context).pop();
+                },
+                child: Text("确定".tl),
+              ),
+            ],
+          );
+        });
+      },
+    );
+    return;
+  }
+
   await showDialog(
     context: App.globalContext!,
     builder: (context) {

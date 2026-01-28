@@ -19,7 +19,7 @@ class _EhSettingsState extends State<EhSettings> {
         ListTile(
           leading: const Icon(Icons.dns),
           title: Text("画廊站点".tl),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: int.parse(appdata.settings[20]),
             width: 150,
             values: const [

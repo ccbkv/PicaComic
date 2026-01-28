@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
@@ -268,6 +269,147 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
     return DynamicColorBuilder(builder: (light, dark) {
       var (lightColor, darkColor) = _generateColorSchemes(light, dark);
+      if (appdata.settings.length > 91 && appdata.settings[91] == "1") {
+        return fluent.FluentApp(
+          title: 'Pica Comic',
+          debugShowCheckedModeBanner: false,
+          navigatorKey: App.navigatorKey,
+          theme: fluent.FluentThemeData(
+             accentColor: fluent.AccentColor('normal', {
+               'normal': lightColor.primary,
+               'dark': lightColor.primary,
+               'light': lightColor.primary,
+               'darker': lightColor.primary,
+               'lighter': lightColor.primary,
+               'darkest': lightColor.primary,
+               'lightest': lightColor.primary,
+             }),
+             brightness: fluent.Brightness.light,
+             fontFamily: appdata.settings.length > 95 &&
+                     appdata.settings[95].isNotEmpty
+                 ? appdata.settings[95]
+                 : (App.isWindows ? "font" : ""),
+           ),
+           darkTheme: fluent.FluentThemeData(
+             accentColor: fluent.AccentColor('normal', {
+               'normal': darkColor.primary,
+               'dark': darkColor.primary,
+               'light': darkColor.primary,
+               'darker': darkColor.primary,
+               'lighter': darkColor.primary,
+               'darkest': darkColor.primary,
+               'lightest': darkColor.primary,
+             }),
+             brightness: fluent.Brightness.dark,
+             fontFamily: appdata.settings.length > 95 &&
+                     appdata.settings[95].isNotEmpty
+                 ? appdata.settings[95]
+                 : (App.isWindows ? "font" : ""),
+           ),
+          themeMode: appdata.appSettings.darkMode == 2
+              ? fluent.ThemeMode.dark
+              : appdata.appSettings.darkMode == 1
+                  ? fluent.ThemeMode.light
+                  : fluent.ThemeMode.system,
+          onGenerateRoute: (settings) => AppPageRoute(
+            builder: (context) {
+              // 使用FutureBuilder来异步检查firstUse[3]的值
+              return FutureBuilder<bool>(
+                future: _checkFirstUse(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    // 显示加载页面
+                    return const Scaffold(
+                      body: Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  } else if (snapshot.hasError) {
+                    // 发生错误，显示欢迎页面
+                    LogManager.addLog(LogLevel.error, "MyApp.onGenerateRoute",
+                        "Error checking firstUse: ${snapshot.error}");
+                    return const WelcomePage();
+                  } else {
+                    // 根据firstUse[3]的值决定显示哪个页面
+                    bool isFirstUse = snapshot.data ?? true;
+                    return isFirstUse
+                        ? const WelcomePage()
+                        : (appdata.settings[13] == "1"
+                            ? const AuthPage()
+                            : const MainPage());
+                  }
+                },
+              );
+            },
+          ),
+          localizationsDelegates: const [
+            fluent.FluentLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('zh', 'CN'),
+            Locale('zh', 'TW'),
+            Locale('en', 'US')
+          ],
+          builder: (context, widget) {
+            ErrorWidget.builder = (details) {
+              LogManager.addLog(LogLevel.error, "Unhandled Exception",
+                  "${details.exception}\n${details.stack}");
+              return Material(
+                child: Center(
+                  child: Text(details.exception.toString()),
+                ),
+              );
+            };
+            if (widget != null) {
+              widget = OverlayWidget(widget);
+              if (App.isDesktop) {
+                widget = Shortcuts(
+                  shortcuts: {
+                    LogicalKeySet(LogicalKeyboardKey.escape):
+                        VoidCallbackIntent(
+                      () {
+                        final globalNavigator = App.navigatorKey.currentState;
+                        if (globalNavigator != null &&
+                            globalNavigator.canPop()) {
+                          App.globalBack();
+                        } else {
+                          final mainNavigator =
+                              App.mainNavigatorKey?.currentState;
+                          if (mainNavigator != null && mainNavigator.canPop()) {
+                            mainNavigator.pop();
+                          }
+                        }
+                      },
+                    ),
+                  },
+                  child: WindowFrame(widget),
+                );
+              }
+              return Theme(
+                  data: ThemeData(
+                    colorScheme: fluent.FluentTheme.of(context).brightness ==
+                            fluent.Brightness.light
+                        ? lightColor
+                        : darkColor,
+                    useMaterial3: true,
+                    fontFamily: appdata.settings.length > 95 &&
+                            appdata.settings[95].isNotEmpty
+                        ? appdata.settings[95]
+                        : (App.isWindows ? "font" : ""),
+                    brightness: fluent.FluentTheme.of(context).brightness ==
+                            fluent.Brightness.light
+                        ? Brightness.light
+                        : Brightness.dark,
+                  ),
+                  child: _SystemUiProvider(widget));
+            }
+            throw ('widget is null');
+          },
+        );
+      }
       return MaterialApp(
         title: 'Pica Comic',
         debugShowCheckedModeBanner: false,

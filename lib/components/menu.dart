@@ -35,6 +35,53 @@ class DesktopMenuRoute<T> extends PopupRoute<T> {
     if (top + height > size.height - 15) {
       top = size.height - height - 15;
     }
+    
+    if (App.isFluent) {
+      return Stack(
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            child: fluent.Mica(
+              borderRadius: BorderRadius.circular(8),
+              elevation: 4,
+              child: Container(
+                width: width,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: entries.map((e) => fluent.HoverButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      e.onClick();
+                    },
+                    builder: (p0, state) {
+                      return Container(
+                        height: 32,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        color: state.isHovering
+                            ? fluent.FluentTheme.of(context).menuColor.withOpacity(0.1)
+                            : Colors.transparent,
+                        child: Row(
+                          children: [
+                            if (e.icon != null) ...[
+                              Icon(e.icon, size: 16),
+                              const SizedBox(width: 12),
+                            ],
+                            Text(e.text),
+                          ],
+                        ),
+                      );
+                    },
+                  )).toList(),
+                ),
+              ),
+            ),
+          )
+        ],
+      );
+    }
+
     return Stack(
       children: [
         Positioned(

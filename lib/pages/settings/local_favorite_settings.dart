@@ -16,7 +16,7 @@ class _LocalFavoritesSettingsState extends State<LocalFavoritesSettings> {
           leading: const Icon(Icons.book),
           title: Text("快速收藏".tl),
           subtitle: Text("长按收藏按钮执行快速收藏".tl),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: LocalFavoritesManager()
                 .folderNames
                 .indexOf(appdata.settings[51]),
@@ -49,7 +49,7 @@ class _LocalFavoritesSettingsState extends State<LocalFavoritesSettings> {
         ListTile(
           leading: const Icon(Icons.sync),
           title: Text("下拉更新拉取页数".tl),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: ["1", "2", "3", "4", "5", "10", "99"]
                 .indexOf(appdata.settings[71]),
             values: const ["1", "2", "3", "4", "5", "10", "99"],

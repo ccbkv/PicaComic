@@ -51,6 +51,33 @@ class _SelectState extends State<Select> {
       value = 0;
     }
     if (value != null && value! < 0) value = null;
+    
+    if (App.isFluent) {
+      return SizedBox(
+        width: widget.width,
+        height: 38,
+        child: fluent.ComboBox<int>(
+          value: value,
+          items: List.generate(widget.values.length, (index) {
+            return fluent.ComboBoxItem<int>(
+              value: index,
+              enabled: !widget.disabledValues.contains(index),
+              child: Text(widget.values[index]),
+            );
+          }),
+          onChanged: (i) {
+            if (i != null) {
+              setState(() {
+                value = i;
+                widget.onChange(i);
+              });
+            }
+          },
+          placeholder: Text(value != null ? widget.values[value!] : ""),
+        ),
+      );
+    }
+
     return MouseRegion(
       onEnter: (_) => setState(() => isHover = true),
       onExit: (_) => setState(() => isHover = false),

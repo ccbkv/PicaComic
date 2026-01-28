@@ -304,6 +304,23 @@ class _IconButtonState extends State<_IconButton> {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      Widget icon = widget.icon;
+      if (widget.isLoading) {
+        icon = const fluent.ProgressRing(strokeWidth: 2.5).fixWidth(16).fixHeight(16);
+      }
+      return fluent.Tooltip(
+        message: widget.tooltip ?? "",
+        child: fluent.IconButton(
+          icon: icon,
+          onPressed: widget.isLoading ? null : widget.onPressed,
+          style: fluent.ButtonStyle(
+            iconSize: fluent.ButtonState.all(widget.size ?? 24),
+            foregroundColor: widget.color != null ? fluent.ButtonState.all(widget.color!) : null,
+          ),
+        ),
+      );
+    }
     var iconSize = widget.size ?? 24;
     Widget icon = IconTheme(
       data: IconThemeData(
@@ -371,6 +388,17 @@ class _StatefulSwitchState extends State<StatefulSwitch> {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ToggleSwitch(
+        checked: value,
+        onChanged: (b) {
+          setState(() {
+            value = b;
+            widget.onChanged(b);
+          });
+        },
+      );
+    }
     return Switch(
         value: value,
         onChanged: (b) {

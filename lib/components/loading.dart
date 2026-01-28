@@ -271,6 +271,11 @@ abstract class MultiPageLoadingState<T extends StatefulWidget, S extends Object>
   }
 
   Widget buildLoading(BuildContext context) {
+    if (App.isFluent) {
+      return const Center(
+        child: fluent.ProgressRing(strokeWidth: 2.5),
+      );
+    }
     return Center(
       child: const CircularProgressIndicator(
         strokeWidth: 2,

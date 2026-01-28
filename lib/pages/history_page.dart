@@ -9,6 +9,7 @@ import '../base.dart';
 import '../foundation/app.dart';
 import 'package:pica_comic/tools/translations.dart';
 import 'package:pica_comic/components/components.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({Key? key}) : super(key: key);
@@ -25,16 +26,52 @@ class _HistoryPageState extends State<HistoryPage> {
   var results = <History>[];
   bool isModified = false;
 
+  ModalRoute? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _route) {
+      _route?.animation?.removeStatusListener(_handleStatusChange);
+      _route = route;
+      _route?.animation?.addStatusListener(_handleStatusChange);
+    }
+  }
+
+  void _handleStatusChange(AnimationStatus status) {
+    if (status == AnimationStatus.reverse) {
+      if (App.isFluent) {
+        App.mainAppbarActions.value = null;
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _route?.animation?.removeStatusListener(_handleStatusChange);
+    if (App.isFluent) {
+      App.mainAppbarActions.value = null;
+    }
     if (isModified) {
       appdata.history.saveData();
     }
     super.dispose();
   }
 
-  Widget buildTitle() {
+  Widget? buildTitle() {
     if (searchMode) {
+      if(App.isFluent) {
+        return fluent.TextBox(
+          autofocus: true,
+          placeholder: "搜索".tl,
+          onChanged: (s) {
+            setState(() {
+              keyword = s.toLowerCase();
+            });
+          },
+        );
+      }
       final FocusNode focusNode = FocusNode();
       focusNode.requestFocus();
       bool focus = searchInit;
@@ -50,7 +87,7 @@ class _HistoryPageState extends State<HistoryPage> {
         },
       );
     } else {
-      return Text("${"历史记录".tl}(${comics.length})");
+      return null;
     }
   }
 
@@ -73,11 +110,97 @@ class _HistoryPageState extends State<HistoryPage> {
     if (searchMode) {
       find();
     }
+
+    if (App.isFluent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        var route = ModalRoute.of(context);
+        if (mounted && route != null && route.isCurrent) {
+          if (route.animation?.status == AnimationStatus.reverse) {
+            return;
+          }
+          App.mainAppbarActions.value = fluent.CommandBar(
+            mainAxisAlignment: MainAxisAlignment.end,
+            primaryItems: [
+              fluent.CommandBarButton(
+                icon: const Icon(fluent.FluentIcons.delete),
+                label: Text("清除".tl),
+                onPressed: () {
+                  fluent.showDialog(
+                    context: context,
+                    builder: (context) => fluent.ContentDialog(
+                      title: Text("清除记录".tl),
+                      content: Text("要清除历史记录吗?".tl),
+                      actions: [
+                        fluent.Button(
+                            onPressed: () => App.globalBack(),
+                            child: Text("取消".tl)),
+                        fluent.FilledButton(
+                            onPressed: () {
+                              appdata.history.clearHistory();
+                              setState(() => comics.clear());
+                              isModified = true;
+                              StateController.find(tag: "me_page_history").update();
+                              App.globalBack();
+                            },
+                            child: Text("清除".tl)),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              fluent.CommandBarButton(
+                icon: Icon(searchMode
+                    ? fluent.FluentIcons.cancel
+                    : fluent.FluentIcons.search),
+                label: Text(searchMode ? "取消搜索".tl : "搜索".tl),
+                onPressed: () {
+                  setState(() {
+                    searchMode = !searchMode;
+                    searchInit = true;
+                    if (!searchMode) {
+                      keyword = "";
+                    }
+                  });
+                },
+              )
+            ],
+          );
+        }
+      });
+      return fluent.ScaffoldPage(
+        header: fluent.PageHeader(
+          title: searchMode
+              ? SizedBox(
+                  width: 300,
+                  child: fluent.TextBox(
+                    autofocus: true,
+                    placeholder: "搜索".tl,
+                    onChanged: (s) {
+                      setState(() {
+                        keyword = s.toLowerCase();
+                      });
+                    },
+                  ),
+                )
+              : null,
+        ),
+        content: CustomScrollView(
+          slivers: [
+            if (!searchMode) buildComics(comics) else buildComics(results),
+            SliverPadding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom),
+            )
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       body: SmoothCustomScrollView(
         slivers: [
           SliverAppbar(
-            title: buildTitle(),
+            title: buildTitle() ?? Text("${"历史记录".tl}(${comics.length})"),
             actions: [
               Tooltip(
                 message: "清除".tl,
@@ -166,6 +289,33 @@ class _HistoryPageState extends State<HistoryPage> {
           key: Key(comics_[i].target),
           sourceKey: comics_[i].type.comicSource?.key,
           onLongTap: () {
+            if (App.isFluent) {
+              fluent.showDialog(
+                context: context,
+                builder: (context) => fluent.ContentDialog(
+                  title: Text("删除".tl),
+                  content: Text("要删除这条历史记录吗".tl),
+                  actions: [
+                    fluent.Button(
+                        onPressed: () => App.globalBack(),
+                        child: Text("取消".tl)),
+                    fluent.FilledButton(
+                        onPressed: () {
+                          appdata.history.remove(comics_[i].target);
+                          setState(() {
+                            isModified = true;
+                            comics.removeWhere((element) =>
+                                element.target == comics_[i].target);
+                          });
+                          StateController.find(tag: "me_page_history").update();
+                          App.globalBack();
+                        },
+                        child: Text("删除".tl)),
+                  ],
+                ),
+              );
+              return;
+            }
             final now = DateTime.now();
             showDialog(
               context: context,

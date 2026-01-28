@@ -110,6 +110,20 @@ class _OverlayWidgetState extends State<OverlayWidget> {
 }
 
 void showDialogMessage(BuildContext context, String title, String message) {
+  if (App.isFluent) {
+    fluent.showDialog(
+      context: context,
+      builder: (context) => fluent.ContentDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          fluent.Button(
+              onPressed: () => App.back(context), child: Text("了解".tl))
+        ],
+      ),
+    );
+    return;
+  }
   showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -167,6 +181,53 @@ LoadingDialogController showLoadingDialog(BuildContext context,
     String? message,
     String cancelButtonText = "Cancel"}) {
   var controller = LoadingDialogController();
+
+  if (App.isFluent) {
+    fluent.showDialog(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      builder: (context) {
+        return fluent.ContentDialog(
+          content: Container(
+            width: 100,
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: fluent.ProgressRing(),
+                ),
+                const SizedBox(
+                  width: 16,
+                ),
+                Text(
+                  message ?? 'Loading',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const Spacer(),
+                if (allowCancel)
+                  fluent.Button(
+                      onPressed: () {
+                        controller.close();
+                        onCancel?.call();
+                      },
+                      child: Text(cancelButtonText.tl))
+              ],
+            ),
+          ),
+        );
+      },
+    ).then((value) => controller.closed = true);
+    
+    controller.closeDialog = () {
+      if(Navigator.of(context, rootNavigator: true).canPop()){
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    };
+    
+    return controller;
+  }
 
   var loadingDialogRoute = DialogRoute(
       context: context,
@@ -231,7 +292,14 @@ class ContentDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var content = Column(
+    if (App.isFluent) {
+      return fluent.ContentDialog(
+        title: Text(title),
+        content: this.content,
+        actions: actions,
+      );
+    }
+    var dialogContent = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Appbar(
@@ -261,7 +329,7 @@ class ContentDialog extends StatelessWidget {
             removeTop: true,
             removeBottom: true,
             context: context,
-            child: content,
+            child: dialogContent,
           ),
         ),
       ),

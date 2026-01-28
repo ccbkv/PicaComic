@@ -29,6 +29,7 @@ import 'show_image_page.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shimmer_animation/shimmer_animation.dart';
 import 'dart:math' as math;
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class ComicPage extends StatelessWidget {
   const ComicPage({
@@ -804,51 +805,119 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
-      return Scaffold(
-        body: StateBuilder<ComicPageLogic<T>>(
-          tag: tag,
-          init: ComicPageLogic<T>(),
-          initState: (logic) {
-            tagsStack.push(_logic);
-            _logic.favoriteOnPlatform = favoriteOnPlatformInitial;
-          },
-          dispose: (logic) {
-            tagsStack.pop();
-          },
-          builder: (logic) {
-            _logic.width = constraints.maxWidth;
-            _logic.height = constraints.maxHeight;
-            if (logic.loading) {
-              logic.get(loadData, loadFavorite, () => id);
-              return buildLoading(context);
-            } else if (logic.message != null) {
-              return NetworkError(
-                message: logic.message!,
-                retry: logic.refresh_,
-              );
-            } else {
-              _logic.thumbnailsData ??= thumbnailsCreator;
-              logic.controller.removeListener(scrollListener);
-              logic.controller.addListener(scrollListener);
-              return SmoothCustomScrollView(
-                controller: logic.controller,
-                slivers: [
-                  buildTitle(logic),
-                  buildComicInfo(logic, context),
-                  buildTags(logic, context),
-                  ...buildEpisodeInfo(context),
-                  ...buildIntroduction(context),
-                  ...buildThumbnails(context),
-                  ...buildRecommendation(context),
-                  SliverPadding(
-                    padding: EdgeInsets.only(
-                        bottom: MediaQuery.of(context).padding.bottom),
-                  )
-                ],
-              );
-            }
-          },
-        ),
+      return StateBuilder<ComicPageLogic<T>>(
+        tag: tag,
+        init: ComicPageLogic<T>(),
+        initState: (logic) {
+          tagsStack.push(_logic);
+          _logic.favoriteOnPlatform = favoriteOnPlatformInitial;
+        },
+        dispose: (logic) {
+          tagsStack.pop();
+        },
+        builder: (logic) {
+          _logic.width = constraints.maxWidth;
+          _logic.height = constraints.maxHeight;
+
+          if (App.isFluent) {
+            return fluent.ScaffoldPage(
+              header: fluent.PageHeader(
+                title: Text(title ?? "Comic"),
+                commandBar: fluent.CommandBar(
+                  primaryItems: [
+                    fluent.CommandBarButton(
+                      icon: const Icon(fluent.FluentIcons.share),
+                      label: Text("分享".tl),
+                      onPressed: () {
+                        var text = title!;
+                        if (url != null) {
+                          text += ":$url";
+                        }
+                        Share.share(text);
+                      },
+                    ),
+                    fluent.CommandBarButton(
+                      icon: const Icon(fluent.FluentIcons.copy),
+                      label: Text("复制标题".tl),
+                      onPressed: () {
+                        var text = title!;
+                        if (url != null) {
+                          text += ":$url";
+                        }
+                        Clipboard.setData(ClipboardData(text: text));
+                        showToast(message: "已复制".tl, icon: const Icon(Icons.check));
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              content: () {
+                if (logic.loading) {
+                  logic.get(loadData, loadFavorite, () => id);
+                  return buildLoading(context);
+                } else if (logic.message != null) {
+                  return NetworkError(
+                    message: logic.message!,
+                    retry: logic.refresh_,
+                  );
+                } else {
+                  _logic.thumbnailsData ??= thumbnailsCreator;
+                  // logic.controller.removeListener(scrollListener);
+                  // logic.controller.addListener(scrollListener);
+                  return CustomScrollView(
+                    controller: logic.controller,
+                    slivers: [
+                      buildComicInfo(logic, context),
+                      buildTags(logic, context),
+                      ...buildEpisodeInfo(context),
+                      ...buildIntroduction(context),
+                      ...buildThumbnails(context),
+                      ...buildRecommendation(context),
+                      SliverPadding(
+                        padding: EdgeInsets.only(
+                            bottom: MediaQuery.of(context).padding.bottom),
+                      )
+                    ],
+                  );
+                }
+              }(),
+            );
+          }
+
+          return Scaffold(
+            body: () {
+              if (logic.loading) {
+                logic.get(loadData, loadFavorite, () => id);
+                return buildLoading(context);
+              } else if (logic.message != null) {
+                return NetworkError(
+                  message: logic.message!,
+                  retry: logic.refresh_,
+                );
+              } else {
+                _logic.thumbnailsData ??= thumbnailsCreator;
+                logic.controller.removeListener(scrollListener);
+                logic.controller.addListener(scrollListener);
+                return SmoothCustomScrollView(
+                  controller: logic.controller,
+                  slivers: [
+                    buildTitle(logic),
+                    buildComicInfo(logic, context),
+                    buildTags(logic, context),
+                    ...buildEpisodeInfo(context),
+                    ...buildIntroduction(context),
+                    ...buildThumbnails(context),
+                    ...buildRecommendation(context),
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                          bottom: MediaQuery.of(context).padding.bottom),
+                    )
+                  ],
+                );
+              }
+            }(),
+          );
+        },
       );
     });
   }
@@ -1159,6 +1228,47 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
       _logic.colorIndex++;
     }
 
+    if (App.isFluent) {
+      return GestureDetector(
+        onSecondaryTapUp: (details) {
+          showMenu(
+              context: App.globalContext!,
+              position: RelativeRect.fromLTRB(
+                  details.globalPosition.dx,
+                  details.globalPosition.dy,
+                  details.globalPosition.dx,
+                  details.globalPosition.dy),
+              items: buildPopMenus());
+        },
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+          child: fluent.Button(
+            style: fluent.ButtonStyle(
+              padding: fluent.ButtonState.all(
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6)),
+              backgroundColor: title
+                  ? fluent.ButtonState.all(
+                      colors[_logic.colorIndex % colors.length]
+                          .shade100
+                          .withOpacity(0.6))
+                  : null,
+            ),
+            child: enableTranslationToCN
+                ? (title
+                    ? label(text.translateTagsCategoryToCN)
+                    : label(() {
+                        var translated =
+                            TagsTranslation.translationTagWithNamespace(
+                                text, key);
+                        return translated;
+                      }()))
+                : label(text),
+            onPressed: title ? null : () => tapOnTag(text, key),
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
       onLongPressStart: (details) {
         showMenu(
@@ -1189,23 +1299,24 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
             margin: EdgeInsets.zero,
             color: title
                 ? colors[_logic.colorIndex % colors.length]
-                .shade100
-                .withOpacity(0.6)
+                    .shade100
+                    .withOpacity(0.6)
                 : ElevationOverlay.applySurfaceTint(
-                colorScheme.surface, colorScheme.surfaceTint, 3),
+                    colorScheme.surface, colorScheme.surfaceTint, 3),
             shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 0,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
               child: enableTranslationToCN
                   ? (title
-                  ? label(text.translateTagsCategoryToCN)
-                  : label((){
-                      var translated = TagsTranslation.translationTagWithNamespace(text, key);
-                      //print("DEBUG: Translating tag '$key:$text' -> '$translated'");
-                      return translated;
-                    }()))
+                      ? label(text.translateTagsCategoryToCN)
+                      : label(() {
+                          var translated =
+                              TagsTranslation.translationTagWithNamespace(
+                                  text, key);
+                          return translated;
+                        }()))
                   : label(text),
             ),
           ),
@@ -1216,6 +1327,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
 
   Widget buildActions(ComicPageLogic logic, BuildContext context, bool center) {
     if (logic.loading) {
+      if (App.isFluent) return const fluent.ProgressBar();
       return Container(
         decoration: BoxDecoration(
           color: Theme.of(context)
@@ -1231,6 +1343,23 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
 
     Widget buildItem(String title, IconData icon, VoidCallback onTap,
         [VoidCallback? onLongPress]) {
+      if (App.isFluent) {
+        return Padding(
+          padding: const EdgeInsets.all(4.0),
+          child: fluent.Button(
+            onPressed: onTap,
+            onLongPress: onLongPress,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 20),
+                const SizedBox(height: 4),
+                Text(title, style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+        );
+      }
       return InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
@@ -1368,19 +1497,29 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: FilledButton.tonal(
-                      onPressed: download,
-                      child: Text("下载".tl),
-                    ),
+                    child: App.isFluent
+                        ? fluent.FilledButton(
+                            onPressed: download,
+                            child: Text("下载".tl),
+                          )
+                        : FilledButton.tonal(
+                            onPressed: download,
+                            child: Text("下载".tl),
+                          ),
                   ),
                   const SizedBox(
                     width: 16,
                   ),
                   Expanded(
-                    child: FilledButton.tonal(
-                      onPressed: () => read(_logic.history),
-                      child: Text("阅读".tl),
-                    ),
+                    child: App.isFluent
+                        ? fluent.FilledButton(
+                            onPressed: () => read(_logic.history),
+                            child: Text("阅读".tl),
+                          )
+                        : FilledButton.tonal(
+                            onPressed: () => read(_logic.history),
+                            child: Text("阅读".tl),
+                          ),
                   ),
                 ],
               ),

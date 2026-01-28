@@ -25,7 +25,7 @@ class _PicacgSettingsState extends State<PicacgSettings> {
         ListTile(
           leading: const Icon(Icons.dns),
           title: Text("设置分流".tl),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: int.parse(picacg.data['appChannel']) - 1,
             values: ["分流1".tl, "分流2".tl, "分流3".tl],
             onChange: (i) {
@@ -37,7 +37,7 @@ class _PicacgSettingsState extends State<PicacgSettings> {
         ListTile(
           leading: const Icon(Icons.image),
           title: Text("设置图片质量".tl),
-          trailing: Select(
+          trailing: components.Select(
             initialValue:
                 _imageQualityValues.indexOf(picacg.data['imageQuality']),
             width: App.locale.languageCode == "en" ? 140 : 120,
@@ -50,7 +50,7 @@ class _PicacgSettingsState extends State<PicacgSettings> {
         ),
         ListTile(
           leading: const Icon(Icons.manage_search_outlined),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: appdata.getSearchMode(),
             values: ["新到旧".tl, "旧到新".tl, "最多喜欢".tl, "最多指名".tl],
             onChange: (i) {
@@ -61,7 +61,7 @@ class _PicacgSettingsState extends State<PicacgSettings> {
         ),
         ListTile(
           leading: const Icon(Icons.collections_bookmark_outlined),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: int.parse(appdata.settings[30]),
             values: ["旧到新".tl, "新到旧".tl],
             onChange: (i) {

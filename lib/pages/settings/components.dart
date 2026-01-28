@@ -23,6 +23,22 @@ class SwitchSetting extends StatefulWidget {
 class _SwitchSettingState extends State<SwitchSetting> {
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ListTile(
+        title: Text(widget.title),
+        subtitle: widget.subTitle == null ? null : Text(widget.subTitle!),
+        leading: widget.icon,
+        trailing: fluent.ToggleSwitch(
+          checked: appdata.settings[widget.settingsIndex] == '1',
+          onChanged: (value) {
+            setState(() {
+              appdata.settings[widget.settingsIndex] = value ? '1' : '0';
+              appdata.updateSettings();
+            });
+          },
+        ),
+      );
+    }
     return ListTile(
       title: Text(widget.title),
       subtitle: widget.subTitle == null ? null : Text(widget.subTitle!),
@@ -47,6 +63,17 @@ class SettingsTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ListTile(
+        title: Text(
+          text,
+          style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: fluent.FluentTheme.of(context).accentColor),
+        ),
+      );
+    }
     return ListTile(
       title: Text(text),
     );
@@ -68,6 +95,14 @@ class NewPageSetting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ListTile(
+        leading: icon,
+        title: Text(title),
+        onPressed: onTap,
+        trailing: const Icon(Icons.arrow_right),
+      );
+    }
     return ListTile(
       leading: icon,
       title: Text(title),
@@ -147,6 +182,18 @@ class SelectSetting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ListTile(
+        leading: leading,
+        title: Text(title),
+        trailing: components.Select(
+          width: 136,
+          initialValue: initialValue,
+          onChange: onChanged,
+          values: values,
+        ),
+      );
+    }
     return LayoutBuilder(
       builder: (context, constrains) {
         bool small = constrains.maxWidth < 400;
@@ -162,7 +209,7 @@ class SelectSetting extends StatelessWidget {
         return ListTile(
           leading: leading,
           title: Text(title),
-          trailing: Select(
+          trailing: components.Select(
             width: 136,
             initialValue: initialValue,
             onChange: onChanged,

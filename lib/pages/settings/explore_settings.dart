@@ -93,6 +93,33 @@ Widget buildExploreSettings(BuildContext context, bool popUp) {
         values: ["详细".tl, "简略".tl],
       ),
       StatefulBuilder(builder: (context, setState){
+        if (App.isFluent) {
+          return fluent.ListTile(
+            leading: const Icon(Icons.crop_free),
+            title: Text("漫画块大小".tl),
+            subtitle: fluent.Slider(
+              max: 1.25,
+              min: 0.75,
+              divisions: 10,
+              value: double.parse(appdata.settings[44].split(',').elementAtOrNull(1) ?? "1.00"),
+              onChangeEnd: (v){
+                appdata.updateSettings();
+              },
+              onChanged: (v) {
+                var settings = appdata.settings[44].split(',');
+                if(settings.length == 1){
+                  settings.add(v.toStringAsFixed(2));
+                } else {
+                  settings[1] = v.toStringAsFixed(2);
+                }
+                setState((){
+                  appdata.settings[44] = settings.join(',');
+                });
+              },
+            ),
+            trailing: Text(appdata.settings[44].split(',').elementAtOrNull(1) ?? "1.00"),
+          );
+        }
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: SizedBox(
@@ -167,6 +194,27 @@ Widget buildExploreSettings(BuildContext context, bool popUp) {
         icon: const Icon(Icons.history_toggle_off),
       ),
       StatefulBuilder(builder: (context, setState){
+        if (App.isFluent) {
+          return fluent.ListTile(
+            leading: const Icon(Icons.crop_free),
+            title: Text("图片收藏大小".tl),
+            subtitle: fluent.Slider(
+              max: 1.25,
+              min: 0.75,
+              divisions: 10,
+              value: double.parse(appdata.settings[74]),
+              onChangeEnd: (v){
+                appdata.updateSettings();
+              },
+              onChanged: (v) {
+                setState((){
+                  appdata.settings[74] = v.toStringAsFixed(2);
+                });
+              },
+            ),
+            trailing: Text(appdata.settings[74]),
+          );
+        }
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: SizedBox(

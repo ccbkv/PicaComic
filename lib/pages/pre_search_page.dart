@@ -4,6 +4,7 @@ import 'package:pica_comic/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/app.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:pica_comic/foundation/pair.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
@@ -254,6 +255,36 @@ class PreSearchPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ScaffoldPage(
+        content: Column(
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).padding.top,
+            ),
+            Builder(
+              builder: (context) => _FloatingSearchBar(
+                supportingText: '${'搜索'.tl} / ${'链接'.tl} / ID',
+                onFinish: (s) {
+                  // if (s == "") return;
+                  search();
+                },
+                controller: controller,
+                onChanged: (s) {
+                  findSuggestions();
+                  searchController.update([1, 100]);
+                },
+                focusNode: _focusNode,
+              ),
+            ),
+            const SizedBox(
+              height: 8,
+            ),
+            buildBody(context)
+          ],
+        ),
+      );
+    }
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: search,

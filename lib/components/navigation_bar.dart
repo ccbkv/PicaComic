@@ -177,8 +177,83 @@ class NaviPaneState extends State<NaviPane>
     }
   }
 
+  String _getTitle() {
+    if (widget.observer.routes.length > 1) {
+      var route = widget.observer.routes.last;
+      if (route is AppPageRoute) {
+        if (route.label == 'DownloadPage') return '已下载'.tl;
+        if (route.label == 'ImageFavoritesPage') return '图片收藏'.tl;
+        if (route.label == 'HistoryPage') return '历史记录'.tl;
+        if (route.label == 'ComicSourceSettings') return '漫画源'.tl;
+      }
+      if (route.settings.name == '/SettingsPage') return '设置'.tl;
+    } else if (currentPage == 0) {
+      return '我的'.tl;
+    }
+    return widget.paneItems[currentPage].label;
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.NavigationView(
+        appBar: fluent.NavigationAppBar(
+          title: Text(_getTitle()),
+          automaticallyImplyLeading: false,
+          leading: widget.observer.routes.length > 1
+              ? fluent.IconButton(
+                  icon: const Icon(fluent.FluentIcons.back),
+                  onPressed: () {
+                    widget.navigatorKey.currentState!.pop();
+                  },
+                )
+              : null,
+          actions: ValueListenableBuilder(
+            valueListenable: App.mainAppbarActions,
+            builder: (context, value, child) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: value ?? const SizedBox(),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        pane: fluent.NavigationPane(
+          selected: currentPage,
+          onChanged: (index) {
+            updatePage(index);
+          },
+          displayMode: fluent.PaneDisplayMode.auto,
+          items: List.generate(widget.paneItems.length, (index) {
+            var entry = widget.paneItems[index];
+            return fluent.PaneItem(
+              icon: Icon(entry.icon),
+              title: Text(entry.label),
+              body: const SizedBox.shrink(),
+              onTap: () {
+                updatePage(index);
+              },
+            );
+          }),
+          footerItems: widget.paneActions.map((e) {
+            return fluent.PaneItemAction(
+              icon: Icon(e.icon),
+              title: Text(e.label),
+              onTap: e.onTap,
+            );
+          }).toList(),
+        ),
+        transitionBuilder: (child, animation) {
+          return buildMainView();
+        },
+      );
+    }
     onRebuild(context);
     bool internalCanPop = widget.observer.routes.length > 1;
     bool rootCanPop = Navigator.of(context).canPop();
@@ -660,6 +735,9 @@ class _NaviMainViewState extends State<_NaviMainView> {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return state.buildMainViewContent();
+    }
     var shouldShowAppBar = state.controller.value < 2;
     final useAdaptive = App.isIOS &&
         (appdata.settings.length > 90 ? appdata.settings[90] == "1" : false);

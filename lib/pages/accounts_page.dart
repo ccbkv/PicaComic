@@ -21,7 +21,7 @@ class AccountsPage extends StatelessWidget {
     var body = StateBuilder<AccountsPageLogic>(
       init: AccountsPageLogic(),
       builder: (logic) {
-        return CustomScrollView(
+        Widget body = CustomScrollView(
           slivers: [
             SliverList(
               delegate: SliverChildListDelegate(
@@ -33,6 +33,13 @@ class AccountsPage extends StatelessWidget {
             )
           ],
         );
+        if (App.isFluent) {
+          return Material(
+            type: MaterialType.transparency,
+            child: body,
+          );
+        }
+        return body;
       },
     );
 

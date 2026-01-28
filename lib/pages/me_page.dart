@@ -13,12 +13,29 @@ import 'history_page.dart';
 import 'package:pica_comic/tools/translations.dart';
 import 'image_favorites.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class _SearchBar extends StatelessWidget {
   const _SearchBar();
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: fluent.TextBox(
+          placeholder: '搜索'.tl,
+          prefix: const Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: Icon(fluent.FluentIcons.search),
+          ),
+          readOnly: true,
+          onTap: () {
+            context.to(() => PreSearchPage());
+          },
+        ),
+      );
+    }
     return Container(
       height: App.isMobile ? 52 : 46,
       width: double.infinity,
@@ -52,6 +69,25 @@ class MePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ScaffoldPage.scrollable(
+        children: [
+          const _SearchBar(),
+          buildHistory(context),
+          const SizedBox(height: 12),
+          buildAccount(1000), // width not critical for Fluent layout here
+          const SizedBox(height: 12),
+          buildDownload(context, 1000),
+          const SizedBox(height: 12),
+          buildImageFavorite(context, 1000),
+          const SizedBox(height: 12),
+          buildComicSource(context, 1000),
+          const SizedBox(height: 12),
+          buildTools(1000),
+          const SizedBox(height: 24),
+        ],
+      );
+    }
     return SizedBox.expand(
       child: LayoutBuilder(
         builder: (context, constrains) {
@@ -143,6 +179,60 @@ class MePage extends StatelessWidget {
         init: SimpleController(),
         builder: (controller) {
           var history = HistoryManager().getRecent();
+          if (App.isFluent) {
+            return fluent.Card(
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  fluent.ListTile(
+                    leading: const Icon(fluent.FluentIcons.history),
+                    title: Text("${"历史记录".tl}(${HistoryManager().count()})"),
+                    trailing: const Icon(fluent.FluentIcons.chevron_right),
+                    onPressed: () => context.to(() => const HistoryPage()),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 128,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: history.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: fluent.HoverButton(
+                            onPressed: () => toComicPageWithHistory(context, history[index]),
+                            builder: (context, states) {
+                              return Container(
+                                width: 96,
+                                height: 128,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: AnimatedImage(
+                                  image: CachedImageProvider(
+                                    history[index].cover,
+                                    sourceKey:
+                                        history[index].type.comicSource?.key,
+                                  ),
+                                  width: 96,
+                                  height: 128,
+                                  fit: BoxFit.cover,
+                                  filterQuality: FilterQuality.medium,
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
           return InkWell(
             onTap: () => context.to(() => const HistoryPage()),
             mouseCursor: SystemMouseCursors.click,
@@ -217,6 +307,19 @@ class MePage extends StatelessWidget {
         var accounts = findAccounts();
 
         Widget buildItem(String name) {
+          if (App.isFluent) {
+             return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: fluent.FluentTheme.of(App.globalContext!).resources.cardBackgroundFillColorSecondary,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                name,
+                style: const TextStyle(fontSize: 12),
+              ),
+            );
+          }
           return Container(
             height: 24,
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -288,6 +391,19 @@ class MePage extends StatelessWidget {
       builder: (controller) {
         var comicSources = ComicSource.sources;
         Widget buildItem(String name) {
+          if (App.isFluent) {
+             return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: fluent.FluentTheme.of(App.globalContext!).resources.cardBackgroundFillColorSecondary,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                name,
+                style: const TextStyle(fontSize: 12),
+              ),
+            );
+          }
           return Container(
             height: 24,
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -322,6 +438,19 @@ class MePage extends StatelessWidget {
 
   Widget buildTools(double width) {
     Widget buildItem(String name) {
+      if (App.isFluent) {
+          return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: fluent.FluentTheme.of(App.globalContext!).resources.cardBackgroundFillColorSecondary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            name,
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      }
       return Container(
         height: 24,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -381,6 +510,25 @@ class _MePageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        padding: EdgeInsets.zero,
+        child: fluent.ListTile(
+          onPressed: onTap,
+          title: Text(title),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(description).paddingVertical(4),
+              if (child != null) child!,
+            ],
+          ),
+          leading: icon,
+          trailing: const Icon(fluent.FluentIcons.chevron_right),
+        ),
+      );
+    }
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),

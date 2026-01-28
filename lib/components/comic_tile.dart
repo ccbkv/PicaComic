@@ -48,6 +48,13 @@ abstract class ComicTile extends StatelessWidget {
   bool get showFavorite => true;
 
   void showBlockPane() {
+    if (App.isFluent) {
+      fluent.showDialog(
+        context: App.globalContext!,
+        builder: (context) => _BlockingPane(comic: this),
+      );
+      return;
+    }
     showDialog(
       context: App.globalContext!,
       builder: (context) => _BlockingPane(comic: this),
@@ -111,8 +118,8 @@ abstract class ComicTile extends StatelessWidget {
                       onTap: () {
                         context.pop();
                         context.to(() => PreSearchPage(
-                              initialValue: title,
-                            ));
+                          initialValue: title,
+                        ));
                       },
                     ),
                     ListTile(
@@ -152,7 +159,7 @@ abstract class ComicTile extends StatelessWidget {
   Widget buildFavoriteDialog(BuildContext context) {
     String? folder = appdata.settings[51];
     int? initialFolderIndex =
-        LocalFavoritesManager().folderNames.indexOf(appdata.settings[51]);
+    LocalFavoritesManager().folderNames.indexOf(appdata.settings[51]);
     if (initialFolderIndex == -1) {
       folder = null;
       initialFolderIndex = null;
@@ -194,44 +201,44 @@ abstract class ComicTile extends StatelessWidget {
   void onSecondaryTap_(TapDownDetails details) {
     showDesktopMenu(App.globalContext!,
         Offset(details.globalPosition.dx, details.globalPosition.dy), [
-      DesktopMenuEntry(
-        text: "查看".tl,
-        onClick: () => Future.microtask(onTap_),
-      ),
-      if (read != null)
-        DesktopMenuEntry(
-          text: "阅读".tl,
-          onClick: () => Future.microtask(read!),
-        ),
-      DesktopMenuEntry(
-        text: "搜索".tl,
-        onClick: () => Future.microtask(
-          () {
-            App.mainNavigatorKey!.currentContext!.to(
-              () => PreSearchPage(
-                initialValue: title,
-              ),
-            );
-          },
-        ),
-      ),
-      DesktopMenuEntry(
-        text: "本地收藏".tl,
-        onClick: () => Future.microtask(() => showDialog(
-            context: App.globalContext!,
-            builder: (context) => buildFavoriteDialog(context))),
-      ),
-      DesktopMenuEntry(
-        text: "屏蔽".tl,
-        onClick: () => Future.microtask(showBlockPane),
-      ),
-      if (addonMenuOptions != null)
-        for (var option in addonMenuOptions!)
           DesktopMenuEntry(
-            text: option.title,
-            onClick: () => option.onTap(comicID),
+            text: "查看".tl,
+            onClick: () => Future.microtask(onTap_),
           ),
-    ]);
+          if (read != null)
+            DesktopMenuEntry(
+              text: "阅读".tl,
+              onClick: () => Future.microtask(read!),
+            ),
+          DesktopMenuEntry(
+            text: "搜索".tl,
+            onClick: () => Future.microtask(
+                  () {
+                App.mainNavigatorKey!.currentContext!.to(
+                      () => PreSearchPage(
+                    initialValue: title,
+                  ),
+                );
+              },
+            ),
+          ),
+          DesktopMenuEntry(
+            text: "本地收藏".tl,
+            onClick: () => Future.microtask(() => showDialog(
+                context: App.globalContext!,
+                builder: (context) => buildFavoriteDialog(context))),
+          ),
+          DesktopMenuEntry(
+            text: "屏蔽".tl,
+            onClick: () => Future.microtask(showBlockPane),
+          ),
+          if (addonMenuOptions != null)
+            for (var option in addonMenuOptions!)
+              DesktopMenuEntry(
+                text: option.title,
+                onClick: () => option.onTap(comicID),
+              ),
+        ]);
   }
 
   @override
@@ -299,7 +306,7 @@ abstract class ComicTile extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: CustomPaint(
                       painter:
-                          _ReadingHistoryPainter(history.page, history.maxPage),
+                      _ReadingHistoryPainter(history.page, history.maxPage),
                     ),
                   )
               ],
@@ -425,14 +432,14 @@ abstract class ComicTile extends StatelessWidget {
 class _ComicDescription extends StatelessWidget {
   const _ComicDescription(
       {required this.title,
-      required this.user,
-      required this.description,
-      this.subDescription,
-      this.badge,
-      this.maxLines = 2,
-      this.tags,
-      this.categories,
-      this.sourceKey});
+        required this.user,
+        required this.description,
+        this.subDescription,
+        this.badge,
+        this.maxLines = 2,
+        this.tags,
+        this.categories,
+        this.sourceKey});
 
   final String title;
   final String user;
@@ -529,10 +536,10 @@ class _ComicDescription extends StatelessWidget {
                                         .colorScheme
                                         .primaryContainer,
                                     borderRadius:
-                                        const BorderRadius.all(Radius.circular(8)),
+                                    const BorderRadius.all(Radius.circular(8)),
                                   ),
                                   child: Text(
-                                    (){
+                                        (){
                                       // Check if translation should be enabled for JS plugins
                                       //print("DEBUG: _ComicDescription processing tag '$s', sourceKey: $sourceKey");
                                       if (sourceKey != null) {
@@ -545,12 +552,12 @@ class _ComicDescription extends StatelessWidget {
                                             var namespace = parts[0];
                                             var tagText = parts.sublist(1).join(':');
                                             var translated = TagsTranslation.translationTagWithNamespace(tagText, namespace);
-                                           // print("DEBUG: ComicTile translating tag '$s' -> '$translated'");
+                                            // print("DEBUG: ComicTile translating tag '$s' -> '$translated'");
                                             return translated;
                                           } else {
                                             // For tags without namespace, try direct translation
                                             var translated = TagsTranslation.translationTagWithNamespace(s, "tag");
-                                           // print("DEBUG: ComicTile translating tag without namespace '$s' -> '$translated'");
+                                            // print("DEBUG: ComicTile translating tag without namespace '$s' -> '$translated'");
                                             return translated;
                                           }
                                         }
@@ -613,18 +620,18 @@ class _ComicDescription extends StatelessWidget {
                                     color: s == "Unavailable"
                                         ? Theme.of(context).colorScheme.errorContainer
                                         : Theme.of(context)
-                                            .colorScheme
-                                            .secondaryContainer,
+                                        .colorScheme
+                                        .secondaryContainer,
                                     borderRadius:
-                                        const BorderRadius.all(Radius.circular(8)),
+                                    const BorderRadius.all(Radius.circular(8)),
                                   ),
                                   child: Text(
-                                    (){
+                                        (){
                                       // Check if translation should be enabled for JS plugins
                                       //print("DEBUG: _ComicDescription processing TAG '$s', sourceKey: $sourceKey");
                                       if (sourceKey != null) {
                                         var source = ComicSource.find(sourceKey!);
-                                       // print("DEBUG: Found source: ${source?.name}, isBuiltIn: ${source?.isBuiltIn}, enableTagsTranslate: ${source?.enableTagsTranslate}");
+                                        // print("DEBUG: Found source: ${source?.name}, isBuiltIn: ${source?.isBuiltIn}, enableTagsTranslate: ${source?.enableTagsTranslate}");
                                         if (source != null && !source.isBuiltIn && source.enableTagsTranslate && App.locale.languageCode == "zh") {
                                           // Parse namespace:tag format for translation
                                           if (s.contains(':')) {
@@ -637,7 +644,7 @@ class _ComicDescription extends StatelessWidget {
                                           } else {
                                             // For tags without namespace, try direct translation
                                             var translated = TagsTranslation.translationTagWithNamespace(s, "tag");
-                                           // print("DEBUG: ComicTile translating TAG without namespace '$s' -> '$translated'");
+                                            // print("DEBUG: ComicTile translating TAG without namespace '$s' -> '$translated'");
                                             return translated;
                                           }
                                         }
@@ -774,16 +781,16 @@ class _ReadingHistoryPainter extends CustomPainter {
 class NormalComicTile extends ComicTile {
   const NormalComicTile(
       {required this.description_,
-      required this.coverPath,
-      required this.name,
-      required this.subTitle_,
-      required this.onTap,
-      this.onLongTap,
-      this.badgeName,
-      this.headers,
-      this.tags,
-      super.sourceKey,
-      super.key});
+        required this.coverPath,
+        required this.name,
+        required this.subTitle_,
+        required this.onTap,
+        this.onLongTap,
+        this.badgeName,
+        this.headers,
+        this.tags,
+        super.sourceKey,
+        super.key});
 
   final String description_;
   final String coverPath;
@@ -808,15 +815,15 @@ class NormalComicTile extends ComicTile {
 
   @override
   Widget get image => AnimatedImage(
-        image: CachedImageProvider(
-          coverPath,
-          headers: headers,
-          sourceKey: sourceKey,
-        ),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      );
+    image: CachedImageProvider(
+      coverPath,
+      headers: headers,
+      sourceKey: sourceKey,
+    ),
+    fit: BoxFit.cover,
+    width: double.infinity,
+    height: double.infinity,
+  );
 
   @override
   void onTap_() => onTap();
@@ -925,7 +932,7 @@ class ComicTilePlaceholder extends StatelessWidget {
 
 class CustomComicTile extends ComicTile {
   const CustomComicTile(this.comic, {super.key, this.addonMenuOptions});
-  
+
   @override
   String? get sourceKey => comic.sourceKey;
 
@@ -936,22 +943,22 @@ class CustomComicTile extends ComicTile {
 
   @override
   Widget get image => AnimatedImage(
-        image: StreamImageProvider(
+    image: StreamImageProvider(
             () =>
-                ImageManager().getCustomThumbnail(comic.cover, comic.sourceKey),
-            comic.id),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      );
+            ImageManager().getCustomThumbnail(comic.cover, comic.sourceKey),
+        comic.id),
+    fit: BoxFit.cover,
+    width: double.infinity,
+    height: double.infinity,
+  );
 
   @override
   void onTap_() {
     App.mainNavigatorKey!.currentContext!.to(() => ComicPage(
-          sourceKey: comic.sourceKey,
-          id: comic.id,
-          cover: comic.cover,
-        ));
+      sourceKey: comic.sourceKey,
+      id: comic.id,
+      cover: comic.cover,
+    ));
   }
 
   @override
@@ -974,33 +981,33 @@ class CustomComicTile extends ComicTile {
 
   @override
   get read => () async {
-        bool cancel = false;
-        var dialog = showLoadingDialog(
-          App.globalContext!,
-          onCancel: () => cancel = true,
-        );
-        var comicSource = ComicSource.find(comic.sourceKey)!;
-        var res = await comicSource.loadComicInfo!(comic.id);
-        if (cancel) return;
-        dialog.close();
-        if (res.error) {
-          showToast(message: res.errorMessage ?? "Error");
-        } else {
-          var history = await History.findOrCreate(res.data);
-          App.globalTo(
+    bool cancel = false;
+    var dialog = showLoadingDialog(
+      App.globalContext!,
+      onCancel: () => cancel = true,
+    );
+    var comicSource = ComicSource.find(comic.sourceKey)!;
+    var res = await comicSource.loadComicInfo!(comic.id);
+    if (cancel) return;
+    dialog.close();
+    if (res.error) {
+      showToast(message: res.errorMessage ?? "Error");
+    } else {
+      var history = await History.findOrCreate(res.data);
+      App.globalTo(
             () => ComicReadingPage(
-              CustomReadingData(
-                res.data.target,
-                res.data.title,
-                comicSource,
-                res.data.chapters,
-              ),
-              history.page,
-              history.ep,
-            ),
-          );
-        }
-      };
+          CustomReadingData(
+            res.data.target,
+            res.data.title,
+            comicSource,
+            res.data.chapters,
+          ),
+          history.page,
+          history.ep,
+        ),
+      );
+    }
+  };
 }
 
 Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
@@ -1016,8 +1023,8 @@ Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
         children: [
           const Positioned.fill(
               child: ComicTilePlaceholder(
-            type: '',
-          )),
+                type: '',
+              )),
           Positioned.fill(
             child: Center(
               child: Container(
@@ -1134,6 +1141,34 @@ class _BlockingPaneState extends State<_BlockingPane> {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ContentDialog(
+        title: Text("屏蔽".tl),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: buildTags().toList(),
+              ).paddingVertical(8),
+            ),
+            fluent.TextBox(
+              controller: controller,
+              placeholder: "屏蔽关键词".tl,
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+        actions: [
+          fluent.Button(onPressed: () => context.pop(), child: Text("取消".tl)),
+          fluent.FilledButton(onPressed: onSubmit, child: Text("提交".tl)),
+        ],
+      );
+    }
     var content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [

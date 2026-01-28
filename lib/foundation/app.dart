@@ -20,11 +20,16 @@ class App {
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   static bool get isMobile => Platform.isAndroid || Platform.isIOS;
 
+  static bool get isFluent =>
+      appdata.settings.length > 91 && appdata.settings[91] == "1";
+
   static BuildContext? get globalContext => navigatorKey.currentContext;
 
   static final navigatorKey = GlobalKey<NavigatorState>();
 
   static GlobalKey<NavigatorState>? mainNavigatorKey;
+
+  static ValueNotifier<Widget?> mainAppbarActions = ValueNotifier(null);
 
   /// get ui mode
   static UiModes uiMode([BuildContext? context]) {
@@ -87,11 +92,15 @@ class App {
       [bool enableIOSGesture = true]) {
     LogManager.addLog(LogLevel.info, "App Status",
         "Going to Page /${page.runtimeType.toString().replaceFirst("() => ", "")}");
-    return Navigator.of(context).push<T>(AppPageRoute(builder: (context) => page()));
+    var widget = page();
+    var settings = RouteSettings(name: "/${widget.runtimeType}");
+    return Navigator.of(context).push<T>(AppPageRoute(builder: (context) => widget, settings: settings));
   }
 
   static Future<T?> globalTo<T extends Object?>(Widget Function() page, {bool preventDuplicates = false}) {
-    return Navigator.of(globalContext!).push<T>(AppPageRoute(builder: (context) => page()));
+    var widget = page();
+    var settings = RouteSettings(name: "/${widget.runtimeType}");
+    return Navigator.of(globalContext!).push<T>(AppPageRoute(builder: (context) => widget, settings: settings));
   }
 
   static bool get enablePopGesture => isIOS;

@@ -10,6 +10,31 @@ void findUpdate(BuildContext context) {
       getUpdatesInfo().then((s) {
         if (!context.mounted) return;
         if (s != null) {
+          if (App.isFluent) {
+            fluent.showDialog(
+              context: context,
+              builder: (context) {
+                return fluent.ContentDialog(
+                  title: Text("有可用更新".tl),
+                  content: Text(s),
+                  actions: [
+                    fluent.Button(
+                        onPressed: () => App.globalBack(),
+                        child: Text("取消".tl)),
+                    fluent.FilledButton(
+                        onPressed: () {
+                          getDownloadUrl().then((s) {
+                            launchUrlString(s,
+                                mode: LaunchMode.externalApplication);
+                          });
+                        },
+                        child: Text("下载".tl))
+                  ],
+                );
+              });
+            return;
+          }
+
           showDialog(
               context: context,
               builder: (context) {
@@ -48,6 +73,82 @@ class ProxyController extends StateController {
 }
 
 void setProxy(BuildContext context) {
+  if (App.isFluent) {
+    fluent.showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StateBuilder(
+            init: ProxyController(),
+            builder: (controller) {
+              return fluent.ContentDialog(
+                title: Text("设置代理".tl),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    fluent.ListTile(
+                      title: Text("使用系统代理".tl),
+                      trailing: fluent.ToggleSwitch(
+                        checked: controller.value,
+                        onChanged: (value) {
+                          if (value == true) {
+                            controller.controller.text = "";
+                          }
+                          controller.value = !controller.value;
+                          controller.update();
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(15, 10, 15, 10),
+                      child: fluent.TextBox(
+                        readOnly: controller.value,
+                        controller: controller.controller,
+                        placeholder: controller.value
+                              ? "使用系统代理时无法手动设置".tl
+                              : "设置代理, 例如127.0.0.1:7890".tl,
+                      ),
+                    ),
+                    if (!controller.value)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 10, 15, 10),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              size: 20,
+                            ),
+                            Text("  ${"留空表示禁用网络代理".tl}")
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                actions: [
+                  fluent.FilledButton(
+                      onPressed: () {
+                        if (controller.value) {
+                          appdata.settings[8] = "0";
+                          appdata.writeData();
+                          setNetworkProxy();
+                          App.globalBack();
+                        } else {
+                          appdata.settings[8] = controller.controller.text;
+                          appdata.writeData();
+                          setNetworkProxy();
+                          App.globalBack();
+                        }
+                      },
+                      child: Text("确认".tl)),
+                  fluent.Button(
+                    onPressed: () => App.globalBack(),
+                    child: Text("取消".tl),
+                  )
+                ],
+              );
+            });
+      });
+    return;
+  }
   showDialog(
       context: context,
       builder: (dialogContext) {
@@ -165,6 +266,99 @@ class _SetDownloadFolderDialogState extends State<SetDownloadFolderDialog> {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ContentDialog(
+        title: Text("设置下载目录".tl),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
+                child: fluent.InfoLabel(
+                  label: "路径".tl,
+                  child: fluent.TextBox(
+                    controller: controller,
+                    placeholder: "为空表示使用App数据目录".tl,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+                child: fluent.Checkbox(
+                  checked: transform,
+                  onChanged: (b) => setState(() {
+                    transform = b!;
+                  }),
+                  content: Text("转移数据".tl),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      size: 18,
+                    ),
+                    const SizedBox(
+                      width: 4,
+                    ),
+                    Expanded(
+                      child: SizedBox(
+                        child: Text("如需还原之前的下载, 将路径填写为下载数据的位置, 并取消勾选转移数据".tl),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+                child: Text("${"现在的路径为".tl}: ${DownloadManager().path}"),
+              )
+            ],
+          ),
+        ),
+        actions: [
+          fluent.Button(
+            onPressed: () => Navigator.pop(context),
+            child: Text("取消".tl),
+          ),
+          fluent.FilledButton(
+            onPressed: () async {
+              if (controller.text == appdata.settings[22]) return;
+              var directory = Directory(controller.text);
+              if (directory.existsSync() || controller.text == "") {
+                var oldPath = appdata.settings[22];
+                appdata.settings[22] = controller.text;
+                if (transform) {
+                  showToast(message: "正在复制文件".tl);
+                  await Future.delayed(const Duration(milliseconds: 200));
+                }
+                var res = await downloadManager.updatePath(controller.text,
+                    transform: transform);
+                if (res == "ok") {
+                  hideAllMessages();
+                  if (context.mounted) {
+                    context.pop();
+                  }
+                  showToast(message: "更新成功".tl);
+                  appdata.updateSettings();
+                } else {
+                  appdata.settings[22] = oldPath;
+                  showToast(message: res);
+                }
+              } else {
+                showToast(message: "目录不存在".tl);
+              }
+            },
+            child: Text("提交".tl),
+          ),
+        ],
+      );
+    }
     return SimpleDialog(
       title: Text("设置下载目录".tl),
       children: [
@@ -381,6 +575,32 @@ class _SetExplorePagesState extends State<SetExplorePages> {
   }
 
   Widget buildItem(String i) {
+    if(App.isFluent){
+      Widget removeButton = Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: fluent.IconButton(
+            onPressed: () {
+              setState(() {
+                var config = appdata.appSettings.explorePages;
+                config.remove(i);
+                appdata.appSettings.explorePages = config;
+              });
+            },
+            icon: const Icon(fluent.FluentIcons.delete)),
+      );
+
+      return fluent.ListTile(
+        title: Text(i.tl),
+        key: Key(i),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            removeButton,
+            const Icon(fluent.FluentIcons.drag_object),
+          ],
+        ),
+      );
+    }
     Widget removeButton = Padding(
       padding: const EdgeInsets.only(right: 8),
       child: IconButton(
@@ -408,6 +628,19 @@ class _SetExplorePagesState extends State<SetExplorePages> {
   }
 
   Widget buildNotShowPageSelector(String i, BuildContext context) {
+    if(App.isFluent){
+      var widget = fluent.ListTile(title: Text(i.tl), key: Key(i));
+      return InkWell(
+        child: widget,
+        onTap: () {
+          App.back(context);
+          setState(() {
+            appdata.appSettings.explorePages = appdata.appSettings.explorePages
+              ..add(i);
+          });
+        },
+      );
+    }
     var widget = ListTile(title: Text(i.tl), key: Key(i));
     return InkWell(
       child: widget,
@@ -484,6 +717,31 @@ class _SetExplorePagesState extends State<SetExplorePages> {
         if (notShowPages.isNotEmpty)
           IconButton(
             onPressed: () {
+              if (App.isFluent) {
+                fluent.showDialog(
+                  context: context,
+                  builder: (context) {
+                    return fluent.ContentDialog(
+                      title: const Text("Add"),
+                      content: SizedBox(
+                        height: 300,
+                        child: ListView(
+                          children: notShowPages
+                              .map((e) => buildNotShowPageSelector(e, context))
+                              .toList(),
+                        ),
+                      ),
+                      actions: [
+                        fluent.Button(
+                          onPressed: () => App.back(context),
+                          child: Text("取消".tl),
+                        )
+                      ],
+                    );
+                  },
+                );
+                return;
+              }
               showDialog(
                 context: context,
                 builder: (context) {
@@ -505,6 +763,27 @@ class _SetExplorePagesState extends State<SetExplorePages> {
 }
 
 void clearUserData(BuildContext context) {
+  if (App.isFluent) {
+    fluent.showDialog(
+      context: context,
+      builder: (context) => fluent.ContentDialog(
+        title: Text("警告".tl),
+        content: Text("此操作无法撤销, 是否继续?".tl),
+        actions: [
+          fluent.Button(
+              onPressed: () => App.globalBack(), child: Text("取消".tl)),
+          fluent.FilledButton(
+              onPressed: () async {
+                await clearAppdata();
+                App.offAll(() => const WelcomePage());
+                MyApp.updater?.call();
+              },
+              child: Text("继续".tl)),
+        ],
+      ),
+    );
+    return;
+  }
   showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -537,6 +816,32 @@ void exportDataSetting(BuildContext context) {
         showToast(message: "导出失败".tl);
       }
     }
+  }
+
+  if (App.isFluent) {
+    fluent.showDialog(
+      context: context,
+      builder: (context) => fluent.ContentDialog(
+        title: Text("导出用户数据".tl),
+        content: Text("将导出设置, 账号, 历史记录, 下载内容, 本地收藏等数据".tl),
+        actions: [
+          fluent.Button(
+              onPressed: () => App.globalBack(), child: Text("取消".tl)),
+          fluent.Button(
+              onPressed: () {
+                App.globalBack();
+                export(false);
+              },
+              child: Text("导出不含下载的数据".tl)),
+          fluent.FilledButton(
+              onPressed: () {
+                App.globalBack();
+                export(true);
+              },
+              child: Text("导出所有数据".tl))
+        ],
+      ));
+    return;
   }
 
   showDialog(
@@ -601,6 +906,135 @@ void syncDataSettings(BuildContext context) {
   String pwd = configs[2];
   String path = configs[3];
   int value = 0;
+  
+  if (App.isFluent) {
+    fluent.showDialog(
+      context: context,
+      builder: (context) => fluent.ContentDialog(
+        title: const Text("Webdav"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            fluent.TextBox(
+                onChanged: (s) => url = s,
+                controller: TextEditingController(text: url),
+                placeholder: "https://example.com:4433/webdav",
+                prefix: const Padding(
+                  padding: EdgeInsets.only(left: 8.0),
+                  child: Text("URL"),
+                )),
+            const SizedBox(
+              height: 8,
+            ),
+            fluent.TextBox(
+                onChanged: (s) => username = s,
+                controller: TextEditingController(text: username),
+                prefix: Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text("用户名".tl),
+                )),
+            const SizedBox(
+              height: 8,
+            ),
+            fluent.TextBox(
+                onChanged: (s) => pwd = s,
+                controller: TextEditingController(text: pwd),
+                obscureText: true,
+                prefix: Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text("密码".tl),
+                )),
+            const SizedBox(
+              height: 8,
+            ),
+            fluent.TextBox(
+                onChanged: (s) => path = s,
+                controller: TextEditingController(text: path),
+                prefix: Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text("储存路径".tl),
+                ),
+                placeholder: "请确保路径存在".tl),
+            const SizedBox(
+              height: 8,
+            ),
+            StatefulBuilder(builder: (context, stateSetter) {
+              return Row(
+                children: [
+                  Text("立即执行:".tl),
+                  const SizedBox(width: 8),
+                  fluent.RadioButton(
+                      checked: value == 0,
+                      content: Text("上传数据".tl),
+                      onChanged: (i) => stateSetter(() => value = 0)),
+                  const SizedBox(width: 16),
+                  fluent.RadioButton(
+                      checked: value == 1,
+                      content: Text("下载数据".tl),
+                      onChanged: (i) => stateSetter(() => value = 1)),
+                ],
+              );
+            }),
+            const SizedBox(
+              height: 8,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 20,
+                  ),
+                  const SizedBox(
+                    width: 4,
+                  ),
+                  if (configs.length == 4)
+                    Text("将URL留空以禁用同步".tl)
+                  else
+                    Text("已禁用".tl)
+                ],
+              ),
+            )
+          ],
+        ),
+        actions: [
+          fluent.FilledButton(
+            child: Text("提交".tl),
+            onPressed: () async {
+              if (url.isEmpty) {
+                appdata.settings[45] = "$url;$username;$pwd;$path";
+                appdata.updateSettings();
+                App.globalBack();
+                return;
+              }
+              var dialog = showLoadingDialog(context,
+                  allowCancel: false, barrierDismissible: false);
+              var res = value == 0
+                  ? await Webdav.uploadData("$url;$username;$pwd;$path")
+                  : await Webdav.downloadData("$url;$username;$pwd;$path");
+              if (!res) {
+                dialog.close();
+                showToast(message: "Failed to sync data");
+              } else {
+                appdata.settings[45] = "$url;$username;$pwd;$path";
+                appdata.updateSettings();
+                dialog.close();
+                App.globalBack();
+              }
+            },
+          ),
+          fluent.Button(
+            onPressed: () => App.globalBack(),
+            child: Text("取消".tl),
+          )
+        ],
+      ).paddingHorizontal(12),
+    );
+    return;
+  }
+
   showDialog(
     context: context,
     useSafeArea: false,
@@ -726,7 +1160,70 @@ void setCacheLimit() {
   const minSize = 16;
   bool isValid = true;
   final FocusNode focusNode = FocusNode();
-  final TextEditingController controller = TextEditingController(text: size.toString());
+  final TextEditingController controller =
+      TextEditingController(text: size.toString());
+  if (App.isFluent) {
+    fluent.showDialog(
+      context: App.globalContext!,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          focusNode.requestFocus();
+          return fluent.ContentDialog(
+            title: Text("设置缓存限制".tl),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                fluent.InfoLabel(
+                  label: "缓存大小".tl,
+                  child: fluent.TextBox(
+                    focusNode: focusNode,
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    onChanged: (s) {
+                      size = int.tryParse(s) ?? 500;
+                      setState(() {
+                        isValid = size < minSize ? false : true;
+                      });
+                    },
+                    suffix: const Text("MB"),
+                    placeholder: isValid ? null : "${"不能小于".tl} $minSize MB",
+                    foregroundDecoration: isValid
+                        ? null
+                        : fluent.ButtonState.all(BoxDecoration(
+                            border: Border.all(color: Colors.red),
+                          )),
+                  ),
+                ).paddingHorizontal(16),
+              ],
+            ),
+            actions: [
+              fluent.Button(
+                onPressed: () => App.globalBack(),
+                child: Text("取消".tl),
+              ),
+              fluent.FilledButton(
+                child: Text("确认".tl),
+                onPressed: () {
+                  if (size < minSize) {
+                    setState(() {
+                      isValid = false;
+                    });
+                    return;
+                  } else {
+                    appdata.appSettings.cacheLimit = size;
+                    appdata.writeData();
+                    CacheManager().setLimitSize(size);
+                    App.globalBack();
+                  }
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    return;
+  }
   showDialog(
     context: App.globalContext!,
     useSafeArea: false,
@@ -750,7 +1247,8 @@ void setCacheLimit() {
                 },
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
-                    borderSide: BorderSide(color: isValid ? Colors.grey : Colors.red),
+                    borderSide:
+                        BorderSide(color: isValid ? Colors.grey : Colors.red),
                   ),
                   suffix: const Text("MB"),
                   errorText: isValid ? null : "${"不能小于".tl} $minSize MB",

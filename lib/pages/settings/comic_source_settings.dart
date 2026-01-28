@@ -64,6 +64,31 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ScaffoldPage.scrollable(children: [
+        buildCard(context),
+        const _BuiltInSources(),
+        if (appdata.appSettings.isComicSourceEnabled("picacg"))
+          const PicacgSettings(false).withDivider(),
+        if (appdata.appSettings.isComicSourceEnabled("ehentai"))
+          const EhSettings(false).withDivider(),
+        if (appdata.appSettings.isComicSourceEnabled("nhentai"))
+          const NhSettings(false).withDivider(),
+        if (appdata.appSettings.isComicSourceEnabled("jm"))
+          const JmSettings(false).withDivider(),
+        if (appdata.appSettings.isComicSourceEnabled("hitomi"))
+          const HitomiSettings(false).withDivider(),
+        if (appdata.appSettings.isComicSourceEnabled("htmanga"))
+          // const HtSettings(false).withDivider(),
+          const HtSettings(false),
+        // buildCustomSettings(),
+        for (var source in ComicSource.sources.where((e) => !e.isBuiltIn))
+          buildCustom(context, source),
+        Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
+      ]);
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text("漫画源"),

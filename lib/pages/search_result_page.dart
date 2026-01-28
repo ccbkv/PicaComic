@@ -10,6 +10,7 @@ import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/components/category_selector.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/app.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:pica_comic/foundation/pair.dart';
 import 'package:pica_comic/network/base_comic.dart';
 import 'package:pica_comic/network/res.dart';
@@ -292,6 +293,124 @@ class _SearchResultPageState extends State<_SearchResultPage> {
       );
     }
 
+    if (App.isFluent) {
+      return fluent.ScaffoldPage(
+        content: NotificationListener<ScrollUpdateNotification>(
+          onNotification: (notification) {
+            if (suggestionsController.entry != null) {
+              suggestionsController.remove();
+            }
+            final ScrollDirection direction = notification.scrollDelta! < 0
+                ? ScrollDirection.forward
+                : ScrollDirection.reverse;
+            var showFab = _showFab;
+            if (direction == ScrollDirection.reverse) {
+              _showFab = false;
+            } else if (direction == ScrollDirection.forward) {
+              _showFab = true;
+            }
+            if (_showFab == showFab) return true;
+            setState(() {});
+            return false;
+          },
+          child: _SearchPageComicList(
+            keyword: keyword,
+            sourceKey: sourceKey,
+            key: Key(keyword +
+                options.toString() +
+                sourceKey +
+                selectedCategories.toString()),
+            header: SliverPersistentHeader(
+              pinned: _showFab && SmoothScrollProvider.isMouseScroll,
+              floating: !SmoothScrollProvider.isMouseScroll,
+              delegate: _SliverAppBarDelegate(
+                minHeight: context.width > 600 ? 96.0 : 60.0,
+                maxHeight: context.width > 600 ? 96.0 : 60.0,
+                child: context.width > 600
+                    ? Column(
+                        children: [
+                          SizedBox(height: 36.0),
+                          Expanded(
+                            child: FloatingSearchBar(
+                              onSearch: (s) {
+                                suggestionsController.suggestions.clear();
+                                suggestionsController.remove();
+                                HistoryManager.addSearchHistory(s);
+                                String newKeyword = s;
+                                // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
+                                if (sourceKey == "jm") {
+                                  newKeyword = _addJmBlockingKeywords(newKeyword);
+                                }
+                                if (!newKeyword.contains('language') &&
+                                    ComicSource.find(sourceKey)
+                                            ?.searchPageData
+                                            ?.enableLanguageFilter ==
+                                        true) {
+                                  var lang =
+                                      int.tryParse(appdata.settings[69]) ?? 0;
+                                  if (lang != 0) {
+                                    newKeyword += " language:${[
+                                      "chinese",
+                                      "english",
+                                      "japanese"
+                                    ][lang - 1]}";
+                                  }
+                                }
+                                if (newKeyword == keyword) return;
+                                setState(() {
+                                  keyword = newKeyword;
+                                  selectedCategories = []; // 清空分类选择
+                                });
+                              },
+                              controller: controller,
+                              onChanged: onChanged,
+                              trailing: trailing,
+                            ),
+                          ),
+                        ],
+                      )
+                    : FloatingSearchBar(
+                        onSearch: (s) {
+                          suggestionsController.suggestions.clear();
+                          suggestionsController.remove();
+                          HistoryManager.addSearchHistory(s);
+                          String newKeyword = s;
+                          // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
+                          if (sourceKey == "jm") {
+                            newKeyword = _addJmBlockingKeywords(newKeyword);
+                          }
+                          if (!newKeyword.contains('language') &&
+                              ComicSource.find(sourceKey)
+                                      ?.searchPageData
+                                      ?.enableLanguageFilter ==
+                                  true) {
+                            var lang = int.tryParse(appdata.settings[69]) ?? 0;
+                            if (lang != 0) {
+                              newKeyword += " language:${[
+                                "chinese",
+                                "english",
+                                "japanese"
+                              ][lang - 1]}";
+                            }
+                          }
+                          if (newKeyword == keyword) return;
+                          setState(() {
+                            keyword = newKeyword;
+                            selectedCategories = []; // 清空分类选择
+                          });
+                        },
+                        controller: controller,
+                        onChanged: onChanged,
+                        trailing: trailing,
+                      ),
+              ),
+            ),
+            options: options,
+            selectedCategories: selectedCategories,
+          ),
+        ),
+      );
+    }
     return Scaffold(
       floatingActionButton: _showFab
           ? FloatingActionButton(

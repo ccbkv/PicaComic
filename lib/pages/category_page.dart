@@ -8,6 +8,7 @@ import 'package:pica_comic/tools/tags_translation.dart';
 import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/tools/translations.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class AllCategoryPage extends StatefulWidget {
   const AllCategoryPage({super.key});
@@ -23,6 +24,7 @@ class _AllCategoryPageState extends State<AllCategoryPage>
   bool get wantKeepAlive => true; // 保持页面状态
   
   late TabController _tabController;
+  int _fluentCurrentIndex = 0;
   
   @override
   void initState() {
@@ -58,6 +60,7 @@ class _AllCategoryPageState extends State<AllCategoryPage>
     final savedIndex = PageStorage.of(context).readState(context, identifier: 'category_tab_index') as int?;
     if (savedIndex != null && savedIndex >= 0 && savedIndex < _tabController.length) {
       _tabController.index = savedIndex;
+      _fluentCurrentIndex = savedIndex;
     }
   }
   
@@ -94,6 +97,31 @@ class _AllCategoryPageState extends State<AllCategoryPage>
           PageStorage.of(context).writeState(context, _tabController.index, identifier: 'category_tab_index');
         }
       });
+    }
+
+    if (App.isFluent) {
+      return fluent.ScaffoldPage(
+        content: fluent.TabView(
+          currentIndex: _fluentCurrentIndex,
+          onChanged: (i) => setState(() => _fluentCurrentIndex = i),
+          closeButtonVisibility: fluent.CloseButtonVisibilityMode.never,
+          tabs: categories.map((e) {
+            String title = e;
+            try {
+              title = getCategoryDataWithKey(e).title;
+            } catch (e) {
+              //
+            }
+            return fluent.Tab(
+              text: Text(title.tl),
+              body: CategoryPage(
+                e,
+                key: PageStorageKey(e),
+              ),
+            );
+          }).toList(),
+        ),
+      );
     }
 
     return Material(
@@ -284,7 +312,11 @@ class CategoryPage extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh))
+          App.isFluent
+              ? fluent.IconButton(
+                  icon: const Icon(fluent.FluentIcons.refresh),
+                  onPressed: onRefresh)
+              : IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh))
         ],
       ),
     );
@@ -299,6 +331,8 @@ class CategoryPage extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
       child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: List<Widget>.generate(
           tags.length,
           (index) => buildTag(
@@ -323,6 +357,13 @@ class CategoryPage extends StatelessWidget {
         }
       }
       return tag;
+    }
+
+    if (App.isFluent) {
+      return fluent.Button(
+        child: Text(translateTag(tag)),
+        onPressed: () => onClick(tag, param),
+      );
     }
 
     return Padding(

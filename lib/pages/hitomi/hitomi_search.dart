@@ -465,7 +465,7 @@ class _HitomiSearchComicDescription extends StatelessWidget {
                       clipBehavior: Clip.hardEdge,
                       crossAxisAlignment: WrapCrossAlignment.end,
                       children: [
-                            for (var s in tags!.take(10))
+                            for (var s in tags!.take(6))
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(0, 0, 4, 3),
                             child: Container(

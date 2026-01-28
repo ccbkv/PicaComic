@@ -19,6 +19,7 @@ import 'package:pica_comic/network/update.dart';
 import 'me_page.dart';
 import 'package:pica_comic/network/picacg_network/methods.dart';
 import 'package:pica_comic/tools/android_first_use_manager.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 bool _haveClipboardDialog = false;
 
@@ -85,7 +86,8 @@ class MainPageState extends State<MainPage> {
       var page = widget();
       if ("/${page.runtimeType}" == _observer.routes.last.toString()) return;
     }
-    App.to(_navigatorKey!.currentContext!, widget);
+    await App.to(_navigatorKey!.currentContext!, widget);
+    setState(() {});
   }
 
   // Venera-style navigation method
@@ -140,6 +142,37 @@ class MainPageState extends State<MainPage> {
     if (res != true) return;
     var info = await getUpdatesInfo();
     if (info == null) return;
+    
+    if (App.isFluent) {
+      fluent.showDialog(
+        context: App.globalContext!,
+        builder: (dialogContext) {
+          return fluent.ContentDialog(
+            title: Text("有可用更新".tl),
+            content: Text(info),
+            actions: [
+              fluent.Button(
+                  onPressed: () {
+                    dialogContext.pop();
+                    appdata.settings[2] = "0";
+                    appdata.writeData();
+                  },
+                  child: const Text("关闭更新检查")),
+              fluent.Button(onPressed: dialogContext.pop, child: Text("取消".tl)),
+              fluent.FilledButton(
+                  onPressed: () {
+                    getDownloadUrl().then((s) {
+                      launchUrlString(s, mode: LaunchMode.externalApplication);
+                    });
+                  },
+                  child: Text("下载".tl))
+            ],
+          );
+        }
+      );
+      return;
+    }
+
     showDialog(
         context: App.globalContext!,
         builder: (dialogContext) {
@@ -275,6 +308,10 @@ class MainPageState extends State<MainPage> {
       onPageChanged: (index) {
         setState(() {
           _currentIndex = index;
+          // Clear appbar actions when switching main pages
+          if (App.isFluent) {
+            App.mainAppbarActions.value = null;
+          }
           // Save current page state to settings[24], keep initial page setting at settings[23]
           appdata.settings[24] = index.toString();
           appdata.writeData();

@@ -109,6 +109,26 @@ class _PopUpWidgetScaffoldState extends State<PopUpWidgetScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ScaffoldPage(
+        header: fluent.PageHeader(
+          title: Text(widget.title),
+          commandBar: widget.tailing != null
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: widget.tailing!,
+                )
+              : null,
+          leading: fluent.IconButton(
+            icon: const Icon(fluent.FluentIcons.back),
+            onPressed: () => Navigator.of(context).canPop()
+                ? Navigator.of(context).pop()
+                : App.globalBack(),
+          ),
+        ),
+        content: widget.body,
+      );
+    }
     return Material(
       child: Column(
         children: [

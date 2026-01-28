@@ -111,7 +111,7 @@ class _JmSettingsState extends State<JmSettings> {
             ignoring: autoSelectStream,
             child: Opacity(
               opacity: !autoSelectStream ? 1.0 : 0.5,
-              child: Select(
+              child: components.Select(
                 initialValue: int.parse(appdata.settings[17]),
                 values: [
                   "分流1".tl,"分流2".tl,"分流3".tl,"分流4".tl,
@@ -128,7 +128,7 @@ class _JmSettingsState extends State<JmSettings> {
         ListTile(
           leading: const Icon(Icons.dns_outlined),
           title: Text("图片分流".tl),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: int.parse(appdata.appSettings.jmImgUrlIndex),
             values: [
               "分流1".tl,"分流2".tl,"分流3".tl,"分流4".tl
@@ -143,7 +143,7 @@ class _JmSettingsState extends State<JmSettings> {
         ListTile(
           leading: const Icon(Icons.favorite_border),
           title: Text("收藏夹漫画排序模式".tl),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: int.parse(appdata.settings[42]),
             width: App.locale.languageCode == "en" ? 130 : 120,
             values: [

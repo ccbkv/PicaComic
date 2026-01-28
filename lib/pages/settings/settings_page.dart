@@ -23,12 +23,14 @@ import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/main.dart';
 import 'package:pica_comic/network/app_dio.dart';
-import 'package:pica_comic/components/components.dart';
+import 'package:pica_comic/components/components.dart' as components;
+import 'package:pica_comic/components/components.dart' hide Select;
 import 'package:pica_comic/pages/logs_page.dart';
 import 'package:pica_comic/tools/extensions.dart';
 import 'package:pica_comic/tools/io_tools.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../../comic_source/comic_source.dart';
+import '../../components/components.dart' hide Select;
 import '../../foundation/app.dart';
 import '../../foundation/local_favorites.dart';
 import '../../network/cookie_jar.dart';
@@ -48,6 +50,7 @@ import 'package:pica_comic/tools/translations.dart';
 import 'package:pica_comic/tools/font_manager.dart';
 import 'package:pica_comic/pages/settings/font_management_page.dart';
 import 'user_comments_page.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 part "reading_settings.dart";
 part "picacg_settings.dart";
@@ -183,6 +186,9 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
   @override
   Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return buildFluent(context);
+    }
     if (currentPage != -1 && !enableTwoViews) {
       canPop.value = false;
       App.temporaryDisablePopGesture = true;
@@ -192,6 +198,302 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     }
     return Material(
       child: buildBody(),
+    );
+  }
+
+  Widget buildFluent(BuildContext context) {
+    if (UiMode.m1(context)) {
+      if (currentPage == -1) {
+        return fluent.ScaffoldPage(
+          header: fluent.PageHeader(
+            leading: fluent.IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Text("设置".tl),
+          ),
+          content: ListView.builder(
+            itemCount: categories.length,
+            itemBuilder: (context, index) {
+              return fluent.ListTile(
+                leading: Icon(icons[index]),
+                title: Text(categories[index].tl),
+                trailing: const Icon(Icons.arrow_right),
+                onPressed: () {
+                  setState(() {
+                    currentPage = index;
+                  });
+                },
+              );
+            },
+          ),
+        );
+      } else {
+        return fluent.ScaffoldPage(
+          header: fluent.PageHeader(
+            leading: fluent.IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                setState(() {
+                  currentPage = -1;
+                });
+              },
+            ),
+            title: Text(categories[currentPage].tl),
+          ),
+          content: fluent.ScaffoldPage.scrollable(
+            children: [
+              buildFluentRight(currentPage),
+            ],
+          ),
+        );
+      }
+    }
+    return fluent.NavigationView(
+      pane: fluent.NavigationPane(
+        selected: currentPage == -1 ? 0 : currentPage,
+        onChanged: (i) => setState(() => currentPage = i),
+        displayMode: fluent.PaneDisplayMode.open,
+        items: List.generate(categories.length, (index) {
+          return fluent.PaneItem(
+            icon: Icon(icons[index]),
+            title: Text(categories[index].tl),
+            body: fluent.ScaffoldPage.scrollable(
+              children: [
+                buildFluentRight(index),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget buildFluentRight(int index) {
+    switch (index) {
+      case 0:
+        return buildExploreSettings(context, false);
+      case 1:
+        return const ReadingSettings(false);
+      case 2:
+        return buildFluentAppearanceSettings();
+      case 3:
+        return const LocalFavoritesSettings();
+      case 4:
+        return buildFluentAppSettings();
+      case 5:
+        return const NetworkSettings();
+      case 6:
+        return buildFluentAbout();
+      case 7:
+        return const DebugPage();
+      default:
+        return const SizedBox();
+    }
+  }
+
+  Widget buildFluentAppSettings() {
+    return Column(
+      children: [
+        fluent.ListTile(
+          title: Text("数据".tl),
+          leading: const Icon(Icons.storage),
+        ),
+        fluent.ListTile(
+          title: Text("本地漫画的存储路径".tl),
+          subtitle: Text(DownloadManager().path ?? "", softWrap: false),
+          trailing: fluent.IconButton(
+            icon: const Icon(Icons.copy),
+            onPressed: () {
+              Clipboard.setData(
+                  ClipboardData(text: DownloadManager().path ?? ""));
+              context.showMessage(message: "路径已复制到剪贴板".tl);
+            },
+          ),
+        ),
+        if (App.isDesktop || App.isAndroid)
+          fluent.ListTile(
+            title: Text("设置下载目录".tl),
+            onPressed: () => setDownloadFolder(),
+            trailing: fluent.Button(
+              onPressed: () => setDownloadFolder(),
+              child: Text('设置'.tl),
+            ),
+          ),
+        fluent.ListTile(
+          title: Text("缓存大小".tl),
+          subtitle: Text(bytesToReadableString(CacheManager().currentSize)),
+        ),
+        fluent.ListTile(
+          title: Text("清除缓存".tl),
+          onPressed: () async {
+            var loadingDialog = showLoadingDialog(
+              context,
+              barrierDismissible: false,
+              allowCancel: false,
+            );
+            await CacheManager().clear();
+            loadingDialog.close();
+            context.showMessage(message: "Cache cleared".tl);
+            setState(() {});
+          },
+          trailing: fluent.Button(
+            onPressed: () async {
+              var loadingDialog = showLoadingDialog(
+                context,
+                barrierDismissible: false,
+                allowCancel: false,
+              );
+              await CacheManager().clear();
+              loadingDialog.close();
+              context.showMessage(message: "Cache cleared".tl);
+              setState(() {});
+            },
+            child: Text("清除".tl),
+          ),
+        ),
+        fluent.ListTile(
+            title: Text("缓存限制".tl),
+            subtitle:
+                Text('${bytesLengthToReadableSize(CacheManager().limitSize)}'),
+            onPressed: setCacheLimit,
+            trailing: fluent.Button(
+              onPressed: setCacheLimit,
+              child: Text('设置'.tl),
+            )),
+        fluent.ListTile(
+          title: Text("删除所有数据".tl),
+          onPressed: () => clearUserData(context),
+          trailing: fluent.Button(
+            onPressed: () => clearUserData(context),
+            child: Text('删除'.tl),
+          ),
+        ),
+        fluent.ListTile(
+          title: Text("导出用户数据".tl),
+          onPressed: () => exportDataSetting(context),
+          trailing: fluent.Button(
+            onPressed: () => exportDataSetting(context),
+            child: Text('导出'.tl),
+          ),
+        ),
+        fluent.ListTile(
+          title: Text("导入用户数据".tl),
+          onPressed: () => importDataSetting(context),
+          trailing: fluent.Button(
+            onPressed: () => importDataSetting(context),
+            child: Text('导入'.tl),
+          ),
+        ),
+        fluent.ListTile(
+          title: Text("数据同步".tl),
+          onPressed: () => syncDataSettings(context),
+          trailing: fluent.Button(
+            onPressed: () => syncDataSettings(context),
+            child: Text('同步'.tl),
+          ),
+        ),
+        fluent.ListTile(
+          title: Text("用户".tl),
+          leading: const Icon(Icons.person_outline),
+        ),
+        fluent.ListTile(
+          title: Text("语言".tl),
+          trailing: fluent.ComboBox<int>(
+            value: ["", "cn", "tw", "en"].indexOf(appdata.settings[50]),
+            items: const [
+              fluent.ComboBoxItem(value: 0, child: Text("System")),
+              fluent.ComboBoxItem(value: 1, child: Text("中文(简体)")),
+              fluent.ComboBoxItem(value: 2, child: Text("中文(繁體)")),
+              fluent.ComboBoxItem(value: 3, child: Text("English")),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              appdata.settings[50] = ["", "cn", "tw", "en"][value];
+              appdata.updateSettings();
+              MyApp.updater?.call();
+            },
+            placeholder: const Text("Select"),
+          ),
+        ),
+        fluent.ListTile(
+          title: Text("需要身份验证".tl),
+          subtitle: Text("如果系统中未设置任何认证方法请勿开启".tl),
+          trailing: fluent.ToggleSwitch(
+            checked: appdata.settings[13] == "1",
+            onChanged: (b) {
+              setState(() {
+                appdata.settings[13] = b ? "1" : "0";
+              });
+              appdata.updateSettings();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildFluentAbout() {
+    return Column(
+      children: [
+        SizedBox(
+          height: 130,
+          width: double.infinity,
+          child: Center(
+            child: Container(
+              width: 156,
+              height: 156,
+              decoration:
+                  BoxDecoration(borderRadius: BorderRadius.circular(20)),
+              child: const Image(
+                image: AssetImage("images/app_icon_no_bg.png"),
+                filterQuality: FilterQuality.medium,
+              ),
+            ),
+          ),
+        ),
+        const Text(
+          "V$appVersion",
+          style: TextStyle(fontSize: 16),
+        ),
+        Text("Pica Comic是一个免费的开源漫画阅读应用。".tl),
+        const SizedBox(
+          height: 16,
+        ),
+        fluent.ListTile(
+          title: Text("检查更新".tl),
+          trailing: fluent.Button(
+            child: Text("检查".tl),
+            onPressed: () => findUpdate(context),
+          ),
+        ),
+        fluent.ListTile(
+          title: Text("启动时检查更新".tl),
+          trailing: fluent.ToggleSwitch(
+            checked: appdata.settings[2] == "1",
+            onChanged: (value) {
+              appdata.settings[2] = value ? "1" : "0";
+              appdata.updateSettings();
+              setState(() {});
+            },
+          ),
+        ),
+        fluent.ListTile(
+          leading: const Icon(Icons.code),
+          title: Text("项目地址".tl),
+          onPressed: () => launchUrlString("https://github.com/ccbkv/PicaComic",
+              mode: LaunchMode.externalApplication),
+          trailing: const Icon(Icons.open_in_new),
+        ),
+        fluent.ListTile(
+          leading: const Icon(Icons.comment_outlined),
+          title: Text("问题反馈 (Github)".tl),
+          onPressed: () => launchUrlString(
+              "https://github.com/ccbkv/PicaComic/issues",
+              mode: LaunchMode.externalApplication),
+          trailing: const Icon(Icons.open_in_new),
+        ),
+      ],
     );
   }
 
@@ -366,12 +668,160 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     return const Placeholder();
   }
 
+  Widget buildFluentAppearanceSettings() {
+    return Column(
+      children: [
+        fluent.ListTile(
+          leading: const Icon(Icons.color_lens),
+          title: Text("主题选择".tl),
+          trailing: fluent.ComboBox<int>(
+            value: int.parse(appdata.settings[27]),
+            items: const [
+              fluent.ComboBoxItem(value: 0, child: Text("dynamic")),
+              fluent.ComboBoxItem(value: 1, child: Text("red")),
+              fluent.ComboBoxItem(value: 2, child: Text("pink")),
+              fluent.ComboBoxItem(value: 3, child: Text("purple")),
+              fluent.ComboBoxItem(value: 4, child: Text("indigo")),
+              fluent.ComboBoxItem(value: 5, child: Text("blue")),
+              fluent.ComboBoxItem(value: 6, child: Text("cyan")),
+              fluent.ComboBoxItem(value: 7, child: Text("teal")),
+              fluent.ComboBoxItem(value: 8, child: Text("green")),
+              fluent.ComboBoxItem(value: 9, child: Text("lime")),
+              fluent.ComboBoxItem(value: 10, child: Text("yellow")),
+              fluent.ComboBoxItem(value: 11, child: Text("amber")),
+              fluent.ComboBoxItem(value: 12, child: Text("orange")),
+            ],
+            onChanged: (i) {
+              if (i == null) return;
+              appdata.settings[27] = i.toString();
+              appdata.updateSettings();
+              MyApp.updater?.call();
+            },
+            placeholder: const Text("Select"),
+          ),
+        ),
+        fluent.ListTile(
+          leading: const Icon(Icons.font_download),
+          title: Text("字体".tl),
+          trailing: fluent.ComboBox<int>(
+            value: (() {
+              while (appdata.settings.length <= 95) {
+                appdata.settings.add("");
+              }
+              var font = appdata.settings[95];
+              if (font.isEmpty) return 0;
+              var index = FontManager().availableFonts.indexOf(font);
+              return index == -1 ? 0 : index + 1;
+            })(),
+            items: [
+              const fluent.ComboBoxItem(value: 0, child: Text("Default")),
+              ...List.generate(FontManager().availableFonts.length, (index) {
+                return fluent.ComboBoxItem(
+                  value: index + 1,
+                  child: Text(FontManager().availableFonts[index]),
+                );
+              })
+            ],
+            onChanged: (i) {
+              if (i == null) return;
+              while (appdata.settings.length <= 95) {
+                appdata.settings.add("");
+              }
+              if (i == 0) {
+                appdata.settings[95] = "";
+              } else {
+                appdata.settings[95] = FontManager().availableFonts[i - 1];
+              }
+              appdata.updateSettings();
+              MyApp.updater?.call();
+            },
+            placeholder: const Text("Select"),
+          ),
+        ),
+        fluent.ListTile(
+          leading: const Icon(Icons.add_circle_outline),
+          title: Text("导入字体".tl),
+          onPressed: () async {
+            FilePickerResult? result = await FilePicker.platform.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: ['ttf', 'otf'],
+            );
+
+            if (result != null && result.files.single.path != null) {
+              var name = await FontManager().addFont(result.files.single.path!);
+              if (name != null) {
+                setState(() {});
+              }
+            }
+          },
+        ),
+        fluent.ListTile(
+          leading: const Icon(Icons.folder_open),
+          title: Text("字体管理器".tl),
+          onPressed: () {
+            App.to(context, () => const FontManagementPage());
+          },
+        ),
+        fluent.ListTile(
+          leading: const Icon(Icons.dark_mode),
+          title: Text("深色模式".tl),
+          trailing: fluent.ComboBox<int>(
+            value: int.parse(appdata.settings[32]),
+            items: [
+              fluent.ComboBoxItem(value: 0, child: Text("跟随系统".tl)),
+              fluent.ComboBoxItem(value: 1, child: Text("禁用".tl)),
+              fluent.ComboBoxItem(value: 2, child: Text("启用".tl)),
+            ],
+            onChanged: (i) {
+              if (i == null) return;
+              appdata.settings[32] = i.toString();
+              appdata.updateSettings();
+              MyApp.updater?.call();
+            },
+            placeholder: const Text("Select"),
+          ),
+        ),
+        if (appdata.settings[32] == "0" || appdata.settings[32] == "2")
+         fluent.ListTile(
+          leading: const Icon(Icons.window),
+          title: const Text("Fluent UI"),
+          subtitle: Text("实验性功能,注目前这ui比较多bug，而且对手机不太友好".tl),
+          trailing: fluent.ToggleSwitch(
+            checked: appdata.settings.length > 91 ? appdata.settings[91] == "1" : false,
+            onChanged: (b) {
+              while (appdata.settings.length <= 91) {
+                appdata.settings.add("0");
+              }
+              appdata.settings[91] = b ? "1" : "0";
+              appdata.updateSettings();
+              MyApp.updater?.call();
+            },
+          ),
+        ),
+          fluent.ListTile(
+            leading: const Icon(Icons.remove_red_eye),
+            title: Text("纯黑色模式".tl),
+            trailing: fluent.ToggleSwitch(
+              checked: appdata.settings[84] == "1",
+              onChanged: (i) {
+                setState(() {
+                  appdata.settings[84] = i ? "1" : "0";
+                });
+                appdata.updateSettings();
+                MyApp.updater?.call();
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget buildAppearanceSettings() => Column(
         children: [
           ListTile(
             leading: const Icon(Icons.color_lens),
             title: Text("主题选择".tl),
-            trailing: Select(
+            trailing: components.Select(
               initialValue: int.parse(appdata.settings[27]),
               values: const [
                 "dynamic",
@@ -399,7 +849,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           ListTile(
             leading: const Icon(Icons.font_download),
             title: Text("字体".tl),
-            trailing: Select(
+            trailing: components.Select(
               initialValue: (() {
                 while (appdata.settings.length <= 95) {
                   appdata.settings.add("");
@@ -459,7 +909,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           ListTile(
             leading: const Icon(Icons.dark_mode),
             title: Text("深色模式".tl),
-            trailing: Select(
+            trailing: components.Select(
               initialValue: int.parse(appdata.settings[32]),
               values: ["跟随系统".tl, "禁用".tl, "启用".tl],
               onChange: (i) {
@@ -470,6 +920,23 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               width: 140,
             ),
           ),
+          ListTile(
+            leading: const Icon(Icons.window),
+            title: const Text("Fluent UI"),
+            subtitle: Text("实验性功能,注目前这ui比较多bug，而且对手机不太友好".tl),
+            trailing: Switch(
+              value: appdata.settings.length > 91 ? appdata.settings[91] == "1" : false,
+              onChanged: (b) {
+                while (appdata.settings.length <= 91) {
+                  appdata.settings.add("0");
+                }
+                appdata.settings[91] = b ? "1" : "0";
+                appdata.updateSettings();
+                MyApp.updater?.call();
+              },
+            ),
+          ),
+       
           if (App.isIOS)
             ListTile(
               leading: const Icon(Icons.tab),
@@ -684,7 +1151,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         ListTile(
           title: Text("语言".tl),
           //leading: const Icon(Icons.language),
-          trailing: Select(
+          trailing: components.Select(
             initialValue: ["", "cn", "tw", "en"].indexOf(appdata.settings[50]),
             values: const ["System", "中文(简体)", "中文(繁體)", "English"],
             onChange: (value) {

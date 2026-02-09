@@ -2001,12 +2001,12 @@ class _DownloadPageState extends State<DownloadPage> {
       );
     }
 
-    // 添加类型筛选按钮
+    // 添加漫画源筛选按钮
     if (!logic.selecting && !logic.searchMode) {
       actions.add(
         Builder(
           builder: (buttonContext) => Tooltip(
-            message: "类型筛选".tl,
+            message: "漫画源筛选".tl,
             child: IconButton(
               icon: const Icon(Icons.filter_list),
               onPressed: () {

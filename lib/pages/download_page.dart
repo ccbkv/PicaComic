@@ -439,6 +439,22 @@ class DownloadPageLogic extends StateController {
   /// 更新下载类型筛选
   void updateDownloadTypeFilter(DownloadType? type) {
     downloadTypeFilter = type;
+    
+    // 重置所有搜索状态
+    searchMode = false;
+    tagSearchMode = false;
+    categorySearchMode = false;
+    searchInit = false;
+    
+    // 清空搜索输入框
+    searchController?.clear();
+    keyword = "";
+    tagKeyword = "";
+    categoryKeyword = "";
+    
+    // 重置分页
+    resetPagination();
+    
     // 重新应用筛选
     applyTypeFilter();
     update();
@@ -1985,12 +2001,12 @@ class _DownloadPageState extends State<DownloadPage> {
       );
     }
 
-    // 添加漫画源筛选按钮
+    // 添加类型筛选按钮
     if (!logic.selecting && !logic.searchMode) {
       actions.add(
         Builder(
           builder: (buttonContext) => Tooltip(
-            message: "漫画源筛选".tl,
+            message: "类型筛选".tl,
             child: IconButton(
               icon: const Icon(Icons.filter_list),
               onPressed: () {

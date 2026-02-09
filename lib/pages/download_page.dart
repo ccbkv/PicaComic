@@ -1274,7 +1274,13 @@ class _DownloadPageState extends State<DownloadPage> {
         }
       } else {
         // 默认使用所有漫画
-        fullResultComics = logic.baseComics;
+        if (logic.downloadTypeFilter != null) {
+          fullResultComics = logic.baseComics
+              .where((element) => element.type == logic.downloadTypeFilter)
+              .toList();
+        } else {
+          fullResultComics = logic.baseComics;
+        }
       }
 
       // 计算最大页数
@@ -1979,12 +1985,12 @@ class _DownloadPageState extends State<DownloadPage> {
       );
     }
 
-    // 添加类型筛选按钮
+    // 添加漫画源筛选按钮
     if (!logic.selecting && !logic.searchMode) {
       actions.add(
         Builder(
           builder: (buttonContext) => Tooltip(
-            message: "类型筛选".tl,
+            message: "漫画源筛选".tl,
             child: IconButton(
               icon: const Icon(Icons.filter_list),
               onPressed: () {

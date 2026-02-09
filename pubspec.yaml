@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 4.4.3+46118
+version: 4.4.5+46119
 environment:
   sdk: '>=3.3.0'
 
@@ -36,7 +36,7 @@ dependencies:
       url: https://github.com/venera-app/flutter_saf
       ref: fe182cdf40e5fa6230f451bc1d643b860f610d13
   dynamic_color: ^1.6.9
-  adaptive_platform_ui: 0.1.100
+  adaptive_platform_ui: 0.1.101
   crypto: any
   pointycastle: ^3.7.3
   uuid: ^3.0.7

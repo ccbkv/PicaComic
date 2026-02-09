@@ -194,6 +194,9 @@ class DownloadPageLogic extends StateController {
   String categoryKeyword = "";
   String categoryKeyword_ = "";
 
+  /// 下载类型筛选
+  DownloadType? downloadTypeFilter;
+
   /// 普通搜索防抖计时器
   Timer? _searchDebounceTimer;
 
@@ -432,6 +435,53 @@ class DownloadPageLogic extends StateController {
     selected = List.generate(length, (index) => false);
     selectedNum = 0;
   }
+
+  /// 更新下载类型筛选
+  void updateDownloadTypeFilter(DownloadType? type) {
+    downloadTypeFilter = type;
+    // 重新应用筛选
+    applyTypeFilter();
+    update();
+  }
+
+  /// 应用类型筛选
+  void applyTypeFilter() {
+    List<DownloadedItem> filteredComics = baseComics;
+
+    // 应用类型筛选
+    if (downloadTypeFilter != null) {
+      filteredComics = filteredComics.where((comic) => comic.type == downloadTypeFilter).toList();
+    }
+
+    // 处理分页
+    if (isPaginationMode) {
+      maxPage = (filteredComics.length / pageSize).ceil();
+      int startIndex = (currentPage - 1) * pageSize;
+      int endIndex = startIndex + pageSize;
+      if (endIndex > filteredComics.length) {
+        endIndex = filteredComics.length;
+      }
+      comics = filteredComics.sublist(startIndex, endIndex);
+    } else {
+      comics = filteredComics;
+    }
+
+    resetSelected(comics.length);
+  }
+}
+
+/// 获取下载类型的显示名称
+String getDownloadTypeName(DownloadType type) {
+  const typeNames = {
+    DownloadType.picacg: "哔咔",
+    DownloadType.ehentai: "E-Hentai",
+    DownloadType.jm: "禁漫",
+    DownloadType.hitomi: "Hitomi",
+    DownloadType.htmanga: "HTManga",
+    DownloadType.nhentai: "nhentai",
+    DownloadType.other: "其他",
+  };
+  return typeNames[type] ?? "";
 }
 
 // 自定义文本编辑控制器，用于检测IME输入状态
@@ -1929,6 +1979,26 @@ class _DownloadPageState extends State<DownloadPage> {
       );
     }
 
+    // 添加类型筛选按钮
+    if (!logic.selecting && !logic.searchMode) {
+      actions.add(
+        Builder(
+          builder: (buttonContext) => Tooltip(
+            message: "类型筛选".tl,
+            child: IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: () {
+                showDownloadTypeFilterMenu(
+                  buttonContext: buttonContext,
+                  logic: logic,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
     // 添加标签搜索和普通搜索按钮
     if (!logic.selecting) {
       actions.add(
@@ -2512,4 +2582,76 @@ void _toComicInfoPage(DownloadedItem comic) {
   } else if (comic is CustomDownloadedItem) {
     context.to(() => ComicPage(sourceKey: comic.sourceKey, id: comic.comicId));
   }
+}
+
+/// 显示下载类型筛选菜单
+void showDownloadTypeFilterMenu({
+  required BuildContext buttonContext,
+  required DownloadPageLogic logic,
+}) {
+  final RenderBox? renderBox = buttonContext.findRenderObject() as RenderBox?;
+  if (renderBox == null) return;
+
+  final Offset offset = renderBox.localToGlobal(Offset.zero);
+  final Size buttonSize = renderBox.size;
+  final Size screenSize = MediaQuery.of(App.globalContext!).size;
+
+  showMenu<DownloadType?>(
+    context: App.globalContext!,
+    position: RelativeRect.fromLTRB(
+      offset.dx,
+      offset.dy + buttonSize.height,
+      screenSize.width - offset.dx - buttonSize.width,
+      screenSize.height - offset.dy - buttonSize.height,
+    ),
+    items: [
+      PopupMenuItem<DownloadType?>(
+        value: null,
+        child: Row(
+          children: [
+            if (logic.downloadTypeFilter == null)
+              const Icon(Icons.check, size: 20),
+            if (logic.downloadTypeFilter != null)
+              const SizedBox(width: 28),
+            const SizedBox(width: 8),
+            Text("全部".tl),
+          ],
+        ),
+        onTap: () {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            logic.updateDownloadTypeFilter(null);
+          });
+        },
+      ),
+      const PopupMenuDivider(),
+      ...[
+        DownloadType.picacg,
+        DownloadType.ehentai,
+        DownloadType.jm,
+        DownloadType.hitomi,
+        DownloadType.htmanga,
+        DownloadType.nhentai,
+        DownloadType.other,
+      ].map((type) {
+        final typeName = getDownloadTypeName(type);
+        return PopupMenuItem<DownloadType?>(
+          value: type,
+          child: Row(
+            children: [
+              if (logic.downloadTypeFilter == type)
+                const Icon(Icons.check, size: 20),
+              if (logic.downloadTypeFilter != type)
+                const SizedBox(width: 28),
+              Text(typeName),
+            ],
+          ),
+          onTap: () {
+            Future.delayed(const Duration(milliseconds: 100), () {
+              logic.updateDownloadTypeFilter(type);
+            });
+          },
+        );
+      }),
+    ],
+  );
 }

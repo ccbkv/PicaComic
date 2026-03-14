@@ -7,7 +7,7 @@ import 'package:pica_comic/network/htmanga_network/models.dart';
 import 'package:pica_comic/network/download_model.dart';
 import '../../base.dart';
 import '../../foundation/image_manager.dart';
-import '../../tools/io_tools.dart';
+import '../../utils/io_tools.dart';
 
 class DownloadedHtComic extends DownloadedItem {
   DownloadedHtComic(this.comic, this.size);

@@ -9,8 +9,8 @@ import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/network/http_client.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 export 'package:flutter_inappwebview/flutter_inappwebview.dart' show WebUri, URLRequest;

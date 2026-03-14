@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pica_comic/base.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/app.dart';
@@ -8,10 +8,10 @@ import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:pica_comic/foundation/pair.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/tools/app_links.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/app_links.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:sliver_tools/sliver_tools.dart';
 
 typedef FilterChip = FilterChipFixedWidth;

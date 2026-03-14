@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/network/nhentai_network/login.dart';
 import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/network/nhentai_network/tags.dart';
@@ -13,10 +13,10 @@ import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/nhentai/comic_page.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
-import '../../base.dart';
-import '../../foundation/history.dart';
-import '../../pages/reader/comic_reading_page.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
+import '../../../base.dart';
+import '../../../foundation/history.dart';
+import '../../../pages/reader/comic_reading_page.dart';
 
 final nhentai = ComicSource.named(
   name: 'nhentai',

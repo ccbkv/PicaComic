@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:pica_comic/network/download_model.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
 import '../../base.dart';
-import '../../tools/io_tools.dart';
+import '../../utils/io_tools.dart';
 import 'hitomi_models.dart';
 import 'dart:io';
 

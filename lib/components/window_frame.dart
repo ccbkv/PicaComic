@@ -12,11 +12,11 @@ import 'package:pica_comic/pages/image_favorites.dart';
 import 'package:pica_comic/pages/main_page.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
 import 'package:pica_comic/pages/settings/settings_page.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/pages/download_page.dart';
 import 'package:pica_comic/pages/downloading_page.dart';
 import 'package:window_manager/window_manager.dart';
-import '../comic_source/comic_source.dart';
+import '../foundation/comic_source/comic_source.dart';
 import 'components.dart';
 
 const _kTitleBarHeight = 36.0;

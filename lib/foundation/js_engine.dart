@@ -6,14 +6,15 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/base.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/def.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/app_dio.dart';
 import 'package:html/parser.dart' as html;
 import 'package:html/dom.dart' as dom;
 import 'package:pica_comic/network/cloudflare.dart';
 import 'package:pica_comic/network/cookie_jar.dart';
-import 'package:pica_comic/tools/extensions.dart';
+import 'package:pica_comic/utils/extensions.dart';
 import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:pointycastle/api.dart';
 import 'package:pointycastle/asn1/asn1_parser.dart';
@@ -75,6 +76,8 @@ class JsEngine with _JSEngineApi{
       var setGlobalFunc = _engine!.evaluate(
           "(key, value) => { this[key] = value; }");
       (setGlobalFunc as JSInvokable)(["sendMessage", _messageReceiver]);
+      // Set appVersion for venera-style comic sources compatibility
+      setGlobalFunc(["appVersion", appVersion]);
       setGlobalFunc.free();
       var jsInit = await rootBundle.load("assets/init.js");
       _engine!.evaluate(utf8.decode(jsInit.buffer.asUint8List()), name: "<init>");
@@ -128,6 +131,38 @@ class JsEngine with _JSEngineApi{
                   .firstWhereOrNull((element) => element.key == key);
               source?.data.remove(dataKey);
               source?.saveData();
+            }
+          case 'load_setting':
+            {
+              String key = message["key"];
+              String settingKey = message["setting_key"];
+              var source = ComicSource.sources
+                  .firstWhereOrNull((element) => element.key == key);
+              if (source == null) {
+                throw "Source not found: $key";
+              }
+              // First try to get from saved data
+              var savedValue = source.data["settings"]?[settingKey];
+              if (savedValue != null) {
+                return savedValue;
+              }
+              // Then try to get default value from veneraSettings
+              var veneraSetting = source.veneraSettings[settingKey];
+              if (veneraSetting is Map) {
+                var defaultValue = veneraSetting["default"];
+                if (defaultValue != null) {
+                  return defaultValue;
+                }
+                // For select type, return the first option's value
+                var options = veneraSetting["options"];
+                if (options is List && options.isNotEmpty) {
+                  var firstOption = options.first;
+                  if (firstOption is Map) {
+                    return firstOption["value"];
+                  }
+                }
+              }
+              throw "Setting not found: $settingKey";
             }
           case 'http':
             {
@@ -253,6 +288,13 @@ mixin class _JSEngineApi{
           keys.add(_elements.length - 1);
         }
         return keys;
+      case "getElementById":
+        var res = _documents[data["key"]]!.getElementById(data["id"]);
+        if(res == null) return null;
+        _elements[_elements.length] = res;
+        return _elements.length - 1;
+      case "getInnerHTML":
+        return _elements[data["key"]]!.innerHtml;
     }
   }
 
@@ -308,26 +350,77 @@ mixin class _JSEngineApi{
     try {
       switch (type) {
         case "base64":
-          if(value is String){
+          if(value is String && isEncode){
             value = utf8.encode(value);
           }
-          return isEncode
-              ? base64Encode(value)
-              : base64Decode(value);
+          if (isEncode) {
+            return base64Encode(value);
+          } else {
+            // Convert Uint8List to regular List<int> for JS compatibility
+            var decoded = base64Decode(value);
+            return decoded.toList();
+          }
         case "md5":
-          return Uint8List.fromList(md5.convert(value).bytes);
+          if (value is String) {
+            value = utf8.encode(value);
+          } else if (value is List) {
+            value = value.cast<int>().toList();
+          }
+          return md5.convert(value).bytes.toList();
         case "sha1":
-          return Uint8List.fromList(sha1.convert(value).bytes);
+          if (value is String) {
+            value = utf8.encode(value);
+          } else if (value is List) {
+            value = value.cast<int>().toList();
+          }
+          return sha1.convert(value).bytes.toList();
         case "sha256":
-          return Uint8List.fromList(sha256.convert(value).bytes);
+          if (value is String) {
+            value = utf8.encode(value);
+          } else if (value is List) {
+            value = value.cast<int>().toList();
+          }
+          return sha256.convert(value).bytes.toList();
         case "sha512":
-          return Uint8List.fromList(sha512.convert(value).bytes);
+          if (value is String) {
+            value = utf8.encode(value);
+          } else if (value is List) {
+            value = value.cast<int>().toList();
+          }
+          return sha512.convert(value).bytes.toList();
+        case "hmac":
+          var key = data["key"];
+          var hash = data["hash"];
+          // Convert key to List<int> if it's a List<dynamic>
+          if (key is List) {
+            key = key.cast<int>().toList();
+          }
+          // Convert value to List<int> if needed
+          if (value is String) {
+            value = utf8.encode(value);
+          } else if (value is List) {
+            value = value.cast<int>().toList();
+          }
+          var hmac = Hmac(
+              switch (hash) {
+                "md5" => md5,
+                "sha1" => sha1,
+                "sha256" => sha256,
+                "sha512" => sha512,
+                _ => throw "Unsupported hash: $hash"
+              },
+              key);
+          if (data['isString'] == true) {
+            return hmac.convert(value).toString();
+          } else {
+            return hmac.convert(value).bytes.toList();
+          }
         case "aes-ecb":
           if(!isEncode){
             var key = data["key"];
             var cipher = ECBBlockCipher(AESEngine());
             cipher.init(false, KeyParameter(key));
-            return cipher.process(value);
+            return cipher.process(value).toList();
           }
           return null;
         case "aes-cbc":
@@ -336,7 +429,7 @@ mixin class _JSEngineApi{
             var iv = data["iv"];
             var cipher = CBCBlockCipher(AESEngine());
             cipher.init(false, ParametersWithIV(KeyParameter(key), iv));
-            return cipher.process(value);
+            return cipher.process(value).toList();
           }
           return null;
         case "aes-cfb":
@@ -345,7 +438,7 @@ mixin class _JSEngineApi{
             var blockSize = data["blockSize"];
             var cipher = CFBBlockCipher(AESEngine(), blockSize);
             cipher.init(false, KeyParameter(key));
-            return cipher.process(value);
+            return cipher.process(value).toList();
           }
           return null;
         case "aes-ofb":
@@ -354,7 +447,7 @@ mixin class _JSEngineApi{
             var blockSize = data["blockSize"];
             var cipher = OFBBlockCipher(AESEngine(), blockSize);
             cipher.init(false, KeyParameter(key));
-            return cipher.process(value);
+            return cipher.process(value).toList();
           }
           return null;
         case "rsa":
@@ -363,7 +456,7 @@ mixin class _JSEngineApi{
             final cipher = PKCS1Encoding(RSAEngine());
             cipher.init(
                 false, PrivateKeyParameter<RSAPrivateKey>(_parsePrivateKey(key)));
-            return _processInBlocks(cipher, value);
+            return _processInBlocks(cipher, value).toList();
           }
           return null;
         default:

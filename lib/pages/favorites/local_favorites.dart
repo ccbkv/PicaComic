@@ -6,9 +6,9 @@ import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:flutter/material.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
 import 'package:pica_comic/pages/download_page.dart';
 import 'main_favorites_page.dart';
 import 'network_to_local.dart';
@@ -22,7 +22,7 @@ import '../../network/htmanga_network/htmanga_main_network.dart';
 import '../../network/jm_network/jm_network.dart';
 import '../../network/nhentai_network/nhentai_main_network.dart';
 import '../../network/picacg_network/methods.dart';
-import '../../tools/io_tools.dart';
+import '../../utils/io_tools.dart';
 
 extension LocalFavoritesExt on FavoriteItem {
   void addDownload() {

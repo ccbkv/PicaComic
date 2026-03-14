@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pica_comic/components/components.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 const sample = '''ipb_member_id: ...
 ipb_pass_hash: ...

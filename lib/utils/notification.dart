@@ -1,5 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/pages/downloading_page.dart';
 import '../foundation/app.dart';
 

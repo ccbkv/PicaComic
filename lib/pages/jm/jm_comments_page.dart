@@ -2,7 +2,7 @@ import 'package:pica_comic/components/comment.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:flutter/material.dart';
 import 'package:pica_comic/network/jm_network/jm_models.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/network/jm_network/jm_network.dart';
 import 'package:pica_comic/components/components.dart';
 

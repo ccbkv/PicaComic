@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 class SelectDownloadChapter extends StatefulWidget {
   const SelectDownloadChapter(this.eps, this.finishSelect, this.downloadedEps,

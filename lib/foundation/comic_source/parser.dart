@@ -41,7 +41,7 @@ class ComicSourceParser {
   Future<ComicSource> parse(String js, String filePath) async {
     js = js.replaceAll("\r\n", "\n");
     var line1 = js.split('\n')
-        .firstWhereOrNull((element) => element.removeAllBlank.isNotEmpty);
+        .firstWhereOrNull((element) => element.trim().startsWith("class "));
     if(line1 == null || !line1.startsWith("class ") || !line1.contains("extends ComicSource")){
       throw ComicSourceParseException("Invalid Content");
     }
@@ -93,6 +93,7 @@ class ComicSourceParser {
     final favoriteData = _loadFavoriteData();
     final commentsLoader = _parseCommentsLoader();
     final sendCommentFunc = _parseSendCommentFunc();
+    final veneraSettings = _parseVeneraSettings();
 
     var source =  ComicSource(
         _name!,
@@ -114,7 +115,8 @@ class ComicSourceParser {
         version ?? "1.0.0",
         commentsLoader,
         sendCommentFunc,
-        enableTagsTranslate);
+        enableTagsTranslate,
+        veneraSettings: veneraSettings);
 
     await source.loadData();
 
@@ -191,13 +193,20 @@ class ComicSourceParser {
           try {
             var res = await JsEngine()
                 .runCode("ComicSource.sources.$_key.explore[$i].load()");
-            return Res(List.from(res.keys.map((e) => ExplorePagePart(
+            if (res == null || res is! Map) {
+              return Res.error("Invalid response from explore load");
+            }
+            var keys = res.keys.toList();
+            return Res(List.from(keys.map((e) {
+              var comics = res[e];
+              if (comics == null || comics is! List) {
+                return ExplorePagePart(e, [], null);
+              }
+              return ExplorePagePart(
                 e,
-                (res[e] as List)
-                    .map<CustomComic>((e) => CustomComic.fromJson(e, _key!))
-                    .toList(),
-                null))
-                .toList()));
+                comics.map<CustomComic>((e) => CustomComic.fromJson(e, _key!)).toList(),
+                null);
+            })));
           } catch (e, s) {
             log("$e\n$s", "Data Analysis", LogLevel.error);
             return Res.error(e.toString());
@@ -217,6 +226,29 @@ class ComicSourceParser {
             return Res.error(e.toString());
           }
         };
+      } else if (type == "multiPartPage") {
+        loadMultiPart = () async {
+          try {
+            var res = await JsEngine()
+                .runCode("ComicSource.sources.$_key.explore[$i].load()");
+            if (res == null || res is! List) {
+              return Res.error("Invalid response from explore load");
+            }
+            return Res(List.from(res.map((e) {
+              var comics = e['comics'];
+              if (comics == null || comics is! List) {
+                return ExplorePagePart(e['title'] ?? "", [], null);
+              }
+              return ExplorePagePart(
+                e['title'] ?? "",
+                comics.map<CustomComic>((e) => CustomComic.fromJson(e, _key!)).toList(),
+                null);
+            })));
+          } catch (e, s) {
+            log("$e\n$s", "Data Analysis", LogLevel.error);
+            return Res.error(e.toString());
+          }
+        };
       }
       pages.add(ExplorePageData(
           title,
@@ -224,6 +256,7 @@ class ComicSourceParser {
             "singlePageWithMultiPart" =>
               ExplorePageType.singlePageWithMultiPart,
             "multiPageComicList" => ExplorePageType.multiPageComicList,
+            "multiPartPage" => ExplorePageType.singlePageWithMultiPart,
             _ =>
               throw ComicSourceParseException("Unknown explore page type $type")
           },
@@ -245,19 +278,46 @@ class ComicSourceParser {
 
     var categoryParts = <BaseCategoryPart>[];
 
-    for (var c in doc["parts"]) {
-      final String name = c["name"];
-      final String type = c["type"];
-      final List<String> tags = List.from(c["categories"]);
-      final String itemType = c["itemType"];
-      final List<String>? categoryParams =
-          c["categoryParams"] == null ? null : List.from(c["categoryParams"]);
-      if (type == "fixed") {
-        categoryParts
-            .add(FixedCategoryPart(name, tags, itemType, categoryParams));
-      } else if (type == "random") {
-        categoryParts.add(
-            RandomCategoryPart(name, tags, c["randomNumber"] ?? 1, itemType));
+    var parts = doc["parts"];
+    if (parts == null || parts is! List) {
+      return null;
+    }
+
+    for (var c in parts) {
+      if (c == null || c is! Map) continue;
+      final String name = c["name"] ?? "";
+      final String type = c["type"] ?? "fixed";
+      var categories = c["categories"];
+      if (categories == null || categories is! List) continue;
+      
+      // Support venera format: categories is List<Map> with 'label' and 'target'
+      if (categories.isNotEmpty && categories[0] is Map) {
+        // Venera format: create CategoryItems with targets
+        var categoryItems = categories.map<CategoryItem>((e) {
+          var label = e['label']?.toString() ?? "";
+          var target = e['target'] != null 
+              ? PageJumpTarget.parse(_key!, e['target'])
+              : null;
+          return CategoryItem(label, target);
+        }).toList();
+        
+        if (type == "fixed") {
+          categoryParts.add(FixedCategoryPart.fromItems(
+              name, categoryItems, "category"));
+        }
+      } else {
+        // Picacomic format: categories is List<String>
+        List<String> tags = List<String>.from(categories);
+        final String itemType = c["itemType"] ?? "category";
+        final List<String>? categoryParams =
+            c["categoryParams"] == null ? null : List<String>.from(c["categoryParams"]);
+        if (type == "fixed") {
+          categoryParts
+              .add(FixedCategoryPart(name, tags, itemType, categoryParams));
+        } else if (type == "random") {
+          categoryParts.add(
+              RandomCategoryPart(name, tags, c["randomNumber"] ?? 1, itemType));
+        }
       }
     }
 
@@ -271,23 +331,30 @@ class ComicSourceParser {
   CategoryComicsData? _loadCategoryComicsData() {
     if (!_checkExists("categoryComics")) return null;
     var options = <CategoryComicsOptions>[];
-    for (var element in _getValue("categoryComics.optionList")) {
-      LinkedHashMap<String, String> map = LinkedHashMap<String, String>();
-      for (var option in element["options"]) {
-        if (option.isEmpty || !option.contains("-")) {
-          continue;
+    var optionList = _getValue("categoryComics.optionList");
+    if (optionList != null && optionList is List) {
+      for (var element in optionList) {
+        if (element == null || element is! Map) continue;
+        LinkedHashMap<String, String> map = LinkedHashMap<String, String>();
+        var elementOptions = element["options"];
+        if (elementOptions != null && elementOptions is List) {
+          for (var option in elementOptions) {
+            if (option is! String || option.isEmpty || !option.contains("-")) {
+              continue;
+            }
+            var split = option.split("-");
+            var key = split.removeAt(0);
+            var value = split.join("-");
+            map[key] = value;
+          }
         }
-        var split = option.split("-");
-        var key = split.removeAt(0);
-        var value = split.join("-");
-        map[key] = value;
+        options.add(
+            CategoryComicsOptions(
+              map,
+              List<String>.from(element["notShowWhen"] ?? []),
+              element["showWhen"] == null ? null : List<String>.from(element["showWhen"])
+            ));
       }
-      options.add(
-          CategoryComicsOptions(
-            map,
-            List.from(element["notShowWhen"] ?? []),
-            element["showWhen"] == null ? null : List.from(element["showWhen"])
-          ));
     }
     RankingData? rankingData;
     if(_checkExists("categoryComics.ranking")){
@@ -341,18 +408,25 @@ class ComicSourceParser {
   SearchPageData? _loadSearchData() {
     if (!_checkExists("search")) return null;
     var options = <SearchOptions>[];
-    for (var element in _getValue("search.optionList") ?? []) {
-      LinkedHashMap<String, String> map = LinkedHashMap<String, String>();
-      for (var option in element["options"]) {
-        if (option.isEmpty || !option.contains("-")) {
-          continue;
+    var optionList = _getValue("search.optionList");
+    if (optionList != null && optionList is List) {
+      for (var element in optionList) {
+        if (element == null || element is! Map) continue;
+        LinkedHashMap<String, String> map = LinkedHashMap<String, String>();
+        var elementOptions = element["options"];
+        if (elementOptions != null && elementOptions is List) {
+          for (var option in elementOptions) {
+            if (option is! String || option.isEmpty || !option.contains("-")) {
+              continue;
+            }
+            var split = option.split("-");
+            var key = split.removeAt(0);
+            var value = split.join("-");
+            map[key] = value;
+          }
         }
-        var split = option.split("-");
-        var key = split.removeAt(0);
-        var value = split.join("-");
-        map[key] = value;
+        options.add(SearchOptions(map, element["label"]));
       }
-      options.add(SearchOptions(map, element["label"]));
     }
     return SearchPageData(options, (keyword, page, searchOption) async {
       try {
@@ -377,23 +451,51 @@ class ComicSourceParser {
         var res = await JsEngine().runCode("""
           ComicSource.sources.$_key.comic.loadInfo(${jsonEncode(id)})
         """);
+        if (res == null || res is! Map) {
+          return Res.error("Invalid response from loadInfo");
+        }
         var tags = <String, List<String>>{};
-        (res["tags"] as Map<String, dynamic>?)
-            ?.forEach((key, value) => tags[key] = List.from(value ?? const []));
+        var tagsData = res["tags"];
+        if (tagsData is Map<String, dynamic>) {
+          tagsData.forEach((key, value) => tags[key] = List<String>.from(value ?? const []));
+        }
+        var recommend = res["recommend"];
+        List<CustomComic>? recommendComics;
+        if (recommend is List) {
+          recommendComics = recommend.map((e) => CustomComic.fromJson(e, _key!)).toList();
+        }
+        // Handle chapters - support both flat Map<String, String> and nested Map<String, Map<String, String>>
+        Map<String, String>? chapters;
+        var chaptersData = res["chapters"];
+        if (chaptersData is Map) {
+          chapters = {};
+          for (var entry in chaptersData.entries) {
+            if (entry.value is Map) {
+              // Nested map - flatten it
+              (entry.value as Map).forEach((k, v) {
+                chapters![k.toString()] = v.toString();
+              });
+            } else {
+              // Flat map
+              chapters[entry.key.toString()] = entry.value.toString();
+            }
+          }
+          if (chapters.isEmpty) {
+            chapters = null;
+          }
+        }
         return Res(ComicInfoData(
-            res["title"],
-            res["subTitle"],
-            res["cover"],
-            res["description"],
+            res["title"] ?? "",
+            res["subTitle"] ?? "",
+            res["cover"] ?? "",
+            res["description"] ?? "",
             tags,
-            res["chapters"] == null ? null : Map.from(res["chapters"]),
+            chapters,
             ListOrNull.from(res["thumbnails"]),
             // TODO: implement thumbnailLoader
             null,
             res["thumbnailMaxPage"] ?? 1,
-            (res["recommend"] as List?)
-                ?.map((e) => CustomComic.fromJson(e, _key!))
-                .toList(),
+            recommendComics,
             _key!,
             id,
             isFavorite: res["isFavorite"],
@@ -411,7 +513,14 @@ class ComicSourceParser {
         var res = await JsEngine().runCode("""
           ComicSource.sources.$_key.comic.loadEp(${jsonEncode(id)}, ${jsonEncode(ep)})
         """);
-        return Res(List.from(res["images"]));
+        if (res == null || res is! Map) {
+          return Res.error("Invalid response from loadEp");
+        }
+        var images = res["images"];
+        if (images == null || images is! List) {
+          return Res.error("No images found");
+        }
+        return Res(List<String>.from(images));
       } catch (e, s) {
         log("$e\n$s", "Network", LogLevel.error);
         return Res.error(e.toString());
@@ -546,9 +655,16 @@ class ComicSourceParser {
           ComicSource.sources.$_key.comic.loadComments(
             ${jsonEncode(id)}, ${jsonEncode(subId)}, ${jsonEncode(page)}, ${jsonEncode(replyTo)})
         """);
+        if (res == null || res is! Map) {
+          return Res.error("Invalid response from loadComments");
+        }
+        var comments = res["comments"];
+        if (comments == null || comments is! List) {
+          return Res([]);
+        }
         return Res(
-            (res["comments"] as List).map((e) => Comment(
-                e["userName"], e["avatar"], e["content"], e["time"], e["replyCount"], e["id"].toString()
+            comments.map((e) => Comment(
+                e["userName"] ?? "", e["avatar"] ?? "", e["content"] ?? "", e["time"] ?? "", e["replyCount"] ?? 0, e["id"]?.toString() ?? ""
             )).toList(),
             subData: res["maxPage"]);
       } catch (e, s) {
@@ -612,5 +728,29 @@ class ComicSourceParser {
       }
       return res as Map<String, dynamic>;
     };
+  }
+
+  /// Parse venera format settings from JS
+  Map<String, dynamic> _parseVeneraSettings() {
+    var settings = _getValue("settings");
+    if (settings == null || settings is! Map) {
+      return const {};
+    }
+    // Convert to a simple Map<String, dynamic>
+    var result = <String, dynamic>{};
+    for (var entry in settings.entries) {
+      if (entry.key is! String) continue;
+      var value = entry.value;
+      if (value is Map) {
+        var settingMap = <String, dynamic>{};
+        for (var e in value.entries) {
+          if (e.key is String) {
+            settingMap[e.key] = e.value;
+          }
+        }
+        result[entry.key] = settingMap;
+      }
+    }
+    return result;
   }
 }

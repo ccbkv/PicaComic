@@ -1,6 +1,6 @@
 library pica_reader;
 
-import 'package:pica_comic/tools/show_delayed_dialog.dart';
+import 'package:pica_comic/utils/show_delayed_dialog.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -11,7 +11,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/components/custom_slider.dart';
 import 'package:pica_comic/components/scrollable_list/src/item_positions_listener.dart';
@@ -31,18 +31,18 @@ import 'package:pica_comic/network/jm_network/jm_models.dart';
 import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
-import 'package:pica_comic/tools/keep_screen_on.dart';
+import 'package:pica_comic/utils/keep_screen_on.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/foundation/history.dart';
-import 'package:pica_comic/tools/save_image.dart';
-import 'package:pica_comic/tools/time.dart';
+import 'package:pica_comic/utils/save_image.dart';
+import 'package:pica_comic/utils/time.dart';
 import 'package:pica_comic/network/jm_network/jm_network.dart';
 import '../../foundation/app.dart';
 import '../../foundation/ui_mode.dart';
 import '../../network/hitomi_network/hitomi_models.dart';
-import '../../tools/key_down_event.dart';
+import '../../utils/key_down_event.dart';
 import 'package:pica_comic/network/picacg_network/methods.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 import '../jm/jm_comments_page.dart';
 

@@ -4,12 +4,12 @@ import 'dart:isolate';
 import 'package:flutter/services.dart';
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import 'package:flutter_saf/flutter_saf.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/ext.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/ext.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart' as s;
 import 'package:file_selector/file_selector.dart' as file_selector;
-import 'package:pica_comic/tools/file_type.dart';
+import 'package:pica_comic/utils/file_type.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../foundation/app.dart';

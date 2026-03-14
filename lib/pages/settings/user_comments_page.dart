@@ -5,7 +5,7 @@ import 'package:pica_comic/network/picacg_network/methods.dart';
 import 'package:pica_comic/network/picacg_network/models.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/picacg/comments_page.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 class UserCommentsPageLogic extends StateController {
   bool isLoading = true;

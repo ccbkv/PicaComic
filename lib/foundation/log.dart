@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:pica_comic/tools/extensions.dart';
+import 'package:pica_comic/utils/extensions.dart';
 
 void log(String content,
     [String title = "debug", LogLevel level = LogLevel.info]) {

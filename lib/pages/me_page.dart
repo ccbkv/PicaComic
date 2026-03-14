@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/image_loader/cached_image.dart';
@@ -10,7 +10,7 @@ import 'package:pica_comic/pages/download_page.dart';
 import 'package:pica_comic/pages/tools.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'history_page.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'image_favorites.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;

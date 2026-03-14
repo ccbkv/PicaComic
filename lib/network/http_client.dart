@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/foundation/log.dart';
-import 'package:pica_comic/tools/extensions.dart';
+import 'package:pica_comic/utils/extensions.dart';
 import '../base.dart';
 import '../foundation/app.dart';
 

@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:pica_comic/comic_source/built_in/picacg.dart';
+import 'package:pica_comic/foundation/comic_source/built_in/picacg.dart';
 import 'package:pica_comic/network/cache_network.dart';
 import 'dart:convert' as convert;
 import 'package:pica_comic/network/picacg_network/headers.dart';

@@ -17,10 +17,10 @@ import 'package:pica_comic/network/http_client.dart';
 import 'package:pica_comic/pages/auth_page.dart';
 import 'package:pica_comic/pages/main_page.dart';
 import 'package:pica_comic/pages/welcome_page.dart';
-import 'package:pica_comic/tools/block_screenshot.dart';
-import 'package:pica_comic/tools/mouse_listener.dart';
-import 'package:pica_comic/tools/android_first_use_manager.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
+import 'package:pica_comic/utils/block_screenshot.dart';
+import 'package:pica_comic/utils/mouse_listener.dart';
+import 'package:pica_comic/utils/android_first_use_manager.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'components/components.dart';

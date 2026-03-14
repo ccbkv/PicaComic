@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:pica_comic/tools/extensions.dart';
+import 'package:pica_comic/utils/extensions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 class CookieJarSql {

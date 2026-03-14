@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pica_comic/network/hitomi_network/hitomi_main_network.dart';
 import 'package:pica_comic/network/res.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import '../../base.dart';
 import '../../foundation/app.dart';
 import '../../network/hitomi_network/hitomi_models.dart';

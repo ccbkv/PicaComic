@@ -3,7 +3,7 @@ import 'dart:io' as io;
 import 'package:app_links/app_links.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/js_engine.dart';
@@ -13,25 +13,25 @@ import 'package:pica_comic/network/cookie_jar.dart';
 import 'package:pica_comic/network/http_proxy.dart';
 import 'package:pica_comic/network/jm_network/jm_network.dart';
 import 'package:pica_comic/network/picacg_network/models.dart';
-import 'package:pica_comic/tools/app_links.dart';
-import 'package:pica_comic/tools/background_service.dart';
-import 'package:pica_comic/tools/cache_auto_clear.dart';
-import 'package:pica_comic/tools/io_extensions.dart';
-import 'package:pica_comic/tools/io_tools.dart';
-import 'package:pica_comic/tools/translations.dart';
-import 'package:pica_comic/tools/android_first_use_manager.dart';
+import 'package:pica_comic/utils/app_links.dart';
+import 'package:pica_comic/utils/background_service.dart';
+import 'package:pica_comic/utils/cache_auto_clear.dart';
+import 'package:pica_comic/utils/io_extensions.dart';
+import 'package:pica_comic/utils/io_tools.dart';
+import 'package:pica_comic/utils/translations.dart';
+import 'package:pica_comic/utils/android_first_use_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'base.dart';
-import 'comic_source/built_in/ehentai.dart';
-import 'comic_source/built_in/ht_manga.dart';
-import 'comic_source/built_in/jm.dart';
-import 'comic_source/built_in/nhentai.dart';
-import 'comic_source/built_in/picacg.dart';
+import 'foundation/comic_source/built_in/ehentai.dart';
+import 'foundation/comic_source/built_in/ht_manga.dart';
+import 'foundation/comic_source/built_in/jm.dart';
+import 'foundation/comic_source/built_in/nhentai.dart';
+import 'foundation/comic_source/built_in/picacg.dart';
 import 'foundation/app.dart';
 import 'network/nhentai_network/nhentai_main_network.dart';
-import 'package:pica_comic/tools/font_manager.dart';
+import 'package:pica_comic/utils/font_manager.dart';
 
 Future<void> init() async {
   try {

@@ -1,4 +1,4 @@
-import 'package:pica_comic/tools/ext.dart';
+import 'package:pica_comic/utils/ext.dart';
 
 enum ImageFavoriteSortType {
   title('按标题'),

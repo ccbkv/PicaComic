@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:pica_comic/foundation/image_loader/cached_image.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
-import 'package:pica_comic/tools/save_image.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/save_image.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 class ShowImagePage extends StatelessWidget {
   const ShowImagePage(this.url, {super.key});

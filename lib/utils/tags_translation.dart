@@ -13,7 +13,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/foundation/app.dart';
-import 'package:pica_comic/tools/extensions.dart';
+import 'package:pica_comic/utils/extensions.dart';
 
 extension TagsTranslation on String {
   static final Map<String, Map<String, String>> _data = {};

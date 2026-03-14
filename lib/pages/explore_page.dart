@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:pica_comic/base.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/network/base_comic.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});

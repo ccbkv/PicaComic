@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/def.dart';
@@ -13,7 +13,7 @@ import 'package:pica_comic/pages/hitomi/hitomi_comic_page.dart';
 import 'package:pica_comic/pages/hitomi/hitomi_home_page.dart';
 import 'package:pica_comic/pages/hitomi/hitomi_search.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
 
 final hitomi = ComicSource.named(
   name: "hitomi",

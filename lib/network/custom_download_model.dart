@@ -3,11 +3,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:pica_comic/base.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/network/download_model.dart';
 
-import '../tools/io_tools.dart';
+import '../utils/io_tools.dart';
 import 'download.dart';
 
 class CustomDownloadedItem extends DownloadedItem {

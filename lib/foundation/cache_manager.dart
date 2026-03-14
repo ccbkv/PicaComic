@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pica_comic/foundation/app.dart';
-import 'package:pica_comic/tools/io_extensions.dart';
+import 'package:pica_comic/utils/io_extensions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 class CacheManager {

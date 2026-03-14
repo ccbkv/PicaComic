@@ -48,82 +48,44 @@ class ComicSourceSettings extends StatefulWidget {
   // }
 }
 
-extension _WidgetExt on Widget {
-  Widget withDivider() {
-    return Column(
-      children: [
-        this,
-        const Divider(),
-      ],
-    );
-  }
-}
+
 
 class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   var url = "";
 
   @override
   Widget build(BuildContext context) {
-    if (App.isFluent) {
-      return fluent.ScaffoldPage.scrollable(children: [
-        buildCard(context),
-        const _BuiltInSources(),
-        if (appdata.appSettings.isComicSourceEnabled("picacg"))
-          const PicacgSettings(false).withDivider(),
-        if (appdata.appSettings.isComicSourceEnabled("ehentai"))
-          const EhSettings(false).withDivider(),
-        if (appdata.appSettings.isComicSourceEnabled("nhentai"))
-          const NhSettings(false).withDivider(),
-        if (appdata.appSettings.isComicSourceEnabled("jm"))
-          const JmSettings(false).withDivider(),
-        if (appdata.appSettings.isComicSourceEnabled("hitomi"))
-          const HitomiSettings(false).withDivider(),
-        if (appdata.appSettings.isComicSourceEnabled("htmanga"))
-          // const HtSettings(false).withDivider(),
-          const HtSettings(false),
-        // buildCustomSettings(),
-        for (var source in ComicSource.sources.where((e) => !e.isBuiltIn))
-          buildCustom(context, source),
-        Padding(
-            padding:
-                EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
-      ]);
-    }
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("漫画源"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        automaticallyImplyLeading: true,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            buildCard(context),
-            const _BuiltInSources(),
-            if(appdata.appSettings.isComicSourceEnabled("picacg"))
-              const PicacgSettings(false).withDivider(),
-            if(appdata.appSettings.isComicSourceEnabled("ehentai"))
-              const EhSettings(false).withDivider(),
-            if(appdata.appSettings.isComicSourceEnabled("nhentai"))
-              const NhSettings(false).withDivider(),
-            if(appdata.appSettings.isComicSourceEnabled("jm"))
-              const JmSettings(false).withDivider(),
-            if(appdata.appSettings.isComicSourceEnabled("hitomi"))
-              const HitomiSettings(false).withDivider(),
-            if(appdata.appSettings.isComicSourceEnabled("htmanga"))
-              // const HtSettings(false).withDivider(),
-              const HtSettings(false),
-            // buildCustomSettings(),
-            for (var source in ComicSource.sources.where((e) => !e.isBuiltIn))
-              buildCustom(context, source),
-            Padding(
-                padding: 
-                    EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
-          ],
-        ),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            title: Text("漫画源".tl),
+            pinned: true,
+          ),
+          buildCard(context),
+          const _SliverBuiltInSources(),
+          if(appdata.appSettings.isComicSourceEnabled("picacg"))
+            const SliverPicacgSettings(),
+          if(appdata.appSettings.isComicSourceEnabled("ehentai"))
+            const SliverEhSettings(),
+          if(appdata.appSettings.isComicSourceEnabled("nhentai"))
+            const SliverNhSettings(),
+          if(appdata.appSettings.isComicSourceEnabled("jm"))
+            const SliverJmSettings(),
+          if(appdata.appSettings.isComicSourceEnabled("hitomi"))
+            const SliverHitomiSettings(),
+          if(appdata.appSettings.isComicSourceEnabled("htmanga"))
+            const SliverHtSettings(),
+          for (var source in ComicSource.sources.where((e) => !e.isBuiltIn))
+            _SliverComicSource(
+              key: ValueKey(source.key),
+              source: source,
+              edit: edit,
+              update: update,
+              delete: delete,
+            ),
+          SliverPadding(padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom)),
+        ],
       ),
     );
   }
@@ -149,43 +111,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   //   );
   // }
 
-  Widget buildCustom(BuildContext context, ComicSource source) {
-    return Column(
-      children: [
-        const Divider(),
-        ListTile(
-          title: Text(source.name),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Tooltip(
-                message: "编辑",
-                child: IconButton(
-                    onPressed: () => edit(source),
-                    icon: const Icon(Icons.edit_note)),
-              ),
-              Tooltip(
-                message: "更新",
-                child: IconButton(
-                    onPressed: () => update(source),
-                    icon: const Icon(Icons.update)),
-              ),
-              Tooltip(
-                message: "删除",
-                child: IconButton(
-                    onPressed: () => delete(source),
-                    icon: const Icon(Icons.delete)),
-              ),
-            ],
-          ),
-        ),
-        ListTile(
-          title: const Text("版本"),
-          subtitle: Text(source.version),
-        )
-      ],
-    );
-  }
+
 
   void delete(ComicSource source) {
     showConfirmDialog(App.globalContext!, "删除".tl, "要删除此漫画源吗?".tl, () {
@@ -233,7 +159,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   }
 
   Widget buildCard(BuildContext context) {
-    return Card.outlined(
+    return SliverToBoxAdapter(
       child: SizedBox(
         width: double.infinity,
         child: Column(
@@ -241,66 +167,56 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: Row(
-                children: [
-                  Text("添加漫画源".tl),
-                  const SizedBox(
-                    width: 2,
-                  ),
-                  InkWell(
-                    borderRadius: const BorderRadius.all(Radius.circular(18)),
-                    onTap: () => showDialogMessage(
-                        context,
-                        "警告".tl,
-                        "${"此功能已不再受支持".tl}\n${"请勿反馈相关问题".tl}"
-                    ),
-                    child: const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.red,
-                      size: 18,
-                    ),
-                  )
-                ]
-              ),
+              title: Text("添加漫画源".tl),
               leading: const Icon(Icons.dashboard_customize),
             ),
             TextField(
-                    decoration: InputDecoration(
-                        hintText: "URL",
-                        border: const UnderlineInputBorder(),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 12),
-                        suffix: IconButton(
-                            onPressed: () => handleAddSource(url),
-                            icon: const Icon(Icons.check))),
-                    onChanged: (value) {
-                      url = value;
-                    },
-                    onSubmitted: handleAddSource)
-                .paddingHorizontal(16)
-                .paddingBottom(32),
-            Row(
+              decoration: InputDecoration(
+                hintText: "URL",
+                border: const UnderlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                suffix: IconButton(
+                  onPressed: () => handleAddSource(url),
+                  icon: const Icon(Icons.check),
+                ),
+              ),
+              onChanged: (value) {
+                url = value;
+              },
+              onSubmitted: handleAddSource,
+            ).paddingHorizontal(16).paddingBottom(8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                const Spacer(),
-                TextButton(onPressed: chooseFile, child: Text("选择文件".tl))
-                    .paddingLeft(8),
-                const Spacer(),
-                TextButton(
-                    onPressed: () {
-                      showPopUpWidget(
-                          context, _ComicSourceList(handleAddSource, onClose: () => Navigator.of(context).pop()));
-                    },
-                    child: Text("浏览列表".tl)),
-                const Spacer(),
-                // TextButton(onPressed: help, child: Text("查看帮助".tl))
-                //     .paddingRight(8),
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.article_outlined),
+                  label: Text("浏览列表".tl),
+                  onPressed: () {
+                    showPopUpWidget(
+                      context,
+                      _ComicSourceList(handleAddSource, onClose: () => Navigator.of(context).pop()),
+                    );
+                  },
+                ),
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.file_open_outlined),
+                  label: Text("选择文件".tl),
+                  onPressed: chooseFile,
+                ),
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.help_outline),
+                  label: Text("帮助".tl),
+                  onPressed: help,
+                ),
+                const _CheckUpdatesButton(),
               ],
-            ),
+            ).paddingHorizontal(12).paddingVertical(8),
             const SizedBox(height: 8),
           ],
         ),
       ),
-    ).paddingHorizontal(12);
+    );
   }
 
   void chooseFile() async {
@@ -322,10 +238,11 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     }
   }
 
-  // void help() {
-  //   launchUrlString(
-  //       "https://github.com/user/repo/blob/master/help.md");
-  // }
+  void help() {
+    launchUrlString(
+      "https://github.com/ccbkv/PicaComic/blob/master/doc/comic_source.md",
+    );
+  }
 
   Future<void> handleAddSource(String url) async {
     if (url.isEmpty) {
@@ -359,6 +276,122 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   }
 }
 
+class _CheckUpdatesButton extends StatefulWidget {
+  const _CheckUpdatesButton();
+
+  @override
+  State<_CheckUpdatesButton> createState() => _CheckUpdatesButtonState();
+}
+
+class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
+  bool isLoading = false;
+
+  void check() async {
+    setState(() {
+      isLoading = true;
+    });
+    var count = await checkComicSourceUpdate();
+    if (count == -1) {
+      showToast(message: "网络错误".tl);
+    } else if (count == 0) {
+      showToast(message: "没有更新".tl);
+    } else {
+      showUpdateDialog();
+    }
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  void showUpdateDialog() async {
+    var text = ComicSource.updates.entries.map((e) {
+      return "${ComicSource.find(e.key)?.name}: ${e.value}";
+    }).join("\n");
+    bool doUpdate = false;
+    await showDialog(
+      context: App.globalContext!,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("有可用更新".tl),
+          content: Text(text),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("取消".tl),
+            ),
+            FilledButton(
+              onPressed: () {
+                doUpdate = true;
+                Navigator.pop(context);
+              },
+              child: Text("更新".tl),
+            ),
+          ],
+        );
+      },
+    );
+    if (doUpdate) {
+      var loadingController = showLoadingDialog(App.globalContext!,
+          message: "更新中".tl, barrierDismissible: false);
+      try {
+        var shouldUpdate = ComicSource.updates.keys.toList();
+        for (var key in shouldUpdate) {
+          var source = ComicSource.find(key)!;
+          _ComicSourceSettingsState.update(source);
+        }
+      } catch (e) {
+        showToast(message: e.toString());
+      }
+      loadingController.close();
+    }
+  }
+
+  static Future<int> checkComicSourceUpdate() async {
+    if (ComicSource.sources.isEmpty) {
+      return 0;
+    }
+    var dio = logDio();
+    var res = await dio.get<String>(
+        "https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/index.json");
+    if (res.statusCode != 200) {
+      return -1;
+    }
+    var list = jsonDecode(res.data!) as List;
+    var versions = <String, String>{};
+    for (var source in list) {
+      versions[source['key']] = source['version'];
+    }
+    var shouldUpdate = <String>[];
+    for (var source in ComicSource.sources.where((e) => !e.isBuiltIn)) {
+      if (versions.containsKey(source.key) &&
+          versions[source.key] != source.version) {
+        shouldUpdate.add(source.key);
+      }
+    }
+    if (shouldUpdate.isNotEmpty) {
+      ComicSource.updates = {
+        for (var key in shouldUpdate) key: versions[key]!
+      };
+    }
+    return shouldUpdate.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.tonalIcon(
+      icon: isLoading
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.update),
+      label: Text("检查更新".tl),
+      onPressed: check,
+    );
+  }
+}
+
 class _ComicSourceList extends StatefulWidget {
   const _ComicSourceList(this.onAdd, {this.onClose});
 
@@ -370,21 +403,53 @@ class _ComicSourceList extends StatefulWidget {
 }
 
 class _ComicSourceListState extends State<_ComicSourceList> {
-  bool loading = true;
   List? json;
+  bool changed = false;
+  var controller = TextEditingController();
 
   void load() async {
-    var dio = logDio();
-    var res = await dio.get<String>(
-        "https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/index.json");
-    if (res.statusCode != 200) {
-      showToast(message: "网络错误".tl);
+    if (json != null) {
+      setState(() {
+        json = null;
+      });
+    }
+    if (controller.text.isEmpty) {
+      setState(() {
+        json = [];
+      });
       return;
     }
-    setState(() {
-      json = jsonDecode(res.data!);
-      loading = false;
-    });
+    var dio = logDio();
+    try {
+      var res = await dio.get<String>(controller.text);
+      if (res.statusCode != 200) {
+        throw "error";
+      }
+      if (mounted) {
+        setState(() {
+          json = jsonDecode(res.data!);
+        });
+      }
+    } catch (e) {
+      showToast(message: "网络错误".tl);
+      if (mounted) {
+        setState(() {
+          json = [];
+        });
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    controller.text = "https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/index.json";
+    load();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   @override
@@ -401,59 +466,295 @@ class _ComicSourceListState extends State<_ComicSourceList> {
   }
 
   Widget buildBody() {
-    if (loading) {
-      load();
-      return const Center(child: CircularProgressIndicator());
-    } else {
-      var currentKey = ComicSource.sources.map((e) => e.key).toList();
-      return ListView.builder(
-        itemCount: json!.length,
-        itemBuilder: (context, index) {
-          var key = json![index]["key"];
-          var action = currentKey.contains(key)
-              ? const Icon(Icons.check)
-              : Tooltip(
-                  message: "Add",
-                  child: IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: () async {
-                      await widget.onAdd(
-                          "https://raw.githubusercontent.com/ccbkv/pica_configs/master/${json![index]["fileName"]}");
-                      setState(() {});
-                    },
-                  ),
-                );
+    var currentKey = ComicSource.sources.map((e) => e.key).toList();
 
-          return ListTile(
-            title: Text(json![index]["name"]),
-            subtitle: Text(json![index]["version"]),
-            trailing: action,
+    return ListView.builder(
+      itemCount: (json?.length ?? 1) + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                width: 0.6,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.source_outlined),
+                  title: Text("仓库地址".tl),
+                ),
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    hintText: "URL",
+                    border: UnderlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  onChanged: (value) {
+                    changed = true;
+                  },
+                ).paddingHorizontal(16).paddingBottom(8),
+                Text(
+                  "URL 应指向 'index.json' 文件".tl,
+                ).paddingLeft(16),
+                Text(
+                  "请勿向 App 仓库反馈与漫画源相关的问题".tl,
+                ).paddingLeft(16),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        launchUrlString(
+                          "https://github.com/venera-app/venera/blob/master/doc/comic_source.md",
+                        );
+                      },
+                      child: Text("帮助".tl),
+                    ),
+                    FilledButton.tonal(
+                      onPressed: load,
+                      child: Text("刷新".tl),
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           );
-        },
-      );
-    }
+        }
+
+        if (index == 1 && json == null) {
+          return const Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            ),
+          );
+        }
+
+        index--;
+
+        var key = json![index]["key"];
+        var action = currentKey.contains(key)
+            ? const Icon(Icons.check, size: 20).paddingRight(8)
+            : FilledButton(
+                onPressed: () async {
+                  var fileName = json![index]["fileName"];
+                  var url = json![index]["url"];
+                  if (url == null || !(url.toString()).isURL) {
+                    var listUrl = controller.text;
+                    if (listUrl
+                        .replaceFirst("https://", "")
+                        .replaceFirst("http://", "")
+                        .contains("/")) {
+                      url =
+                          listUrl.substring(0, listUrl.lastIndexOf("/") + 1) +
+                          fileName;
+                    } else {
+                      url = '$listUrl/$fileName';
+                    }
+                  }
+                  await widget.onAdd(url);
+                  setState(() {});
+                },
+                child: Text("添加".tl),
+              ).fixHeight(32);
+
+        var description = json![index]["version"];
+        if (json![index]["description"] != null) {
+          description = "$description\n${json![index]["description"]}";
+        }
+
+        return ListTile(
+          title: Text(json![index]["name"]),
+          subtitle: Text(description),
+          trailing: action,
+        );
+      },
+    );
   }
 }
 
-class _BuiltInSources extends StatefulWidget {
-  const _BuiltInSources();
+// Sliver wrappers for built-in source settings
+class SliverPicacgSettings extends StatelessWidget {
+  const SliverPicacgSettings({super.key});
 
-  @override
-  State<_BuiltInSources> createState() => _BuiltInSourcesState();
-}
-
-class _BuiltInSourcesState extends State<_BuiltInSources> {
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const Divider(),
-        ListTile(
-          title: Text("内置漫画源".tl),
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            height: 0.6,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          const PicacgSettings(false),
+        ],
+      ),
+    );
+  }
+}
+
+class SliverEhSettings extends StatelessWidget {
+  const SliverEhSettings({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            height: 0.6,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          const EhSettings(false),
+        ],
+      ),
+    );
+  }
+}
+
+class SliverNhSettings extends StatelessWidget {
+  const SliverNhSettings({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            height: 0.6,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          const NhSettings(false),
+        ],
+      ),
+    );
+  }
+}
+
+class SliverJmSettings extends StatelessWidget {
+  const SliverJmSettings({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            height: 0.6,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          const JmSettings(false),
+        ],
+      ),
+    );
+  }
+}
+
+class SliverHitomiSettings extends StatelessWidget {
+  const SliverHitomiSettings({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            height: 0.6,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          const HitomiSettings(false),
+        ],
+      ),
+    );
+  }
+}
+
+class SliverHtSettings extends StatelessWidget {
+  const SliverHtSettings({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            height: 0.6,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          const HtSettings(false),
+        ],
+      ),
+    );
+  }
+}
+
+class _SliverBuiltInSources extends StatefulWidget {
+  const _SliverBuiltInSources();
+
+  @override
+  State<_SliverBuiltInSources> createState() => _SliverBuiltInSourcesState();
+}
+
+class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
+  @override
+  Widget build(BuildContext context) {
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 0.6,
+                ),
+              ),
+            ),
+          ),
         ),
-        for(int index = 0; index < builtInSources.length; index++)
-          buildTile(index),
-        const Divider(),
+        SliverToBoxAdapter(
+          child: ListTile(
+            title: Text("内置漫画源".tl),
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => buildTile(index),
+            childCount: builtInSources.length,
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 0.6,
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -535,6 +836,286 @@ void _validatePages() {
   appdata.appSettings.networkFavorites = networkFavorites;
 
   appdata.updateSettings();
+}
+
+class _SliverComicSource extends StatefulWidget {
+  const _SliverComicSource({
+    super.key,
+    required this.source,
+    required this.edit,
+    required this.update,
+    required this.delete,
+  });
+
+  final ComicSource source;
+  final void Function(ComicSource source) edit;
+  final void Function(ComicSource source) update;
+  final void Function(ComicSource source) delete;
+
+  @override
+  State<_SliverComicSource> createState() => _SliverComicSourceState();
+}
+
+class _SliverComicSourceState extends State<_SliverComicSource> {
+  ComicSource get source => widget.source;
+
+  @override
+  Widget build(BuildContext context) {
+    var newVersion = ComicSource.updates[source.key];
+    bool hasUpdate = newVersion != null && newVersion != source.version;
+
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverPadding(padding: const EdgeInsets.only(top: 16)),
+        SliverToBoxAdapter(
+          child: ListTile(
+            title: Row(
+              children: [
+                Text(source.name, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    source.version,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                if (hasUpdate)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      "新版本".tl,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ).paddingLeft(4),
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Tooltip(
+                  message: "编辑".tl,
+                  child: IconButton(
+                    onPressed: () => widget.edit(source),
+                    icon: const Icon(Icons.edit_note),
+                  ),
+                ),
+                Tooltip(
+                  message: "更新".tl,
+                  child: IconButton(
+                    onPressed: () => widget.update(source),
+                    icon: const Icon(Icons.update),
+                  ),
+                ),
+                Tooltip(
+                  message: "删除".tl,
+                  child: IconButton(
+                    onPressed: () => widget.delete(source),
+                    icon: const Icon(Icons.delete),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Venera format settings
+        ..._buildVeneraSettings(),
+        SliverToBoxAdapter(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 0.6,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildVeneraSettings() {
+    if (source.veneraSettings.isEmpty) {
+      return [];
+    }
+
+    var widgets = <Widget>[];
+
+    // Ensure settings data exists
+    if (source.data['settings'] == null) {
+      source.data['settings'] = {};
+    }
+
+    for (var entry in source.veneraSettings.entries) {
+      var key = entry.key;
+      var setting = entry.value;
+
+      if (setting is! Map) continue;
+
+      var type = setting['type'] as String?;
+      var title = setting['title'] as String? ?? key;
+
+      try {
+        if (type == 'select') {
+          var options = setting['options'] as List? ?? [];
+          var defaultValue = setting['default'];
+
+          // Get current value or use default
+          var currentValue = source.data['settings'][key] ?? defaultValue;
+
+          // Find display text for current value
+          String currentText = currentValue?.toString() ?? '';
+          for (var option in options) {
+            if (option is Map && option['value'] == currentValue) {
+              currentText = option['text']?.toString() ?? option['value']?.toString() ?? currentValue.toString();
+              break;
+            }
+          }
+
+          // Build option values and texts
+          List<String> optionValues = [];
+          List<String> optionTexts = [];
+          for (var option in options) {
+            if (option is Map) {
+              var value = option['value']?.toString() ?? '';
+              var text = option['text']?.toString() ?? option['value']?.toString() ?? '';
+              optionValues.add(value);
+              optionTexts.add(text);
+            }
+          }
+
+          if (optionValues.isEmpty) continue;
+
+          // Find current index
+          int currentIndex = optionValues.indexOf(currentValue?.toString() ?? '');
+          if (currentIndex < 0) currentIndex = 0;
+
+          widgets.add(
+            SliverToBoxAdapter(
+              child: ListTile(
+                title: Text(title),
+                trailing: components.Select(
+                  initialValue: currentIndex,
+                  values: optionTexts,
+                  onChange: (index) {
+                    source.data['settings'][key] = optionValues[index];
+                    source.saveData();
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          );
+        } else if (type == 'switch') {
+          var defaultValue = setting['default'] ?? false;
+          var currentValue = source.data['settings'][key] ?? defaultValue;
+
+          widgets.add(
+            SliverToBoxAdapter(
+              child: ListTile(
+                title: Text(title),
+                trailing: Switch(
+                  value: currentValue is bool ? currentValue : false,
+                  onChanged: (value) {
+                    source.data['settings'][key] = value;
+                    source.saveData();
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          );
+        } else if (type == 'input') {
+          var defaultValue = setting['default']?.toString() ?? '';
+          var currentValue = source.data['settings'][key]?.toString() ?? defaultValue;
+
+          widgets.add(
+            SliverToBoxAdapter(
+              child: ListTile(
+                title: Text(title),
+                subtitle: Text(
+                  currentValue,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    _showInputDialog(
+                      context: context,
+                      title: title,
+                      initialValue: currentValue,
+                      onConfirm: (value) {
+                        source.data['settings'][key] = value;
+                        source.saveData();
+                        setState(() {});
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        }
+      } catch (e, s) {
+        log("Failed to build setting $key: $e\n$s", "ComicSourceSettings", LogLevel.error);
+      }
+    }
+
+    return widgets;
+  }
+
+  void _showInputDialog({
+    required BuildContext context,
+    required String title,
+    required String initialValue,
+    required void Function(String) onConfirm,
+  }) {
+    final controller = TextEditingController(text: initialValue);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("取消".tl),
+          ),
+          TextButton(
+            onPressed: () {
+              onConfirm(controller.text);
+              Navigator.pop(context);
+            },
+            child: Text("确定".tl),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _EditFilePage extends StatefulWidget {

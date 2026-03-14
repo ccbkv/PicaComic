@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/main.dart';
-import 'package:pica_comic/tools/font_manager.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/font_manager.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 class FontManagementPage extends StatefulWidget {
   const FontManagementPage({super.key});

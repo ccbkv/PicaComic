@@ -15,7 +15,7 @@ import 'package:pica_comic/foundation/image_loader/cached_image.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
 
 class SearchPageComicList extends StatefulWidget {
   const SearchPageComicList(

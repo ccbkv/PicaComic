@@ -5,9 +5,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/log.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/io_tools.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/io_tools.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:webdav_client/webdav_client.dart';
 
 import '../base.dart';

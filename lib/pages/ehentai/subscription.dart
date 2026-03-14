@@ -1,7 +1,7 @@
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:flutter/material.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import '../../network/eh_network/eh_main_network.dart';
 import '../../network/eh_network/eh_models.dart';
 import '../../network/res.dart';

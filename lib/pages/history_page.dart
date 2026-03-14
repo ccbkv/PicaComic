@@ -3,11 +3,11 @@ import 'package:pica_comic/network/eh_network/eh_main_network.dart';
 import 'package:pica_comic/network/jm_network/jm_image.dart';
 import 'package:pica_comic/network/picacg_network/models.dart';
 import 'package:pica_comic/pages/comic_page.dart';
-import 'package:pica_comic/tools/time.dart';
+import 'package:pica_comic/utils/time.dart';
 import 'package:pica_comic/foundation/history.dart';
 import '../base.dart';
 import '../foundation/app.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 

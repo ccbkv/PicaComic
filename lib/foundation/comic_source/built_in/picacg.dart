@@ -16,7 +16,7 @@ import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
 import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/pages/settings/user_comments_page.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 import '../comic_source.dart';
 

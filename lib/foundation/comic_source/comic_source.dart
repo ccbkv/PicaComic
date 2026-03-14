@@ -12,11 +12,11 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/update.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import '../base.dart';
-import '../foundation/js_engine.dart';
-import '../network/base_comic.dart';
-import '../network/res.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import '../../base.dart';
+import '../../foundation/js_engine.dart';
+import '../../network/base_comic.dart';
+import '../../network/res.dart';
 import 'built_in/ehentai.dart';
 import 'built_in/hitomi.dart';
 import 'built_in/ht_manga.dart';
@@ -55,6 +55,9 @@ class ComicSource {
   static final builtIn = [picacg, ehentai, jm, hitomi, htManga, nhentai];
 
   static List<ComicSource> sources = [];
+
+  /// Available updates for comic sources. key: source key, value: new version
+  static Map<String, String> updates = {};
 
   static ComicSource? find(String key) =>
       sources.firstWhereOrNull((element) => element.key == key);
@@ -125,6 +128,9 @@ class ComicSource {
 
   /// Settings.
   final List<SettingItem> settings;
+
+  /// Venera format settings - stores raw settings from JS for loadSetting API
+  final Map<String, dynamic> veneraSettings;
 
   /// Load comic info.
   final LoadComicFunc? loadComicInfo;
@@ -226,7 +232,8 @@ class ComicSource {
       this.version,
       this.commentsLoader,
       this.sendCommentFunc,
-      this.enableTagsTranslate)
+      this.enableTagsTranslate,
+      {this.veneraSettings = const {}})
       : initData = null,
         comicTileBuilderOverride = null,
         idMatcher = null,
@@ -257,6 +264,7 @@ class ComicSource {
     this.idMatcher,
     this.comicPageBuilder,
     this.enableTagsTranslate = true,
+    this.veneraSettings = const {},
   });
 
   ComicSource.unknown(this.key)
@@ -268,6 +276,7 @@ class ComicSource {
         explorePages = [],
         searchPageData = null,
         settings = [],
+        veneraSettings = const {},
         loadComicInfo = null,
         loadComicPages = null,
         getImageLoadingConfig = null,

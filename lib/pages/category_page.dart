@@ -1,13 +1,13 @@
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:flutter/material.dart';
 import 'package:pica_comic/pages/ranking_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
 import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/base.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class AllCategoryPage extends StatefulWidget {
@@ -265,6 +265,16 @@ class CategoryPage extends StatelessWidget {
             ],
           );
         }));
+      } else if (part.categoryItems != null) {
+        // Venera format with CategoryItems
+        children.add(buildTitle(part.title));
+        children.add(
+          buildCategoryItems(
+            part.categoryItems!,
+            part.title,
+            data.key,
+          ),
+        );
       } else {
         children.add(buildTitle(part.title));
         children.add(
@@ -344,6 +354,59 @@ class CategoryPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Build category items with PageJumpTarget support (venera format)
+  Widget buildCategoryItems(
+    List<CategoryItem> items,
+    String? namespace,
+    String categoryKey,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: items.map((item) {
+          return buildTag(
+            item.label,
+            (tag, param) {
+              if (item.target != null) {
+                handlePageJumpTarget(item.target!, categoryKey);
+              } else {
+                // Fallback to default behavior
+                handleClick(tag, param, "category", namespace ?? "", categoryKey);
+              }
+            },
+            namespace,
+            null,
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  /// Handle PageJumpTarget navigation
+  void handlePageJumpTarget(PageJumpTarget target, String categoryKey) {
+    var context = App.mainNavigatorKey!.currentContext!;
+    var page = target.page;
+    var attrs = target.attributes;
+
+    if (page == "search") {
+      var keyword = attrs?["text"] ?? attrs?["keyword"] ?? "";
+      context.to(() => SearchResultPage(
+            keyword: keyword,
+            sourceKey: findComicSourceKey(),
+          ));
+    } else if (page == "category") {
+      var category = attrs?["category"] ?? "";
+      var param = attrs?["param"];
+      context.to(() => CategoryComicsPage(
+            category: category,
+            categoryKey: categoryKey,
+            param: param,
+          ));
+    }
   }
 
   Widget buildTag(String tag, ClickTagCallback onClick,

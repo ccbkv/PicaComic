@@ -1,6 +1,6 @@
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/log.dart';
-import 'package:pica_comic/tools/extensions.dart';
+import 'package:pica_comic/utils/extensions.dart';
 import '../foundation/app.dart';
 import '../pages/ehentai/eh_gallery_page.dart';
 import '../pages/hitomi/hitomi_comic_page.dart';

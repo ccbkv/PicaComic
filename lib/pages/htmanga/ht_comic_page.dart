@@ -1,4 +1,4 @@
-import 'package:pica_comic/comic_source/built_in/ht_manga.dart';
+import 'package:pica_comic/foundation/comic_source/built_in/ht_manga.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:flutter/material.dart';
 import 'package:pica_comic/network/download.dart';
@@ -8,10 +8,10 @@ import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/tools/extensions.dart';
+import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/components/components.dart';
 
 class HtComicPage extends BaseComicPage<HtComicInfo> {

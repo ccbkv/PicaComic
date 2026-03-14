@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
-import 'package:pica_comic/tools/app_links.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/app_links.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 import 'ehentai/subscription.dart';
 import 'jm/jm_comic_page.dart';

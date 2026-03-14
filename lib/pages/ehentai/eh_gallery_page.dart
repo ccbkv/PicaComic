@@ -1,4 +1,4 @@
-import 'package:pica_comic/comic_source/built_in/ehentai.dart';
+import 'package:pica_comic/foundation/comic_source/built_in/ehentai.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'dart:ui' as ui;
 import 'dart:math';
@@ -12,8 +12,8 @@ import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/pages/ehentai/eh_comments_page.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/network/eh_network/get_gallery_id.dart';

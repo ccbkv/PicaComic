@@ -10,7 +10,7 @@ import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:html/parser.dart';
 import 'package:pica_comic/base.dart';
-import 'package:pica_comic/comic_source/built_in/jm.dart';
+import 'package:pica_comic/foundation/comic_source/built_in/jm.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/network/cache_network.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';

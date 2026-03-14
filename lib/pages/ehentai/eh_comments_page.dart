@@ -2,16 +2,16 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
-import 'package:pica_comic/comic_source/built_in/ehentai.dart';
+import 'package:pica_comic/foundation/comic_source/built_in/ehentai.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/image_loader/cached_image.dart';
 import 'package:pica_comic/network/eh_network/eh_main_network.dart';
 import 'package:pica_comic/network/eh_network/eh_models.dart';
-import 'package:pica_comic/tools/app_links.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/time.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/app_links.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/time.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 class CommentsPageLogic extends StateController {

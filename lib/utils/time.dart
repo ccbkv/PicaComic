@@ -1,5 +1,5 @@
 import 'package:intl/intl.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 String timeToString(DateTime time){
   var current = DateTime.now();

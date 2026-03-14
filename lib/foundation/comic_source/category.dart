@@ -1,5 +1,88 @@
 part of comic_source;
 
+/// Represents a target for page navigation
+class PageJumpTarget {
+  final String sourceKey;
+  final String page;
+  final Map<String, dynamic>? attributes;
+
+  const PageJumpTarget(this.sourceKey, this.page, this.attributes);
+
+  static PageJumpTarget parse(String sourceKey, dynamic value) {
+    if (value is Map) {
+      if (value['page'] != null) {
+        return PageJumpTarget(
+          sourceKey,
+          value["page"] ?? "search",
+          value["attributes"] != null ? Map<String, dynamic>.from(value["attributes"]) : null,
+        );
+      } else if (value["action"] != null) {
+        // old version `onClickTag`
+        var page = value["action"];
+        if (page == "search") {
+          return PageJumpTarget(
+            sourceKey,
+            "search",
+            {"text": value["keyword"]},
+          );
+        } else if (page == "category") {
+          return PageJumpTarget(
+            sourceKey,
+            "category",
+            {
+              "category": value["keyword"],
+              "param": value["param"],
+            },
+          );
+        } else {
+          return PageJumpTarget(sourceKey, page, null);
+        }
+      }
+    } else if (value is String) {
+      // old version string encoding
+      var segments = value.split(":");
+      var page = segments[0];
+      if (page == "search") {
+        return PageJumpTarget(
+          sourceKey,
+          "search",
+          {"text": segments.length > 1 ? segments[1] : ""},
+        );
+      } else if (page == "category") {
+        var c = segments.length > 1 ? segments[1] : "";
+        if (c.contains('@')) {
+          var parts = c.split('@');
+          return PageJumpTarget(
+            sourceKey,
+            "category",
+            {
+              "category": parts[0],
+              "param": parts.length > 1 ? parts[1] : null,
+            },
+          );
+        } else {
+          return PageJumpTarget(
+            sourceKey,
+            "category",
+            {"category": c},
+          );
+        }
+      } else {
+        return PageJumpTarget(sourceKey, page, null);
+      }
+    }
+    return PageJumpTarget(sourceKey, "Invalid Data", null);
+  }
+}
+
+/// Category item with label and navigation target
+class CategoryItem {
+  final String label;
+  final PageJumpTarget? target;
+
+  const CategoryItem(this.label, this.target);
+}
+
 class CategoryData {
   /// The title is displayed in the tab bar.
   final String title;
@@ -39,6 +122,9 @@ abstract class BaseCategoryPart {
 
   List<String> get categories;
 
+  /// Category items with labels and targets (venera format)
+  List<CategoryItem>? get categoryItems;
+
   List<String>? get categoryParams => null;
 
   bool get enableRandom;
@@ -54,6 +140,9 @@ class FixedCategoryPart extends BaseCategoryPart {
   final List<String> categories;
 
   @override
+  final List<CategoryItem>? categoryItems;
+
+  @override
   bool get enableRandom => false;
 
   @override
@@ -67,7 +156,13 @@ class FixedCategoryPart extends BaseCategoryPart {
 
   /// A [BaseCategoryPart] that show fixed tags on category page.
   const FixedCategoryPart(this.title, this.categories, this.categoryType,
-      [this.categoryParams]);
+      [this.categoryParams])
+      : categoryItems = null;
+
+  /// Create from category items (venera format)
+  FixedCategoryPart.fromItems(this.title, this.categoryItems, this.categoryType,
+      [this.categoryParams])
+      : categories = categoryItems?.map((e) => e.label).toList() ?? [];
 }
 
 class RandomCategoryPart extends BaseCategoryPart {
@@ -83,6 +178,9 @@ class RandomCategoryPart extends BaseCategoryPart {
 
   @override
   final String categoryType;
+
+  @override
+  List<CategoryItem>? get categoryItems => null;
 
   List<String> _categories() {
     if (randomNumber >= tags.length) {
@@ -112,6 +210,9 @@ class RandomCategoryPartWithRuntimeData extends BaseCategoryPart {
 
   @override
   final String categoryType;
+
+  @override
+  List<CategoryItem>? get categoryItems => null;
 
   static final random = math.Random();
 

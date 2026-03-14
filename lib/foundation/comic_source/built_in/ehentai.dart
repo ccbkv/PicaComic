@@ -16,10 +16,10 @@ import 'package:pica_comic/pages/ehentai/accounts.dart';
 import 'package:pica_comic/pages/ehentai/eh_gallery_page.dart';
 import 'package:pica_comic/pages/ehentai/eh_login_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
+import 'package:pica_comic/utils/translations.dart';
 
-import '../../base.dart';
+import '../../../base.dart';
 import '../comic_source.dart';
 
 final ehentai = ComicSource.named(

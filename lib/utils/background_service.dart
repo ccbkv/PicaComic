@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
-import 'package:pica_comic/comic_source/built_in/picacg.dart';
+import 'package:pica_comic/foundation/comic_source/built_in/picacg.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:workmanager/workmanager.dart';
 import '../base.dart';

@@ -14,9 +14,9 @@ import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/hitomi/hitomi_search.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/tools/extensions.dart';
-//import 'package:pica_comic/tools/tags_translation.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/extensions.dart';
+//import 'package:pica_comic/utils/tags_translation.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 class HitomiComicPage extends BaseComicPage<HitomiComic> {
   HitomiComicPage(HitomiComicBrief comic, {super.key})

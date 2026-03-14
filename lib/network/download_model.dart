@@ -5,10 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/foundation/log.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/file_type.dart';
-import 'package:pica_comic/tools/io_extensions.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/file_type.dart';
+import 'package:pica_comic/utils/io_extensions.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 import '../base.dart';
 import 'app_dio.dart';

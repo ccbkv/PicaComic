@@ -5,7 +5,7 @@ import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/network/cookie_jar.dart';
 import 'package:pica_comic/pages/webview.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 import '../components/components.dart';
 

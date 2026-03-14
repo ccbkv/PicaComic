@@ -1,5 +1,5 @@
 import 'package:pica_comic/network/nhentai_network/tags.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
 
 import 'comic_source.dart';
 

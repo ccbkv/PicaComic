@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/base.dart';
-import 'package:pica_comic/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/comment.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/components/select_download_eps.dart';
@@ -23,8 +23,8 @@ import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/favorites/local_favorites.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/tools/tags_translation.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'show_image_page.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shimmer_animation/shimmer_animation.dart';
@@ -868,6 +868,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                     controller: logic.controller,
                     slivers: [
                       buildComicInfo(logic, context),
+                      buildActions(logic, context).toSliver(),
                       buildTags(logic, context),
                       ...buildEpisodeInfo(context),
                       ...buildIntroduction(context),
@@ -903,6 +904,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                   slivers: [
                     buildTitle(logic),
                     buildComicInfo(logic, context),
+                    buildActions(logic, context).toSliver(),
                     buildTags(logic, context),
                     ...buildEpisodeInfo(context),
                     ...buildIntroduction(context),
@@ -1090,16 +1092,12 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                           child: Text("${pages}P",
                               style: const TextStyle(fontSize: 12)),
                         ),
-                      if (width >= 500)
-                        buildActions(logic, context, false).paddingTop(12),
                     ],
                   ),
                 )
               ],
             ),
           ).paddingHorizontal(10).paddingBottom(12),
-          if (width < 500)
-            buildActions(logic, context, true).paddingHorizontal(12),
         ],
       );
     });
@@ -1325,7 +1323,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
     );
   }
 
-  Widget buildActions(ComicPageLogic logic, BuildContext context, bool center) {
+  Widget buildActions(ComicPageLogic logic, BuildContext context) {
     if (logic.loading) {
       if (App.isFluent) return const fluent.ProgressBar();
       return Container(
@@ -1341,192 +1339,196 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
       );
     }
 
-    Widget buildItem(String title, IconData icon, VoidCallback onTap,
-        [VoidCallback? onLongPress]) {
-      if (App.isFluent) {
-        return Padding(
-          padding: const EdgeInsets.all(4.0),
-          child: fluent.Button(
-            onPressed: onTap,
-            onLongPress: onLongPress,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 20),
-                const SizedBox(height: 4),
-                Text(title, style: const TextStyle(fontSize: 12)),
-              ],
-            ),
-          ),
-        );
-      }
-      return InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        borderRadius: const BorderRadius.all(Radius.circular(8)),
-        child: SizedBox(
-          height: 72,
-          width: 64,
-          child: Column(
-            children: [
-              const SizedBox(
-                height: 12,
-              ),
-              Icon(
-                icon,
-                size: 24,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(
-                height: 8,
-              ),
-              Text(
-                title,
-                style: const TextStyle(fontSize: 12),
-              )
-            ],
-          ),
-        ),
-      );
-    }
-
     final width = MediaQuery.of(context).size.width;
+    bool isMobile = width < changePoint;
+    bool hasHistory = logic.history != null && 
+        (logic.history!.ep > 1 || logic.history!.page > 1);
 
-    return SizedBox(
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: UiMode.m1(context)
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            alignment: center ? WrapAlignment.center : WrapAlignment.start,
+    return Column(
+      children: [
+        SizedBox(
+          height: 45,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 5),
             children: [
-              if (logic.history != null && width >= 500)
-                buildItem(
-                    "继续阅读".tl, Icons.menu_book, () => read(logic.history)),
-              if (width >= 500 || (width < 500 && logic.history != null))
-                buildItem(
-                    "从头开始".tl, Icons.not_started_outlined, () => read(null)),
-              buildItem("分享".tl, Icons.share, () {
-                var text = title!;
-                if (url != null) {
-                  text += ":$url";
-                }
-                Share.share(text);
-              }),
-              buildItem(
-                  favorite ? "已收藏".tl : "收藏".tl,
-                  favorite
-                      ? Icons.collections_bookmark
-                      : Icons.collections_bookmark_outlined,
-                  openFavoritePanel, () {
-                var folder = appdata.settings[51];
-                if (LocalFavoritesManager().folderNames.contains(folder)) {
-                  LocalFavoritesManager()
-                      .addComic(folder, toLocalFavoriteItem());
-                  showToast(message: "已收藏".tl);
-                }
-              }),
-              if (width >= 500) buildItem("下载".tl, Icons.download, download),
+              if (hasHistory && !isMobile)
+                _ActionButton(
+                  icon: const Icon(Icons.menu_book),
+                  text: '继续'.tl,
+                  onPressed: () => read(logic.history),
+                  iconColor: _useTextColor(context, Colors.yellow),
+                ),
+              if (!isMobile || hasHistory)
+                _ActionButton(
+                  icon: const Icon(Icons.play_circle_outline),
+                  text: hasHistory ? '开始'.tl : '开始'.tl,
+                  onPressed: () => read(null),
+                  iconColor: _useTextColor(context, Colors.orange),
+                ),
+              if (!isMobile && !downloadManager.isExists(downloadedId))
+                _ActionButton(
+                  icon: const Icon(Icons.download),
+                  text: '下载'.tl,
+                  onPressed: download,
+                  iconColor: _useTextColor(context, Colors.cyan),
+                ),
               if (onLike != null)
-                buildItem(likeCount ?? "喜欢".tl,
-                    isLiked ? Icons.favorite : Icons.favorite_border, onLike!),
+                _ActionButton(
+                  icon: const Icon(Icons.favorite_border),
+                  activeIcon: const Icon(Icons.favorite),
+                  isActive: isLiked,
+                  text: likeCount ?? '喜欢'.tl,
+                  onPressed: onLike!,
+                  iconColor: _useTextColor(context, Colors.red),
+                ),
+              _ActionButton(
+                icon: const Icon(Icons.bookmark_outline_outlined),
+                activeIcon: const Icon(Icons.bookmark),
+                isActive: favorite,
+                text: favorite ? '已收藏'.tl : '收藏'.tl,
+                onPressed: openFavoritePanel,
+                onLongPressed: () {
+                  var folder = appdata.settings[51];
+                  if (LocalFavoritesManager().folderNames.contains(folder)) {
+                    LocalFavoritesManager()
+                        .addComic(folder, toLocalFavoriteItem());
+                    showToast(message: "已收藏".tl);
+                  }
+                },
+                iconColor: _useTextColor(context, Colors.purple),
+              ),
               if (openComments != null)
-                buildItem(commentsCount ?? "评论".tl, Icons.comment_outlined,
-                    openComments!),
+                _ActionButton(
+                  icon: const Icon(Icons.comment),
+                  text: commentsCount ?? '评论'.tl,
+                  onPressed: openComments!,
+                  iconColor: _useTextColor(context, Colors.green),
+                ),
+              _ActionButton(
+                icon: const Icon(Icons.share),
+                text: '分享'.tl,
+                onPressed: () {
+                  var text = title!;
+                  if (url != null) {
+                    text += ":$url";
+                  }
+                  Share.share(text);
+                },
+                iconColor: _useTextColor(context, Colors.blue),
+              ),
               if (searchSimilar != null)
-                buildItem("相似".tl, Icons.search, searchSimilar!),
+                _ActionButton(
+                  icon: const Icon(Icons.search),
+                  text: '相似'.tl,
+                  onPressed: searchSimilar!,
+                  iconColor: _useTextColor(context, Colors.indigo),
+                ),
               if (downloadManager.isExists(downloadedId))
-                Flyout(
-                  enableTap: true,
-                  navigator: App.navigatorKey.currentState!,
-                  withInkWell: true,
-                  borderRadius: 8,
-                  flyoutBuilder: (context) => FlyoutContent(
-                    title: "从本地下载中删除?".tl,
-                    actions: [
-                      TextButton(
-                        onPressed: () async {
-                          Navigator.of(context).pop();
-                          await downloadManager.delete([downloadedId]);
-                          showToast(message: "已删除".tl);
-                          logic.update();
-                          StateController.findOrNull(tag: "me_page_downloads")
-                              ?.update();
-                        },
-                        child: Text("删除".tl),
+                _ActionButton(
+                  icon: const Icon(Icons.delete_outline),
+                  text: '删除'.tl,
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text("从本地下载中删除?".tl),
+                        actions: [
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.of(context).pop();
+                              await downloadManager.delete([downloadedId]);
+                              showToast(message: "已删除".tl);
+                              logic.update();
+                              StateController.findOrNull(tag: "me_page_downloads")
+                                  ?.update();
+                            },
+                            child: Text("删除".tl),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: Text("取消".tl),
+                          ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        child: Text("取消".tl),
-                      ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    height: 72,
-                    width: 64,
-                    child: Column(
-                      children: [
-                        const SizedBox(
-                          height: 12,
-                        ),
-                        Icon(
-                          Icons.delete_outline,
-                          size: 24,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(
-                          height: 8,
-                        ),
-                        Text(
-                          "删除下载".tl,
-                          style: const TextStyle(fontSize: 12),
-                        )
-                      ],
-                    ),
-                  ),
+                    );
+                  },
+                  iconColor: _useTextColor(context, Colors.red),
                 ),
             ],
           ),
-          if (width < 500)
-            SizedBox(
-              height: 48,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: App.isFluent
-                        ? fluent.FilledButton(
-                            onPressed: download,
-                            child: Text("下载".tl),
-                          )
-                        : FilledButton.tonal(
-                            onPressed: download,
-                            child: Text("下载".tl),
-                          ),
+        ),
+        if (isMobile)
+          SizedBox(
+            height: 45,
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: download,
+                    child: Text("下载".tl),
                   ),
-                  const SizedBox(
-                    width: 16,
-                  ),
-                  Expanded(
-                    child: App.isFluent
-                        ? fluent.FilledButton(
-                            onPressed: () => read(_logic.history),
-                            child: Text("阅读".tl),
-                          )
-                        : FilledButton.tonal(
-                            onPressed: () => read(_logic.history),
-                            child: Text("阅读".tl),
-                          ),
-                  ),
-                ],
-              ),
-            ).paddingHorizontal(8)
-        ],
-      ),
-    );
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: hasHistory
+                      ? FilledButton(
+                          onPressed: () => read(logic.history),
+                          child: Text("继续".tl),
+                        )
+                      : FilledButton(
+                          onPressed: () => read(null),
+                          child: Text("开始".tl)),
+                ),
+              ],
+            ),
+          ).paddingHorizontal(16).paddingVertical(8),
+        if (logic.history != null)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.history, color: _useTextColor(context, Colors.teal)),
+                const SizedBox(width: 8),
+                Builder(
+                  builder: (context) {
+                    bool haveChapter = eps != null;
+                    var page = logic.history!.page;
+                    var ep = logic.history!.ep;
+                    String text;
+                    if (haveChapter) {
+                      var epName = "E$ep";
+                      try {
+                        epName = eps!.eps[math.min(ep - 1, eps!.eps.length - 1)];
+                      } catch (e) {
+                        // ignore
+                      }
+                      text = "${"上次阅读".tl}: $epName P$page";
+                    } else {
+                      text = "${"上次阅读".tl}: P$page";
+                    }
+                    return Text(text);
+                  },
+                ),
+                const SizedBox(width: 4),
+              ],
+            ),
+          ).toAlign(Alignment.centerLeft),
+      ],
+    ).paddingTop(16);
+  }
+
+  Color _useTextColor(BuildContext context, MaterialColor color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? color[100]! : color[800]!;
   }
 
   Widget buildTags(ComicPageLogic logic, BuildContext context) {
@@ -1875,6 +1877,76 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
         useSurfaceTintColor: true,
       );
     }
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.text,
+    required this.onPressed,
+    this.onLongPressed,
+    this.activeIcon,
+    this.isActive,
+    this.isLoading,
+    this.iconColor,
+  });
+
+  final Widget icon;
+
+  final Widget? activeIcon;
+
+  final bool? isActive;
+
+  final String text;
+
+  final void Function() onPressed;
+
+  final bool? isLoading;
+
+  final Color? iconColor;
+
+  final void Function()? onLongPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+          width: 0.6,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          if (!(isLoading ?? false)) {
+            onPressed();
+          }
+        },
+        onLongPress: onLongPressed,
+        borderRadius: BorderRadius.circular(18),
+        child: IconTheme.merge(
+          data: IconThemeData(size: 20, color: iconColor),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isLoading ?? false)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 1.8),
+                )
+              else
+                (isActive ?? false) ? (activeIcon ?? icon) : icon,
+              const SizedBox(width: 8),
+              Text(text),
+            ],
+          ).paddingHorizontal(16),
+        ),
+      ),
+    );
   }
 }
 

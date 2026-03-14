@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/components/components.dart';
 import '../../foundation/app.dart';
 import '../../foundation/local_favorites.dart';

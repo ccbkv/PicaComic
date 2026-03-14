@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pica_comic/components/comment.dart';
 import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/components/components.dart';
 
 class NhentaiCommentsPage extends StatefulWidget {

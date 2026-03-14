@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:dio/dio.dart';
-import 'package:pica_comic/comic_source/built_in/ht_manga.dart';
+import 'package:pica_comic/foundation/comic_source/built_in/ht_manga.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/cache_network.dart';
@@ -11,8 +11,8 @@ import 'package:pica_comic/network/app_dio.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:html/parser.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
-import 'package:pica_comic/tools/extensions.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/network/cloudflare.dart';
 import '../../base.dart';
 

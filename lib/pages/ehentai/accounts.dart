@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/network/eh_network/eh_main_network.dart';
-import 'package:pica_comic/tools/translations.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 class CookieManagementView extends StatefulWidget {
   const CookieManagementView({super.key});

@@ -1366,7 +1366,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                   onPressed: () => read(null),
                   iconColor: _useTextColor(context, Colors.orange),
                 ),
-              if (!isMobile && !downloadManager.isExists(downloadedId))
+              if (!isMobile)
                 _ActionButton(
                   icon: const Icon(Icons.download),
                   text: '下载'.tl,

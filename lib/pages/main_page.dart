@@ -10,7 +10,7 @@ import 'package:pica_comic/utils/translations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'category_page.dart';
 import 'explore_page.dart';
-import 'favorites/main_favorites_page.dart';
+import 'favorites/favorites_page.dart';
 import 'pre_search_page.dart';
 import 'settings/settings_page.dart';
 import 'package:url_launcher/url_launcher_string.dart';

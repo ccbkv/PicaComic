@@ -159,6 +159,29 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
         );
       }
 
+      if (widget is SliverAppBar) {
+        return AppBar(
+          leading: widget.leading,
+          title: widget.title,
+          actions: widget.actions,
+          backgroundColor: widget.backgroundColor,
+          elevation: widget.elevation,
+          scrolledUnderElevation: widget.scrolledUnderElevation,
+          shadowColor: widget.shadowColor,
+          surfaceTintColor: widget.surfaceTintColor,
+          foregroundColor: widget.foregroundColor,
+          iconTheme: widget.iconTheme,
+          actionsIconTheme: widget.actionsIconTheme,
+          centerTitle: widget.centerTitle,
+          titleSpacing: widget.titleSpacing,
+          toolbarHeight: widget.toolbarHeight,
+          leadingWidth: widget.leadingWidth,
+          toolbarTextStyle: widget.toolbarTextStyle,
+          titleTextStyle: widget.titleTextStyle,
+          systemOverlayStyle: widget.systemOverlayStyle,
+        );
+      }
+
       return widget;
     }
 

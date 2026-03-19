@@ -408,7 +408,11 @@ class JmNetwork {
     }
     try {
       var list = PromoteList(id, []);
-      list.total = int.parse(res.data["total"]);
+      Object total = res.data["total"];
+      if (total is String) {
+        total = int.parse(total);
+      }
+      list.total = total as int;
       for (var comic in (res.data["list"])) {
         var categories = <ComicCategoryInfo>[];
         if (comic["category"]["id"] != null &&
@@ -579,11 +583,14 @@ class JmNetwork {
           //跳过
         }
       });
+      Object total = res.data["total"];
+      if (total is String) {
+        total = int.parse(total);
+      }
       return Res(comics,
           subData: comics.isEmpty
               ? 0
-              : (int.parse(res.data["total"]) / res.data["content"].length)
-                  .ceil());
+              : ((total as int) / res.data["content"].length).ceil());
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analysis", "$e\n$s");
       Future.delayed(const Duration(microseconds: 500),
@@ -812,9 +819,13 @@ class JmNetwork {
         comics.add(JmComicBrief(comic["id"], comic["author"], comic["name"],
             comic["description"] ?? "", categories));
       }
+      Object total = res.data["total"];
+      if (total is String) {
+        total = int.parse(total);
+      }
       int pages;
       if (comics.isNotEmpty) {
-        pages = (int.parse(res.data["total"]) / comics.length).ceil();
+        pages = ((total as int) / comics.length).ceil();
       } else {
         pages = 0;
       }

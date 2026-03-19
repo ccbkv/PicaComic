@@ -2,7 +2,7 @@ part of pica_settings;
 
 class MultiPagesFilter extends StatefulWidget {
   const MultiPagesFilter(this.title, this.settingsIndex, this.pages,
-      {super.key, this.onChange});
+      {super.key, this.onChange, this.helpContent});
 
   final String title;
 
@@ -12,6 +12,8 @@ class MultiPagesFilter extends StatefulWidget {
   final Map<String, String> pages;
 
   final VoidCallback? onChange;
+
+  final String? helpContent;
 
   @override
   State<MultiPagesFilter> createState() => _MultiPagesFilterState();
@@ -74,6 +76,31 @@ class _MultiPagesFilterState extends State<MultiPagesFilter> {
     return PopUpWidgetScaffold(
       title: widget.title,
       tailing: [
+        if (widget.helpContent != null)
+          Tooltip(
+            message: "帮助".tl,
+            child: IconButton(
+              icon: const Icon(Icons.help_outline),
+              onPressed: () {
+                final helpParts = widget.helpContent!.split('\n');
+                final helpTitle = helpParts[0];
+                final helpBody = helpParts.length > 1 ? helpParts[1] : '';
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(helpTitle),
+                    content: Text(helpBody),
+                    actions: [
+                      FilledButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text("确定".tl),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         if (keys.length < widget.pages.length)
           IconButton(onPressed: showAddDialog, icon: const Icon(Icons.add))
       ],

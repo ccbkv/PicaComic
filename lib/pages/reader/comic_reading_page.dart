@@ -177,7 +177,7 @@ class ComicReadingPage extends StatelessWidget {
         if (logic.order == readingData.eps?.length &&
             logic.index == logic.length) {
           history?.ep = 0;
-          history?.page = 0;
+          history?.page = logic.length;
         } else {
           history?.ep = logic.order;
           history?.page = logic.index;
@@ -187,6 +187,9 @@ class ComicReadingPage extends StatelessWidget {
       if (logic!.index == 1) {
         history?.ep = 0;
         history?.page = 0;
+      } else if (logic.index == logic.length) {
+        history?.ep = 0;
+        history?.page = logic.length;
       } else {
         history?.ep = 1;
         history?.page = logic.index;

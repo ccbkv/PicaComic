@@ -1189,8 +1189,8 @@ Future<void> checkFolder(String name) async {
                           const SizedBox(
                             height: 12,
                           ),
-                          Text("Unavailable: $unavailableNum"),
-                          Text("Network Error: $networkError"),
+                          Text("无效收藏: $unavailableNum"),
+                          Text("网络错误: $networkError"),
                         ],
                       ),
                     ),

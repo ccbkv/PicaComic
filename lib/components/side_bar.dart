@@ -382,13 +382,13 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
             color: Theme.of(context).colorScheme.secondary,
           ),
           const SizedBox(width: 12),
-          Text("Local".tl),
+          Text("本地".tl),
           const Spacer(),
           MenuButton(
             entries: [
               DesktopMenuEntry(
                 icon: Icons.add,
-                text: 'Create Folder'.tl,
+                text: '创建收藏夹'.tl,
                 onClick: () {
                   newFolder().then((value) {
                     setState(() {
@@ -399,7 +399,7 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
               ),
               DesktopMenuEntry(
                 icon: Icons.reorder,
-                text: 'Sort'.tl,
+                text: '排序'.tl,
                 onClick: () {
                   sortFolders().then((value) {
                     setState(() {
@@ -434,7 +434,7 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
             color: Theme.of(context).colorScheme.secondary,
           ),
           const SizedBox(width: 12),
-          Text("Network".tl),
+          Text("网络".tl),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.settings),

@@ -94,8 +94,11 @@ class _AppWebviewState extends State<AppWebview> {
   late var future = _createWebviewEnvironment();
 
   Future<bool> _createWebviewEnvironment() async {
-    var proxy = appdata.settings[58].toString();
-    if (!App.isWindows && proxy != "system" && proxy != "direct") {
+    // 获取代理设置 - 使用索引 [8]
+    var proxy = appdata.settings[8].toString();
+    // 只在 Android 平台处理代理设置，iOS 不支持 WebViewFeature API
+    // 并且只处理非系统代理和非直连的情况
+    if (App.isAndroid && proxy != "system" && proxy != "direct" && proxy != "0" && proxy.isNotEmpty) {
       var proxyAvailable = await WebViewFeature.isFeatureSupported(
         WebViewFeature.PROXY_OVERRIDE,
       );

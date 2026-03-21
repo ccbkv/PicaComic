@@ -31,17 +31,7 @@ void openTool() {
           title: Text("图片搜索 [搜图bot酱]".tl),
           onTap: () async {
             App.globalBack();
-            if (App.isMobile) {
-              App.mainNavigatorKey?.currentContext?.to(
-                () => AppWebview(
-                  initialUrl: "https://soutubot.moe/",
-                  onNavigation: (uri) {
-                    return handleAppLinks(Uri.parse(uri),
-                        showMessageWhenError: false);
-                  },
-                ),
-              );
-            } else {
+            if (App.isLinux) {
               var webview = DesktopWebview(
                 initialUrl: "https://soutubot.moe/",
                 onNavigation: (s, webview) {
@@ -52,6 +42,16 @@ void openTool() {
                 },
               );
               webview.open();
+            } else {
+              await App.globalTo(
+                () => AppWebview(
+                  initialUrl: "https://soutubot.moe/",
+                  onNavigation: (uri, controller) {
+                    return handleAppLinks(Uri.parse(uri),
+                        showMessageWhenError: false);
+                  },
+                ),
+              );
             }
           },
           trailing: const Icon(Icons.open_in_new)
@@ -61,17 +61,7 @@ void openTool() {
           title: Text("图片搜索 [SauceNAO]".tl),
           onTap: () async {
             App.globalBack();
-            if (App.isMobile || App.isMacOS) {
-              App.mainNavigatorKey?.currentContext?.to(
-                () => AppWebview(
-                  initialUrl: "https://saucenao.com/",
-                  onNavigation: (uri) {
-                    return handleAppLinks(Uri.parse(uri),
-                        showMessageWhenError: false);
-                  },
-                ),
-              );
-            } else {
+            if (App.isLinux) {
               var webview = DesktopWebview(
                 initialUrl: "https://saucenao.com/",
                 onNavigation: (s, webview) {
@@ -82,6 +72,16 @@ void openTool() {
                 },
               );
               webview.open();
+            } else {
+              await App.globalTo(
+                () => AppWebview(
+                  initialUrl: "https://saucenao.com/",
+                  onNavigation: (uri, controller) {
+                    return handleAppLinks(Uri.parse(uri),
+                        showMessageWhenError: false);
+                  },
+                ),
+              );
             }
           },
           trailing: const Icon(Icons.open_in_new)

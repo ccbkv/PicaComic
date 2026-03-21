@@ -10,7 +10,7 @@ import 'package:pica_comic/utils/translations.dart';
 
 void nhLogin(void Function() onFinished) async{
 
-  if(App.isDesktop && (await DesktopWebview.isAvailable())){
+  if(App.isLinux) {
     var webview = DesktopWebview(
       initialUrl: "${NhentaiNetwork().baseUrl}/login/?next=/",
       onTitleChange: (title, controller) async{
@@ -24,16 +24,18 @@ void nhLogin(void Function() onFinished) async{
           }
           var cookies = await controller.getCookies("${NhentaiNetwork().baseUrl}/");
           List<io.Cookie> cookiesList = [];
-          cookies.forEach((key, value) {
-            var cookie = io.Cookie(key, value);
-            if(key == "sessionid" || key == "XSRF-TOKEN"){
-              NhentaiNetwork().logged = true;
-            }
-            cookie.domain = ".nhentai.net";
-            if (key != "cf_clearance") {
-              cookiesList.add(cookie);
-            }
-          });
+          if (cookies != null) {
+            cookies.forEach((key, value) {
+              var cookie = io.Cookie(key, value);
+              if(key == "sessionid" || key == "XSRF-TOKEN"){
+                NhentaiNetwork().logged = true;
+              }
+              cookie.domain = ".nhentai.net";
+              if (key != "cf_clearance") {
+                cookiesList.add(cookie);
+              }
+            });
+          }
           NhentaiNetwork().cookieJar!.saveFromResponse(
               Uri.parse(NhentaiNetwork().baseUrl), cookiesList);
           onFinished();
@@ -42,8 +44,8 @@ void nhLogin(void Function() onFinished) async{
       },
     );
     webview.open();
-  } else if(App.isMobile) {
-    App.globalTo(() => AppWebview(
+  } else {
+    await App.globalTo(() => AppWebview(
       initialUrl: "${NhentaiNetwork().baseUrl}/login/?next=/",
       singlePage: true,
       onTitleChange: (title, controller) async{
@@ -53,26 +55,21 @@ void nhLogin(void Function() onFinished) async{
             appdata.implicitData[3] = ua;
             appdata.writeImplicitData();
           }
-          var cookies = await controller.getCookies("${NhentaiNetwork().baseUrl}/") ?? {};
-          List<io.Cookie> cookiesList = [];
-          cookies.forEach((key, value) {
-            var cookie = io.Cookie(key, value);
-            if(key == "sessionid" || key == "XSRF-TOKEN"){
-              NhentaiNetwork().logged = true;
+          var cookiesList = await controller.getCookies("${NhentaiNetwork().baseUrl}/");
+          if (cookiesList != null) {
+            for (var cookie in cookiesList) {
+              if(cookie.name == "sessionid" || cookie.name == "XSRF-TOKEN"){
+                NhentaiNetwork().logged = true;
+              }
+              cookie.domain = ".nhentai.net";
             }
-            cookie.domain = ".nhentai.net";
-            if (key != "cf_clearance") {
-              cookiesList.add(cookie);
-            }
-          });
-          NhentaiNetwork().cookieJar!.saveFromResponse(
-              Uri.parse(NhentaiNetwork().baseUrl), cookiesList);
+            NhentaiNetwork().cookieJar!.saveFromResponse(
+                Uri.parse(NhentaiNetwork().baseUrl), cookiesList);
+          }
           onFinished();
           App.globalBack();
         }
       },
     ));
-  } else {
-    showToast(message: "当前设备不支持".tl);
   }
 }

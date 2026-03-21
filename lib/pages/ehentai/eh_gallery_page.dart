@@ -147,6 +147,7 @@ class EhGalleryPage extends BaseComicPage<Gallery> {
     if (namespace != "") {
       tag = "$namespace:$tag";
     }
+    HistoryManager.addSearchHistory(tag);
     context.to(() => SearchResultPage(
           keyword: tag,
           sourceKey: "ehentai",

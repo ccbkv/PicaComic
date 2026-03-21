@@ -148,6 +148,7 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
   @override
   void tapOnTag(String tag, String key) {
     if (data!.categories.contains(tag)) {
+      HistoryManager.addSearchHistory(tag);
       context.to(
         () => CategoryComicsPage(
           category: tag,
@@ -155,6 +156,7 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
         ),
       );
     } else if (data!.author == tag) {
+      HistoryManager.addSearchHistory(tag);
       context.to(
         () => CategoryComicsPage(
           category: tag,
@@ -163,6 +165,7 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
         ),
       );
     } else {
+      HistoryManager.addSearchHistory(tag);
       context.to(
         () => SearchResultPage(
           keyword: tag,

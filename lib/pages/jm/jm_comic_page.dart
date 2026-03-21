@@ -169,10 +169,13 @@ class JmComicPage extends BaseComicPage<JmComicInfo> {
       };
 
   @override
-  void tapOnTag(String tag, String key) => context.to(() => SearchResultPage(
-        keyword: tag,
-        sourceKey: "jm",
-      ));
+  void tapOnTag(String tag, String key) {
+    HistoryManager.addSearchHistory(tag);
+    context.to(() => SearchResultPage(
+          keyword: tag,
+          sourceKey: "jm",
+        ));
+  }
 
   @override
   void onTagLongPress(String tag) {

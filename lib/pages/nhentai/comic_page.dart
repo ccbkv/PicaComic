@@ -204,6 +204,7 @@ class NhentaiComicPage extends BaseComicPage<NhentaiComic> {
     };
 
     if (categoryParam == null) {
+      HistoryManager.addSearchHistory(tag);
       context.to(
         () => SearchResultPage(
           keyword: tag,
@@ -211,6 +212,7 @@ class NhentaiComicPage extends BaseComicPage<NhentaiComic> {
         ),
       );
     } else {
+      HistoryManager.addSearchHistory(tag);
       context.to(
         () => CategoryComicsPage(
           category: tag,

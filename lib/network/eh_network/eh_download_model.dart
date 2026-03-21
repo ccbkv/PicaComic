@@ -109,7 +109,7 @@ class EhDownloadingItem extends DownloadingItem{
   }
 
   @override
-  Stream<DownloadProgress> downloadImage(String link) {
+  Future<Stream<DownloadProgress>> downloadImage(String link) async {
     return ImageManager().getEhImageNew(gallery, int.parse(link));
   }
 

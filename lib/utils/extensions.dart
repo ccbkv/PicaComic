@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 extension ListExtension<T> on List<T>{
   /// Remove all blank value and return the list.
   List<T> getNoBlankList(){
@@ -100,5 +102,11 @@ extension MapExtension<S, T> on Map<S, List<T>>{
 class ListOrNull{
   static List<T>? from<T>(Iterable<dynamic>? i){
     return i == null ? null : List.from(i);
+  }
+}
+
+extension ColorExt on Color {
+  Color toOpacity(double opacity) {
+    return withValues(alpha: opacity);
   }
 }

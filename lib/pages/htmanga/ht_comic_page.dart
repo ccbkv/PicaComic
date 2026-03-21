@@ -109,10 +109,13 @@ class HtComicPage extends BaseComicPage<HtComicInfo> {
       {"分类".tl: data!.category.toList(), "标签".tl: data!.tags.keys.toList()};
 
   @override
-  void tapOnTag(String tag, String key) => context.to(() => SearchResultPage(
-        keyword: tag,
-        sourceKey: sourceKey,
-      ));
+  void tapOnTag(String tag, String key) {
+    HistoryManager.addSearchHistory(tag);
+    context.to(() => SearchResultPage(
+          keyword: tag,
+          sourceKey: sourceKey,
+        ));
+  }
 
   @override
   ThumbnailsData? get thumbnailsCreator => ThumbnailsData(

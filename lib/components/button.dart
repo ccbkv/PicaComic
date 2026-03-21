@@ -433,3 +433,12 @@ class MenuButton extends StatelessWidget {
     );
   }
 }
+
+class MenuEntry {
+  final String text;
+  final IconData? icon;
+  final Color? color;
+  final void Function() onClick;
+
+  MenuEntry({required this.text, this.icon, this.color, required this.onClick});
+}

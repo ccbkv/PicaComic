@@ -393,7 +393,7 @@ class CustomReadingData extends ReadingData{
 
   @override
   String buildImageKey(int ep, int page, String url) =>
-      "$sourceKey$id${eps!.keys.elementAtOrNull(ep-1) ?? id}$url";
+      "$sourceKey$id${eps?.keys.elementAtOrNull(ep-1) ?? id}$url";
 
   @override
   FavoriteType get favoriteType => FavoriteType(source!.intKey);

@@ -28,6 +28,8 @@ import 'package:pointycastle/block/modes/cbc.dart';
 import 'package:pointycastle/block/modes/cfb.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:pointycastle/block/modes/ofb.dart';
+import 'package:pointycastle/padded_block_cipher/padded_block_cipher_impl.dart';
+import 'package:pointycastle/paddings/pkcs7.dart';
 
 
 class JavaScriptRuntimeException implements Exception {
@@ -180,6 +182,10 @@ class JsEngine with _JSEngineApi{
             {
               return _randomInt(message["min"], message["max"]);
             }
+          case "uuid":
+            {
+              return _generateUuid();
+            }
           case "cookie":
             {
               return handleCookieCallback(Map.from(message));
@@ -202,9 +208,10 @@ class JsEngine with _JSEngineApi{
       if(headers["user-agent"] == null && headers["User-Agent"] == null){
         headers["User-Agent"] = webUA;
       }
+      // Always use bytes responseType to avoid Content-Type parsing issues
       response = await _dio!.request(req["url"], data: req["data"], options: Options(
         method: req['http_method'],
-        responseType: req["bytes"] == true ? ResponseType.bytes : ResponseType.plain,
+        responseType: ResponseType.bytes,
         headers: headers
       ));
     } catch (e) {
@@ -216,8 +223,9 @@ class JsEngine with _JSEngineApi{
     response?.headers.forEach((name, values) => headers[name] = values.join(','));
 
     dynamic body = response?.data;
-    if(body is! Uint8List && body is List<int>) {
-      body = Uint8List.fromList(body);
+    if (body is List<int>) {
+      // Convert bytes to UTF-8 string for JS compatibility
+      body = utf8.decode(body, allowMalformed: true);
     }
 
     return {
@@ -343,6 +351,17 @@ mixin class _JSEngineApi{
     }
   }
 
+  Uint8List _toUint8List(dynamic value) {
+    if (value is Uint8List) {
+      return value;
+    } else if (value is String) {
+      return Uint8List.fromList(utf8.encode(value));
+    } else if (value is List) {
+      return Uint8List.fromList(value.cast<int>());
+    }
+    throw "Cannot convert ${value.runtimeType} to Uint8List";
+  }
+
   dynamic _convert(Map<String, dynamic> data) {
     String type = data["type"];
     var value = data["value"];
@@ -357,8 +376,22 @@ mixin class _JSEngineApi{
             return base64Encode(value);
           } else {
             // Convert Uint8List to regular List<int> for JS compatibility
-            var decoded = base64Decode(value);
+            // Ensure value is String for base64Decode
+            var valueStr = value is String ? value : utf8.decode(value);
+            var decoded = base64Decode(valueStr);
             return decoded.toList();
+          }
+        case "utf8":
+          if (isEncode) {
+            // String to bytes
+            if (value is String) {
+              return utf8.encode(value).toList();
+            }
+            throw "UTF8 encode requires a string";
+          } else {
+            // Bytes to string
+            var bytes = _toUint8List(value);
+            return utf8.decode(bytes, allowMalformed: true);
           }
         case "md5":
           if (value is String) {
@@ -391,8 +424,10 @@ mixin class _JSEngineApi{
         case "hmac":
           var key = data["key"];
           var hash = data["hash"];
-          // Convert key to List<int> if it's a List<dynamic>
-          if (key is List) {
+          // Convert key to List<int> if needed
+          if (key is String) {
+            key = utf8.encode(key);
+          } else if (key is List) {
             key = key.cast<int>().toList();
           }
           // Convert value to List<int> if needed
@@ -417,46 +452,57 @@ mixin class _JSEngineApi{
           }
         case "aes-ecb":
           if(!isEncode){
-            var key = data["key"];
-            var cipher = ECBBlockCipher(AESEngine());
-            cipher.init(false, KeyParameter(key));
-            return cipher.process(value).toList();
+            var key = _toUint8List(data["key"]);
+            var valueBytes = _toUint8List(value);
+            Log.info("JS Engine", "AES-ECB decrypt: key length=${key.length}, value length=${valueBytes.length}");
+            // Use PaddedBlockCipher for proper ECB mode with PKCS7 padding
+            var cipher = PaddedBlockCipherImpl(PKCS7Padding(), ECBBlockCipher(AESEngine()));
+            cipher.init(false, PaddedBlockCipherParameters(KeyParameter(key), null));
+            var decrypted = cipher.process(valueBytes);
+            Log.info("JS Engine", "AES-ECB decrypted length: ${decrypted.length}");
+            return decrypted.toList();
           }
           return null;
         case "aes-cbc":
           if(!isEncode){
-            var key = data["key"];
-            var iv = data["iv"];
-            var cipher = CBCBlockCipher(AESEngine());
-            cipher.init(false, ParametersWithIV(KeyParameter(key), iv));
-            return cipher.process(value).toList();
+            var key = _toUint8List(data["key"]);
+            var iv = _toUint8List(data["iv"]);
+            var valueBytes = _toUint8List(value);
+            // Use PaddedBlockCipher for proper CBC mode with PKCS7 padding
+            var cipher = PaddedBlockCipherImpl(PKCS7Padding(), CBCBlockCipher(AESEngine()));
+            cipher.init(false, PaddedBlockCipherParameters(ParametersWithIV(KeyParameter(key), iv), null));
+            var decrypted = cipher.process(valueBytes);
+            return decrypted.toList();
           }
           return null;
         case "aes-cfb":
           if(!isEncode){
-            var key = data["key"];
+            var key = _toUint8List(data["key"]);
             var blockSize = data["blockSize"];
+            var valueBytes = _toUint8List(value);
             var cipher = CFBBlockCipher(AESEngine(), blockSize);
             cipher.init(false, KeyParameter(key));
-            return cipher.process(value).toList();
+            return cipher.process(valueBytes).toList();
           }
           return null;
         case "aes-ofb":
           if(!isEncode){
-            var key = data["key"];
+            var key = _toUint8List(data["key"]);
             var blockSize = data["blockSize"];
+            var valueBytes = _toUint8List(value);
             var cipher = OFBBlockCipher(AESEngine(), blockSize);
             cipher.init(false, KeyParameter(key));
-            return cipher.process(value).toList();
+            return cipher.process(valueBytes).toList();
           }
           return null;
         case "rsa":
           if(!isEncode){
             var key = data["key"];
+            var valueBytes = _toUint8List(value);
             final cipher = PKCS1Encoding(RSAEngine());
             cipher.init(
                 false, PrivateKeyParameter<RSAPrivateKey>(_parsePrivateKey(key)));
-            return _processInBlocks(cipher, value).toList();
+            return _processInBlocks(cipher, valueBytes).toList();
           }
           return null;
         default:
@@ -513,5 +559,16 @@ mixin class _JSEngineApi{
 
   int _randomInt(int min, int max) {
     return (min + (max - min) * math.Random().nextDouble()).toInt();
+  }
+
+  String _generateUuid() {
+    final random = math.Random();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    // Set version (4) and variant bits
+    bytes[6] = (bytes[6] & 0x0F) | 0x40;
+    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+    // Format as UUID string
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
   }
 }

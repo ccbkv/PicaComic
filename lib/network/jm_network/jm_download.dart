@@ -130,7 +130,7 @@ class JmDownloadingItem extends DownloadingItem {
   }
 
   @override
-  Stream<DownloadProgress> downloadImage(String link) {
+  Future<Stream<DownloadProgress>> downloadImage(String link) async {
     var bookId = "";
     for (int i = link.length - 1; i >= 0; i--) {
       if (link[i] == '/') {

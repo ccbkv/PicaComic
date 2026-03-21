@@ -458,13 +458,13 @@ class _ComicDescription extends StatelessWidget {
       // Debug output for translation
       if (sourceKey != null && tags!.isNotEmpty) {
         var source = ComicSource.find(sourceKey!);
-        print("DEBUG: ComicTile checking translation for $sourceKey");
-        print("DEBUG: isBuiltIn: ${source?.isBuiltIn}, enableTagsTranslate: ${source?.enableTagsTranslate}, language: ${App.locale.languageCode}");
+        //print("DEBUG: ComicTile checking translation for $sourceKey");
+        //print("DEBUG: isBuiltIn: ${source?.isBuiltIn}, enableTagsTranslate: ${source?.enableTagsTranslate}, language: ${App.locale.languageCode}");
         if (source != null && !source.isBuiltIn && source.enableTagsTranslate && App.locale.languageCode == "zh") {
-          print("DEBUG: ComicTile translation ENABLED for $sourceKey, tags: ${tags!.length}");
-          print("DEBUG: First few tags: ${tags!.take(3).toList()}");
+          //print("DEBUG: ComicTile translation ENABLED for $sourceKey, tags: ${tags!.length}");
+          //print("DEBUG: First few tags: ${tags!.take(3).toList()}");
         } else {
-          print("DEBUG: ComicTile translation DISABLED for $sourceKey");
+          //print("DEBUG: ComicTile translation DISABLED for $sourceKey");
         }
       }
     }

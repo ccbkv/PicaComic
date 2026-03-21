@@ -41,7 +41,7 @@ final hitomi = ComicSource.named(
   comicPageBuilder: (context, id, cover) {
     return HitomiComicPage.fromLink(id, cover: cover);
   },
-  getThumbnailLoadingConfig: (url) {
+  getThumbnailLoadingConfig: (url) async {
     return {
       "headers": {"User-Agent": webUA, "Referer": "https://hitomi.la/"},
     };

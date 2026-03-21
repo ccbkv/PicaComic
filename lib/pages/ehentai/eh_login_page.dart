@@ -226,35 +226,7 @@ class _EhLoginPageState extends State<EhLoginPage> {
   }
 
   void loginWithWebview() async {
-    if (App.isMobile) {
-      App.globalTo(() => AppWebview(
-            singlePage: true,
-            initialUrl:
-                "https://forums.e-hentai.org/index.php?act=Login&CODE=00",
-            onTitleChange: (title, controller) async {
-              if (title == "E-Hentai Forums") {
-                var ua = await controller.getUA();
-                if (ua != null) {
-                  appdata.implicitData[3] = ua;
-                  appdata.writeImplicitData();
-                }
-                var cookies1 =
-                    await controller.getCookies("https://e-hentai.org") ?? {};
-                var cookies2 =
-                    await controller.getCookies("https://exhentai.org") ?? {};
-                var cookies = <String, String>{};
-                cookies1.forEach((key, value) {
-                  cookies[key] = value;
-                });
-                cookies2.forEach((key, value) {
-                  cookies[key] = value;
-                });
-                loginWithCookies(cookies);
-                App.globalBack();
-              }
-            },
-          ));
-    } else if (App.isDesktop) {
+    if (App.isLinux) {
       if (await DesktopWebview.isAvailable()) {
         var webview = DesktopWebview(
           initialUrl: "https://forums.e-hentai.org/index.php?act=Login&CODE=00",
@@ -269,12 +241,12 @@ class _EhLoginPageState extends State<EhLoginPage> {
               var cookies2 = await webview.getCookies("https://exhentai.org");
               webview.close();
               var cookies = <String, String>{};
-              cookies1.forEach((key, value) {
-                cookies[key] = value;
-              });
-              cookies2.forEach((key, value) {
-                cookies[key] = value;
-              });
+              if (cookies1 != null) {
+                cookies.addAll(cookies1);
+              }
+              if (cookies2 != null) {
+                cookies.addAll(cookies2);
+              }
               loginWithCookies(cookies);
             }
           },
@@ -283,6 +255,38 @@ class _EhLoginPageState extends State<EhLoginPage> {
       } else {
         showToast(message: "Unsupported device".tl);
       }
+    } else {
+      await App.globalTo(() => AppWebview(
+            singlePage: true,
+            initialUrl:
+                "https://forums.e-hentai.org/index.php?act=Login&CODE=00",
+            onTitleChange: (title, controller) async {
+              if (title == "E-Hentai Forums") {
+                var ua = await controller.getUA();
+                if (ua != null) {
+                  appdata.implicitData[3] = ua;
+                  appdata.writeImplicitData();
+                }
+                var cookies1 =
+                    await controller.getCookies("https://e-hentai.org");
+                var cookies2 =
+                    await controller.getCookies("https://exhentai.org");
+                var cookies = <String, String>{};
+                if (cookies1 != null) {
+                  for (var cookie in cookies1) {
+                    cookies[cookie.name] = cookie.value;
+                  }
+                }
+                if (cookies2 != null) {
+                  for (var cookie in cookies2) {
+                    cookies[cookie.name] = cookie.value;
+                  }
+                }
+                loginWithCookies(cookies);
+                App.globalBack();
+              }
+            },
+          ));
     }
   }
 

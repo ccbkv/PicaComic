@@ -95,7 +95,7 @@ class HitomiDownloadingItem extends DownloadingItem {
   }
 
   @override
-  Stream<DownloadProgress> downloadImage(String link) {
+  Future<Stream<DownloadProgress>> downloadImage(String link) async {
     return ImageManager().getHitomiImage(
       HitomiFile.fromMap(const JsonDecoder().convert(link)),
       id.replaceFirst("hitomi", ""),

@@ -106,7 +106,7 @@ class PicDownloadingItem extends DownloadingItem {
   }
 
   @override
-  Stream<DownloadProgress> downloadImage(String link) {
+  Future<Stream<DownloadProgress>> downloadImage(String link) async {
     return ImageManager().getImage(getImageUrl(link));
   }
 

@@ -645,7 +645,7 @@ class ImageManager {
       if (source.getImageLoadingConfig == null) {
         config = {};
       } else {
-        config = source.getImageLoadingConfig!(url, comicId, epId);
+        config = await source.getImageLoadingConfig!(url, comicId, epId);
       }
 
       caching = await CacheManager().openWrite(cacheKey);
@@ -760,7 +760,7 @@ class ImageManager {
       if (source.getThumbnailLoadingConfig == null) {
         config = {};
       } else {
-        config = source.getThumbnailLoadingConfig!(url);
+        config = await source.getThumbnailLoadingConfig!(url);
       }
 
       config['headers'] ??= headers;

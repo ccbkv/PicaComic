@@ -202,6 +202,7 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
 
   @override
   void tapOnTag(String tag, String key) {
+    HistoryManager.addSearchHistory(tag);
     context.to(
           () => SearchResultPage(
         keyword: tag,
@@ -267,6 +268,9 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
 
   @override
   bool? get favoriteOnPlatformInitial => data?.isFavorite;
+
+  @override
+  double? get stars => data?.stars;
 
   ComicPageLogic<ComicInfoData> get logic =>
       StateController.find<ComicPageLogic<ComicInfoData>>(tag: tag);
@@ -732,17 +736,19 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
   /// interface for building more info widget
   Widget? get buildMoreInfo => null;
 
+  /// stars rating
+  double? get stars => null;
+
   /// translation tags to CN
   bool get enableTranslationToCN {
     var source = ComicSource.find(sourceKey);
-    // For JS plugins, check if enableTagsTranslate is true
-    if (source != null && !source.isBuiltIn && source.enableTagsTranslate) {
+    // Check if enableTagsTranslate is true for both JS plugins and built-in sources
+    if (source != null && source.enableTagsTranslate) {
       var shouldTranslate = App.locale.languageCode == "zh";
-     // print("DEBUG: JS Plugin $sourceKey enableTagsTranslate=${source.enableTagsTranslate}, language=${App.locale.languageCode}, shouldTranslate=$shouldTranslate");
+     // print("DEBUG: Source $sourceKey enableTagsTranslate=${source.enableTagsTranslate}, language=${App.locale.languageCode}, shouldTranslate=$shouldTranslate");
       return shouldTranslate;
     }
-    // For built-in sources, use the default behavior
-   // print("DEBUG: Built-in source $sourceKey or enableTagsTranslate=false");
+   // print("DEBUG: Source $sourceKey enableTagsTranslate=false or not found");
     return false;
   }
 
@@ -1570,6 +1576,39 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
       );
     }
 
+    // Display stars rating if available
+    if (stars != null) {
+      yield Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 30, 8),
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            ...List.generate(5, (index) {
+              double starValue = index + 1;
+              IconData icon;
+              if (stars! >= starValue) {
+                icon = Icons.star;
+              } else if (stars! >= starValue - 0.5) {
+                icon = Icons.star_half;
+              } else {
+                icon = Icons.star_border;
+              }
+              return Icon(
+                icon,
+                color: Colors.amber,
+                size: 20,
+              );
+            }),
+            const SizedBox(width: 8),
+            Text(
+              stars!.toStringAsFixed(1),
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
     _logic.colorIndex = 0;
 
     //print("DEBUG: Building info cards for source $sourceKey, tags: ${tags?.keys}, enableTranslationToCN: $enableTranslationToCN");
@@ -1753,7 +1792,8 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
     if (thumbnails == null ||
         (thumbnails!.thumbnails.isEmpty &&
             !tag.contains("Hitomi") &&
-            !tag.contains("Eh"))) return [];
+            !tag.contains("Eh") &&
+            !tag.contains("ehentai"))) return [];
     if (thumbnails!.thumbnails.isEmpty) {
       thumbnails!.get(update);
     }

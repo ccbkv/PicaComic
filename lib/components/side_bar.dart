@@ -338,7 +338,7 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
                   const CloseButton(),
                   const SizedBox(width: 8),
                   Text(
-                    "Folders".tl,
+                    "文件夹".tl,
                     style: const TextStyle(fontSize: 18),
                   ),
                 ],

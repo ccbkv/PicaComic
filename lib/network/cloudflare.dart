@@ -1,18 +1,21 @@
 import 'dart:io' as io;
 
 import 'package:dio/dio.dart';
-import 'package:pica_comic/base.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:pica_comic/foundation/app.dart';
-import 'package:pica_comic/network/cookie_jar.dart';
+import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/pages/webview.dart';
-import 'package:pica_comic/utils/translations.dart';
+import 'package:pica_comic/utils/ext.dart';
 
+import '../base.dart';
 import '../components/components.dart';
+import '../utils/translations.dart';
+import 'cookie_jar.dart';
 
 class CloudflareException implements DioException {
   final String url;
 
-  const CloudflareException(this.url);
+  CloudflareException(this.url);
 
   @override
   String toString() {
@@ -53,13 +56,16 @@ class CloudflareException implements DioException {
 
   @override
   DioExceptionType get type => DioExceptionType.badResponse;
+
+  @override
+  DioExceptionReadableStringBuilder? stringBuilder;
 }
 
 class CloudflareInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    if(options.headers['cookie'].toString().contains('cf_clearance')) {
-      options.headers['user-agent'] = appdata.implicitData[3];
+    if (options.headers['cookie'].toString().contains('cf_clearance')) {
+      options.headers['user-agent'] = appdata.implicitData[3] ?? webUA;
     }
     handler.next(options);
   }
@@ -114,20 +120,36 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
     );
   }
 
-  if (App.isDesktop && (await DesktopWebview.isAvailable())) {
+  // windows version of package `flutter_inappwebview` cannot get some cookies
+  // Using DesktopWebview instead
+  if (App.isLinux) {
     var webview = DesktopWebview(
       initialUrl: url,
       onTitleChange: (title, controller) async {
-        var res = await controller.evaluateJavascript(
-            "document.head.innerHTML.includes('#challenge-success-text')");
-        if (res == 'false') {
+        var head =
+            await controller.evaluateJavascript("document.head.innerHTML") ??
+                "";
+        var body =
+            await controller.evaluateJavascript("document.body.innerHTML") ??
+                "";
+        Log.info("Cloudflare", "Checking head: $head");
+        var isChallenging = head.contains('#challenge-success-text') ||
+            head.contains("#challenge-error-text") ||
+            head.contains("#challenge-form") ||
+            body.contains("challenge-platform") ||
+            body.contains("window._cf_chl_opt");
+        if (!isChallenging) {
+          Log.info(
+            "Cloudflare",
+            "Cloudflare is passed due to there is no challenge css",
+          );
           var ua = controller.userAgent;
           if (ua != null) {
             appdata.implicitData[3] = ua;
             appdata.writeImplicitData();
           }
           var cookiesMap = await controller.getCookies(url);
-          if(cookiesMap['cf_clearance'] == null) {
+          if (cookiesMap['cf_clearance'] == null) {
             return;
           }
           saveCookies(cookiesMap);
@@ -135,30 +157,55 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
           onFinished();
         }
       },
+      onClose: onFinished,
     );
     webview.open();
-  } else if (App.isMobile) {
+  } else {
+    bool success = false;
+    void check(InAppWebViewController controller) async {
+      var head = await controller.evaluateJavascript(
+          source: "document.head.innerHTML") as String;
+      var body = await controller.evaluateJavascript(
+          source: "document.body.innerHTML") as String;
+      Log.info("Cloudflare", "Checking head: $head");
+      var isChallenging = head.contains('#challenge-success-text') ||
+          head.contains("#challenge-error-text") ||
+          head.contains("#challenge-form") ||
+          body.contains("challenge-platform") ||
+          body.contains("window._cf_chl_opt");
+      if (!isChallenging) {
+        Log.info(
+          "Cloudflare",
+          "Cloudflare is passed due to there is no challenge css",
+        );
+        var ua = await controller.getUA();
+        if (ua != null) {
+          appdata.implicitData[3] = ua;
+          appdata.writeImplicitData();
+        }
+        var cookies = await controller.getCookies(url) ?? [];
+        if (cookies.firstWhereOrNull(
+                (element) => element.name == 'cf_clearance') ==
+            null) {
+          return;
+        }
+        SingleInstanceCookieJar.instance?.saveFromResponse(uri, cookies);
+        if (!success) {
+          App.globalBack();
+          success = true;
+        }
+      }
+    }
+
     await App.globalTo(
       () => AppWebview(
         initialUrl: url,
         singlePage: true,
         onTitleChange: (title, controller) async {
-          var res = await controller.platform.evaluateJavascript(
-              source:
-                  "document.head.innerHTML.includes('#challenge-success-text')");
-          if (res == false) {
-            var ua = await controller.getUA();
-            if (ua != null) {
-              appdata.implicitData[3] = ua;
-              appdata.writeImplicitData();
-            }
-            var cookiesMap = await controller.getCookies(url) ?? {};
-            if(cookiesMap['cf_clearance'] == null) {
-              return;
-            }
-            saveCookies(cookiesMap);
-            App.globalBack();
-          }
+          check(controller);
+        },
+        onLoadStop: (controller) async {
+          check(controller);
         },
         onStarted: (controller) async {
           var ua = await controller.getUA();
@@ -166,13 +213,12 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
             appdata.implicitData[3] = ua;
             appdata.writeImplicitData();
           }
-          var cookiesMap = await controller.getCookies(url) ?? {};
-          saveCookies(cookiesMap);
+          var cookies = await controller.getCookies(url) ?? [];
+          SingleInstanceCookieJar.instance?.saveFromResponse(uri, cookies);
         },
       ),
     );
     onFinished();
-  } else {
-    showToast(message: "当前设备不支持".tl);
+
   }
 }

@@ -168,7 +168,7 @@ abstract class DownloadingItem with _TransferSpeedMixin {
 
   final _downloading = <String, _ImageDownloadWrapper>{};
 
-  void _addDownloading(String link, int ep, int index) {
+  Future<void> _addDownloading(String link, int ep, int index) async {
     var downloadTo = '';
     var basename = '';
     if (haveEps) {
@@ -181,7 +181,7 @@ abstract class DownloadingItem with _TransferSpeedMixin {
     if (_downloading["$ep$index"] == null ||
         _downloading["$ep$index"]!.error != null) {
       _downloading["$ep$index"] = _ImageDownloadWrapper(
-        downloadImage(link),
+        await downloadImage(link),
         downloadTo,
         basename,
         onData,
@@ -193,13 +193,13 @@ abstract class DownloadingItem with _TransferSpeedMixin {
     }
   }
 
-  void _scheduleTasks(int ep, int index) {
+  Future<void> _scheduleTasks(int ep, int index) async {
     var urls = links![ep]!;
     int downloading = 0;
     for (int i = index; i < urls.length; i++) {
       var task = _downloading["$ep$i"];
       if (task == null || task.error != null) {
-        _addDownloading(urls[i], ep, i);
+        await _addDownloading(urls[i], ep, i);
         downloading++;
       } else if (!task.isFinished) {
         downloading++;
@@ -232,7 +232,7 @@ abstract class DownloadingItem with _TransferSpeedMixin {
         while (index < urls.length && currentKey == _runtimeKey) {
           notifications.sendProgressNotification(downloadedPages, totalPages,
               "下载中".tl, "${downloadManager.downloading.length} Tasks");
-          _scheduleTasks(ep, index);
+          await _scheduleTasks(ep, index);
           if (currentKey != _runtimeKey) return;
           var task = _downloading["$ep$index"];
           if (task == null) {
@@ -376,7 +376,7 @@ abstract class DownloadingItem with _TransferSpeedMixin {
       type != DownloadType.htmanga &&
       type != DownloadType.nhentai;
 
-  Stream<DownloadProgress> downloadImage(String link);
+  Future<Stream<DownloadProgress>> downloadImage(String link);
 
   ///获取封面链接
   String get cover;

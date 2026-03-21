@@ -62,17 +62,17 @@ class ComicSourceParser {
     var minAppVersion = JsEngine().runCode("this['temp'].minAppVersion");
     var url = JsEngine().runCode("this['temp'].url");
     var matchBriefIdRegex = JsEngine().runCode("this['temp'].comic.matchBriefIdRegex");
-    var enableTagsTranslate = JsEngine().runCode("this['temp'].enableTagsTranslate") ?? false;
+    // Check for enableTagsTranslate at root level or in comic config (Venera compatibility)
+    var enableTagsTranslate = JsEngine().runCode("this['temp'].enableTagsTranslate") ?? 
+                              JsEngine().runCode("this['temp'].comic?.enableTagsTranslate") ?? 
+                              false;
     if(minAppVersion != null){
       if(compareSemVer(minAppVersion, appVersion.split('-').first)){
         throw ComicSourceParseException("minAppVersion $minAppVersion is required");
       }
     }
-    for(var source in ComicSource.sources){
-      if(source.key == key){
-        throw ComicSourceParseException("key($key) already exists");
-      }
-    }
+    // Remove existing source with same key to allow JS plugins to override built-in sources
+    ComicSource.sources.removeWhere((source) => source.key == key);
     _key = key;
     _checkKeyValidation();
 
@@ -121,6 +121,17 @@ class ComicSourceParser {
     await source.loadData();
 
     Future.delayed(const Duration(milliseconds: 50), () {
+      // Initialize apiDomains for JM source if not defined (Venera compatibility)
+      JsEngine().runCode("""
+        (function() {
+          var temp = ComicSource.sources.$_key;
+          if (temp && typeof temp.constructor !== 'undefined' && 
+              typeof temp.constructor.apiDomains === 'undefined' &&
+              typeof temp.constructor.fallbackServers !== 'undefined') {
+            temp.constructor.apiDomains = temp.constructor.fallbackServers;
+          }
+        })()
+      """);
       JsEngine().runCode("ComicSource.sources.$_key.init()");
     });
 
@@ -171,7 +182,7 @@ class ComicSourceParser {
 
     return AccountConfig(
       login,
-      _getValue("account.login.website"),
+      _checkExists("account.login") ? _getValue("account.login.website") : null,
       _getValue("account.registerWebsite"),
       logout
     );
@@ -430,10 +441,22 @@ class ComicSourceParser {
     }
     return SearchPageData(options, (keyword, page, searchOption) async {
       try {
-        var res = await JsEngine().runCode("""
-          ComicSource.sources.$_key.search.load(
-            ${jsonEncode(keyword)}, ${jsonEncode(searchOption)}, ${jsonEncode(page)})
-        """);
+        // Check if search.load exists, otherwise use search.loadNext (Venera compatibility)
+        var hasLoad = _checkExists("search.load");
+        String jsCode;
+        if (hasLoad) {
+          jsCode = """
+            ComicSource.sources.$_key.search.load(
+              ${jsonEncode(keyword)}, ${jsonEncode(searchOption)}, ${jsonEncode(page)})
+          """;
+        } else {
+          // Venera uses loadNext with next token instead of page number
+          jsCode = """
+            ComicSource.sources.$_key.search.loadNext(
+              ${jsonEncode(keyword)}, ${jsonEncode(searchOption)}, ${jsonEncode(page == 1 ? null : page.toString())})
+          """;
+        }
+        var res = await JsEngine().runCode(jsCode);
         return Res(
             List.generate(res["comics"].length,
                 (index) => CustomComic.fromJson(res["comics"][index], _key!)),
@@ -456,8 +479,19 @@ class ComicSourceParser {
         }
         var tags = <String, List<String>>{};
         var tagsData = res["tags"];
-        if (tagsData is Map<String, dynamic>) {
-          tagsData.forEach((key, value) => tags[key] = List<String>.from(value ?? const []));
+        if (tagsData is Map) {
+          // Handle both Dart Map and JavaScript Map/Object
+          for (var entry in tagsData.entries) {
+            var key = entry.key.toString();
+            var value = entry.value;
+            if (value is List) {
+              tags[key] = List<String>.from(value);
+            } else if (value is Iterable) {
+              tags[key] = value.map((e) => e.toString()).toList();
+            } else {
+              tags[key] = [value.toString()];
+            }
+          }
         }
         var recommend = res["recommend"];
         List<CustomComic>? recommendComics;
@@ -484,6 +518,48 @@ class ComicSourceParser {
             chapters = null;
           }
         }
+        // Check if comic has loadThumbnails function (Venera compatibility)
+        Future<Res<List<String>>> Function(String, int)? thumbnailLoader;
+        List<String>? initialThumbnails;
+        int thumbnailMaxPage = res["thumbnailMaxPage"] ?? 1;
+        var hasLoadThumbnails = _checkExists("comic.loadThumbnails");
+        if (hasLoadThumbnails) {
+          // If loadInfo didn't return thumbnails, call loadThumbnails to get initial thumbnails
+          if (res["thumbnails"] == null || (res["thumbnails"] is List && (res["thumbnails"] as List).isEmpty)) {
+            try {
+              var thumbnailResult = await JsEngine().runCode("""
+                ComicSource.sources.$_key.comic.loadThumbnails(${jsonEncode(id)}, null)
+              """);
+              if (thumbnailResult is Map && thumbnailResult["thumbnails"] is List) {
+                initialThumbnails = List<String>.from(thumbnailResult["thumbnails"]);
+                // Get max page from result if available
+                if (thumbnailResult["next"] != null) {
+                  // If there's a next page, estimate max pages (ehentai typically has 20-40 thumbs per page)
+                  thumbnailMaxPage = 10; // Default to a reasonable number
+                }
+              }
+            } catch (e) {
+              // Ignore error, thumbnails will be loaded on demand
+            }
+          }
+
+          thumbnailLoader = (String comicId, int page) async {
+            // ThumbnailsData calls load(current + 1), so page 2 is first load
+            // Convert to 0-based index for ehentai: page 2 -> "0", page 3 -> "1", etc.
+            String? nextToken;
+            if (page >= 2) {
+              nextToken = (page - 2).toString();
+            }
+            var result = await JsEngine().runCode("""
+              ComicSource.sources.$_key.comic.loadThumbnails(${jsonEncode(comicId)}, ${jsonEncode(nextToken)})
+            """);
+            if (result is Map && result["thumbnails"] is List) {
+              return Res(List<String>.from(result["thumbnails"]));
+            }
+            return const Res.error("No thumbnails");
+          };
+        }
+
         return Res(ComicInfoData(
             res["title"] ?? "",
             res["subTitle"] ?? "",
@@ -491,15 +567,15 @@ class ComicSourceParser {
             res["description"] ?? "",
             tags,
             chapters,
-            ListOrNull.from(res["thumbnails"]),
-            // TODO: implement thumbnailLoader
-            null,
-            res["thumbnailMaxPage"] ?? 1,
+            initialThumbnails ?? ListOrNull.from(res["thumbnails"]),
+            thumbnailLoader,
+            thumbnailMaxPage,
             recommendComics,
             _key!,
             id,
             isFavorite: res["isFavorite"],
-            subId: res["subId"],));
+            subId: res["subId"],
+            stars: res["stars"] != null ? (res["stars"] as num).toDouble() : null,));
       } catch (e, s) {
         log("$e\n$s", "Network", LogLevel.error);
         return Res.error(e.toString());
@@ -706,11 +782,16 @@ class ComicSourceParser {
     if(!_checkExists("comic.onImageLoad")){
       return null;
     }
-    return (imageKey, comicId, ep) {
-      return JsEngine().runCode("""
+    return (imageKey, comicId, ep) async {
+      var res = await JsEngine().runCode("""
           ComicSource.sources.$_key.comic.onImageLoad(
             ${jsonEncode(imageKey)}, ${jsonEncode(comicId)}, ${jsonEncode(ep)})
-        """) as Map<String, dynamic>;
+        """);
+      if(res is! Map) {
+        Log.error("Network", "function onImageLoad return invalid data: ${res.runtimeType}");
+        throw "function onImageLoad return invalid data";
+      }
+      return res as Map<String, dynamic>;
     };
   }
 
@@ -718,8 +799,8 @@ class ComicSourceParser {
     if(!_checkExists("comic.onThumbnailLoad")){
       return null;
     }
-    return (imageKey) {
-      var res = JsEngine().runCode("""
+    return (imageKey) async {
+      var res = await JsEngine().runCode("""
           ComicSource.sources.$_key.comic.onThumbnailLoad(${jsonEncode(imageKey)})
         """);
       if(res is! Map) {

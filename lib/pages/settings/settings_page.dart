@@ -502,7 +502,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       return Row(
         children: [
           SizedBox(
-            width: 320,
+            width: 280,
             height: double.infinity,
             child: buildLeft(),
           ),
@@ -517,7 +517,39 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               ),
             ),
           ),
-          Expanded(child: buildRight())
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              transitionBuilder: (child, animation) {
+                return LayoutBuilder(
+                  builder: (context, constrains) {
+                    return AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, _) {
+                        var width = constrains.maxWidth;
+                        var value = animation.isForwardOrCompleted
+                            ? 1 - animation.value
+                            : 1;
+                        var left = width * value;
+                        return Stack(
+                          children: [
+                            Positioned(
+                              top: 0,
+                              bottom: 0,
+                              left: left,
+                              width: width,
+                              child: child,
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+              child: buildRight(),
+            ),
+          )
         ],
       );
     } else {
@@ -624,21 +656,25 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
       Widget content = AnimatedContainer(
         key: ValueKey(id),
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 200),
         width: double.infinity,
-        height: 48,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        height: 46,
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
         decoration: BoxDecoration(
-            color: selected ? colors.primaryContainer : null,
-            borderRadius: BorderRadius.circular(16)),
+          color: selected ? colors.primaryContainer.toOpacity(0.36) : null,
+          border: Border(
+            left: BorderSide(
+              color: selected ? colors.primary : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
         child: Row(children: [
           Icon(icons[id]),
-          const SizedBox(
-            width: 16,
-          ),
+          const SizedBox(width: 16),
           Text(
             name,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: const TextStyle(fontSize: 16),
           ),
           const Spacer(),
           if (selected) const Icon(Icons.arrow_right)
@@ -647,11 +683,10 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
       return Padding(
         padding: enableTwoViews
-            ? const EdgeInsets.fromLTRB(16, 0, 16, 0)
+            ? const EdgeInsets.fromLTRB(8, 0, 8, 0)
             : EdgeInsets.zero,
         child: InkWell(
           onTap: () => setState(() => currentPage = id),
-          borderRadius: BorderRadius.circular(16),
           child: content,
         ).paddingVertical(4),
       );

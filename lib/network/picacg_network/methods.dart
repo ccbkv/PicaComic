@@ -857,42 +857,50 @@ class PicacgNetwork {
       return Res(null, errorMessage: response.errorMessage);
     }
     var res = response.data;
+    var collections = res["data"]["collections"] as List?;
+    if (collections == null || collections.isEmpty) {
+      return Res(comics);
+    }
     try {
-      for (int i = 0; i < res["data"]["collections"][0]["comics"].length; i++) {
-        try {
-          var si = ComicItemBrief(
-            res["data"]["collections"][0]["comics"][i]["title"] ?? "Unknown",
-            res["data"]["collections"][0]["comics"][i]["author"] ?? "Unknown",
-            res["data"]["collections"][0]["comics"][i]["totalLikes"] ?? 0,
-            res["data"]["collections"][0]["comics"][i]["thumb"]["fileServer"] +
-                "/static/" +
-                res["data"]["collections"][0]["comics"][i]["thumb"]["path"],
-            res["data"]["collections"][0]["comics"][i]["_id"],
-            [],
-            pages: res["data"]["collections"][0]["comics"][i]["pagesCount"],
-          );
-          comics[0].add(si);
-        } catch (e) {
-          //出现错误跳过
+      if (collections.length > 0) {
+        for (int i = 0; i < collections[0]["comics"].length; i++) {
+          try {
+            var si = ComicItemBrief(
+              collections[0]["comics"][i]["title"] ?? "Unknown",
+              collections[0]["comics"][i]["author"] ?? "Unknown",
+              collections[0]["comics"][i]["totalLikes"] ?? 0,
+              collections[0]["comics"][i]["thumb"]["fileServer"] +
+                  "/static/" +
+                  collections[0]["comics"][i]["thumb"]["path"],
+              collections[0]["comics"][i]["_id"],
+              [],
+              pages: collections[0]["comics"][i]["pagesCount"],
+            );
+            comics[0].add(si);
+          } catch (e) {
+            //出现错误跳过
+          }
         }
       }
     }  finally {}
     try {
-      for (int i = 0; i < res["data"]["collections"][1]["comics"].length; i++) {
-        try {
-          var si = ComicItemBrief(
-            res["data"]["collections"][1]["comics"][i]["title"] ?? "Unknown",
-            res["data"]["collections"][1]["comics"][i]["author"] ?? "Unknown",
-            res["data"]["collections"][1]["comics"][i]["totalLikes"] ?? 0,
-            res["data"]["collections"][1]["comics"][i]["thumb"]["fileServer"] +
-                "/static/" +
-                res["data"]["collections"][1]["comics"][i]["thumb"]["path"],
-            res["data"]["collections"][1]["comics"][i]["_id"],
-            [],
-            pages: res["data"]["collections"][1]["comics"][i]["pagesCount"],
-          );
-          comics[1].add(si);
-        } finally {}
+      if (collections.length > 1) {
+        for (int i = 0; i < collections[1]["comics"].length; i++) {
+          try {
+            var si = ComicItemBrief(
+              collections[1]["comics"][i]["title"] ?? "Unknown",
+              collections[1]["comics"][i]["author"] ?? "Unknown",
+              collections[1]["comics"][i]["totalLikes"] ?? 0,
+              collections[1]["comics"][i]["thumb"]["fileServer"] +
+                  "/static/" +
+                  collections[1]["comics"][i]["thumb"]["path"],
+              collections[1]["comics"][i]["_id"],
+              [],
+              pages: collections[1]["comics"][i]["pagesCount"],
+            );
+            comics[1].add(si);
+          } finally {}
+        }
       }
     }  finally {}
     return Res(comics);

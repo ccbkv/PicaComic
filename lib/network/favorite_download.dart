@@ -121,7 +121,7 @@ class FavoriteDownloading extends DownloadingItem{
       downloadLogic.toDownloadedItem();
 
   @override
-  Stream<DownloadProgress> downloadImage(String link) {
+  Future<Stream<DownloadProgress>> downloadImage(String link) async {
     return downloadLogic.downloadImage(link);
   }
 }

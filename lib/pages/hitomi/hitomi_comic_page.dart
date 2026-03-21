@@ -147,6 +147,7 @@ class HitomiComicPage extends BaseComicPage<HitomiComic> {
       _ => null
     };
     if (categoryParam != null && tag != "N/A") {
+      HistoryManager.addSearchHistory(categoryParam);
       context.to(
         () => SearchResultPage(
           keyword: categoryParam,

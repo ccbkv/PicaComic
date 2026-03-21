@@ -129,7 +129,10 @@ extension TagsTranslation on String {
     "Tags": "标签",
     "Parodies": "原作",
     "Categories": "分类",
-    "Time": "时间"
+    "Category": "分类",
+    "Time": "时间",
+    "uploader": "上传者",
+    "Uploader": "上传者"
   };
 
   static const tagsCategoryTranslationsTW = {
@@ -152,7 +155,10 @@ extension TagsTranslation on String {
     "Tags": "標籤",
     "Parodies": "原作",
     "Categories": "分類",
-    "Time": "時間"
+    "Category": "分類",
+    "Time": "時間",
+    "uploader": "上傳者",
+    "Uploader": "上傳者"
   };
 
   static Map<String, String> get maleTags => _data["male"] ?? const {};

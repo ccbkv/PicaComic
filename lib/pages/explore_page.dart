@@ -7,6 +7,7 @@ import 'package:pica_comic/network/base_comic.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
+import 'package:pica_comic/pages/settings/settings_page.dart';
 import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 
@@ -74,7 +75,40 @@ class _ExplorePageState extends State<ExplorePage>
     controller.dispose();
     super.dispose();
   }
-  
+
+  void addPage() {
+    showPopUpWidget(
+        App.globalContext!,
+        MultiPagesFilter(
+          "探索页面".tl,
+          77,
+          _explorePages(),
+          onChange: () {
+            setState(() {});
+          },
+        ));
+  }
+
+  Map<String, String> _explorePages() {
+    return {
+      for (var source in ComicSource.sources)
+        for (var page in source.explorePages)
+          page.title: page.title.tl
+    };
+  }
+
+  Widget buildEmpty() {
+    var msg = "没有探索页面".tl;
+    msg += '\n';
+    msg += "请添加一些源".tl;
+    return NetworkError(
+      message: msg,
+      retry: () => App.globalContext!.to(() => const ComicSourceSettings()),
+      withAppbar: false,
+      buttonText: "管理".tl,
+    );
+  }
+
   void refresh() {
     int page = controller.index;
     String currentPageId = pages[page];
@@ -99,11 +133,21 @@ class _ExplorePageState extends State<ExplorePage>
   @override
   Widget build(BuildContext context) {
     super.build(context); // 必须调用，以使AutomaticKeepAliveClientMixin生效
-    
+
+    if (pages.isEmpty) {
+      return buildEmpty();
+    }
+
     Widget tabBar = Material(
-      child: FilledTabBar(
+      child: AppTabBar(
+        key: PageStorageKey(pages.toString()),
         tabs: pages.map((e) => buildTab(e)).toList(),
         controller: controller,
+        actionButton: TabActionButton(
+          icon: const Icon(Icons.add),
+          text: "添加".tl,
+          onPressed: addPage,
+        ),
       ),
     );
 

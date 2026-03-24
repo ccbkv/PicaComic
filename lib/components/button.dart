@@ -417,19 +417,22 @@ class MenuButton extends StatelessWidget {
     this.icon,
   });
 
-  final List<DesktopMenuEntry> entries;
+  final List<MenuEntry> entries;
 
   final Icon? icon;
 
   @override
   Widget build(BuildContext context) {
-    return Button.icon(
-      icon: icon ?? const Icon(Icons.more_vert),
-      onPressed: () {
-        final renderBox = context.findRenderObject() as RenderBox;
-        final offset = renderBox.localToGlobal(Offset.zero);
-        showDesktopMenu(context, offset, entries);
-      },
+    return Tooltip(
+      message: "更多".tl,
+      child: Button.icon(
+        icon: icon ?? const Icon(Icons.more_horiz),
+        onPressed: () {
+          final renderBox = context.findRenderObject() as RenderBox;
+          final offset = renderBox.localToGlobal(Offset.zero);
+          showMenuX(context, offset, entries);
+        },
+      ),
     );
   }
 }

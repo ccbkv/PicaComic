@@ -404,41 +404,45 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
 
   Widget buildPageSelector(BuildContext context, ComicsPageLogic logic) {
     return SliverToBoxAdapter(
-      child: Material(
-        color: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 8, top: 8),
-          child: SizedBox(
-            width: 300,
-            height: 42,
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 16,
-                ),
-                FilledButton.tonal(
-                    onPressed: () => prevPage(logic), child: Text("上一页".tl)),
-                const Spacer(),
-                ActionChip(
-                  label: Text(
-                      "${"页面".tl}: ${logic.current}/${logic.maxPage?.toString() ?? "?"}"),
-                  onPressed: () async {
+      child: Row(
+        children: [
+          FilledButton(
+            onPressed: logic.current > 1
+                ? () {
+                    prevPage(logic);
+                  }
+                : null,
+            child: Text("后退".tl),
+          ).fixWidth(84),
+          Expanded(
+            child: Center(
+              child: Material(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
                     selectPage(logic);
                   },
-                  elevation: 1,
-                  side: BorderSide.none,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Text("${"页面".tl} ${logic.current} / ${logic.maxPage?.toString() ?? "?"}"),
+                  ),
                 ),
-                const Spacer(),
-                FilledButton.tonal(
-                    onPressed: () => nextPage(logic), child: Text("下一页".tl)),
-                const SizedBox(
-                  width: 16,
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+          FilledButton(
+            onPressed: logic.current < (logic.maxPage ?? (logic.current + 1))
+                ? () {
+                    nextPage(logic);
+                  }
+                : null,
+            child: Text("前进".tl),
+          ).fixWidth(84),
+        ],
+      ).paddingVertical(8).paddingHorizontal(16),
     );
   }
 
@@ -532,57 +536,47 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
     }
   }
 
-  void selectPage(ComicsPageLogic logic) async {
-    String res = "";
-    await showDialog(
-        context: App.globalContext!,
-        builder: (dialogContext) {
-          var controller = TextEditingController();
-          return SimpleDialog(
-            title: const Text("切换页面"),
-            children: [
-              const SizedBox(
-                width: 300,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
-                child: TextField(
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    labelText: "页码".tl,
-                    suffixText:
-                        "${"输入范围: ".tl}1-${logic.maxPage?.toString() ?? "?"}",
-                  ),
-                  controller: controller,
-                  onSubmitted: (s) {
-                    res = s;
-                    App.globalBack();
-                  },
-                ),
-              ),
-              Center(
-                child: FilledButton(
-                  child: Text("提交".tl),
-                  onPressed: () {
-                    res = controller.text;
-                    App.globalBack();
-                  },
-                ),
-              )
+  void selectPage(ComicsPageLogic logic) {
+    String value = '';
+    showDialog(
+      context: App.globalContext!,
+      builder: (context) {
+        return ContentDialog(
+          title: "跳转到页面".tl,
+          content: TextField(
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: "页面".tl,
+            ),
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly
             ],
-          );
-        });
-    if (res.isNum) {
-      int i = int.parse(res);
-      if (logic.maxPage == null || (i > 0 && i <= logic.maxPage!)) {
-        logic.current = i;
-        logic.update();
-        return;
-      }
-    }
-    if (res != "") {
-      showToast(message: "输入的数字不正确".tl);
-    }
+            onChanged: (v) {
+              value = v;
+            },
+          ).paddingHorizontal(16),
+          actions: [
+            Button.filled(
+              onPressed: () {
+                Navigator.of(context).pop();
+                var page = int.tryParse(value);
+                if (page == null) {
+                  context.showMessage(message: "输入的数字不正确".tl);
+                } else {
+                  if (page > 0 && (logic.maxPage == null || page <= logic.maxPage!)) {
+                    logic.current = page;
+                    logic.update();
+                  } else {
+                    context.showMessage(message: "输入的数字不正确".tl);
+                  }
+                }
+              },
+              child: Text("跳转".tl),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget buildEmptyView(BuildContext context) {

@@ -19,7 +19,7 @@ class _HtSettingsState extends State<HtSettings> {
         ),
         ListTile(
           leading: const Icon(Icons.compare_arrows),
-          title: Text("API分流".tl),
+          title: Text("点击更新API分流".tl),
           subtitle: Text(appdata.settings[31].replaceFirst("https://", "")),
           onTap: () => _chooseApiHost(context),
           trailing: const Icon(Icons.arrow_right),
@@ -62,31 +62,36 @@ class _HtSettingsState extends State<HtSettings> {
     String? choose = await showDialog<String>(
       context: context,
       builder: (BuildContext context) {
-        return SimpleDialog(
-          title: Text("API分流".tl),
-          children: [
-            ...list.map(
-              (e) => SimpleDialogOption(
-                child: _HtApiOptionRow(
-                  e,
-                  key: Key("API:$e"),
+        return ContentDialog(
+          title: "API分流".tl,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ...list.map(
+                (e) => ListTile(
+                  title: _HtApiOptionRow(
+                    e,
+                    key: Key("API:$e"),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop(e);
+                  },
                 ),
-                onPressed: () {
-                  Navigator.of(context).pop(e);
+              ),
+              ListTile(
+                title: Text("手动输入".tl),
+                onTap: () async {
+                  Navigator.of(context).pop(await _manualInputApiHost(context));
                 },
               ),
-            ),
-            SimpleDialogOption(
-              child: Text("手动输入".tl),
-              onPressed: () async {
-                Navigator.of(context).pop(await _manualInputApiHost(context));
-              },
-            ),
-            SimpleDialogOption(
-              child: Text("取消".tl),
+            ],
+          ),
+          actions: [
+            FilledButton(
               onPressed: () {
                 Navigator.of(context).pop(null);
               },
+              child: Text("取消".tl),
             ),
           ],
         );
@@ -108,35 +113,18 @@ class _HtSettingsState extends State<HtSettings> {
   }
 
   Future<String?> _manualInputApiHost(BuildContext context) async {
-    var controller = TextEditingController(text: appdata.settings[31].replaceFirst("https://", ""));
-    return await showDialog<String>(
+    String? result;
+    await showInputDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text("手动输入API地址".tl),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              hintText: "www.example.com",
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text("取消".tl),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop(controller.text);
-              },
-              child: Text("确定".tl),
-            ),
-          ],
-        );
+      title: "手动输入API地址".tl,
+      hintText: "www.example.com",
+      initialValue: appdata.settings[31].replaceFirst("https://", ""),
+      onConfirm: (value) {
+        result = value;
+        return null;
       },
     );
+    return result;
   }
 }
 

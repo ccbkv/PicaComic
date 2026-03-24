@@ -8,7 +8,6 @@ part of 'components.dart';
 class SideBarRoute<T> extends PopupRoute<T> {
   SideBarRoute(this.title, this.widget,
       {this.showBarrier = true,
-      this.useSurfaceTintColor = false,
       required this.width,
       this.addBottomPadding = true,
       this.addTopPadding = true});
@@ -21,9 +20,6 @@ class SideBarRoute<T> extends PopupRoute<T> {
 
   ///是否显示Barrier
   final bool showBarrier;
-
-  ///使用SurfaceTintColor作为背景色
-  final bool useSurfaceTintColor;
 
   ///宽度
   final double width;
@@ -63,7 +59,7 @@ class SideBarRoute<T> extends PopupRoute<T> {
     Widget body = SidebarBody(
       title: title,
       widget: widget,
-      autoChangeTitleBarColor: !useSurfaceTintColor,
+      autoChangeTitleBarColor: true,
     );
 
     if (addTopPadding) {
@@ -101,9 +97,6 @@ class SideBarRoute<T> extends PopupRoute<T> {
                       ? MediaQuery.of(context).padding.bottom +
                           MediaQuery.of(context).viewInsets.bottom
                       : 0),
-              color: useSurfaceTintColor
-                  ? Theme.of(context).colorScheme.surfaceTint.withAlpha(20)
-                  : null,
               child: body,
             ),
           ),
@@ -242,12 +235,10 @@ class _SidebarBodyState extends State<SidebarBody> {
 void showSideBar(BuildContext context, Widget widget,
     {String? title,
     bool showBarrier = true,
-    bool useSurfaceTintColor = false,
     double width = 500,
     bool addTopPadding = false}) {
   Navigator.of(context).push(SideBarRoute(title, widget,
       showBarrier: showBarrier,
-      useSurfaceTintColor: useSurfaceTintColor,
       width: width,
       addTopPadding: addTopPadding,
       addBottomPadding: true));
@@ -386,7 +377,7 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
           const Spacer(),
           MenuButton(
             entries: [
-              DesktopMenuEntry(
+              MenuEntry(
                 icon: Icons.add,
                 text: '创建收藏夹'.tl,
                 onClick: () {
@@ -397,7 +388,7 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
                   });
                 },
               ),
-              DesktopMenuEntry(
+              MenuEntry(
                 icon: Icons.reorder,
                 text: '排序'.tl,
                 onClick: () {

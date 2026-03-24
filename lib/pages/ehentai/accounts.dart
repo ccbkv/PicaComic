@@ -42,15 +42,14 @@ class _CookieManagementViewState extends State<CookieManagementView> {
                 context: context,
                 builder: (context) {
                   String text = EhNetwork().igneous;
-                  return AlertDialog(
-                    title: const Text("igneous"),
+                  return ContentDialog(
+                    title: "igneous",
                     content: TextField(
                       controller: TextEditingController(text: text),
                       onChanged: (s) => text = s,
-                    ),
+                    ).paddingHorizontal(16),
                     actions: [
-                      TextButton(onPressed: context.pop, child: Text("取消".tl)),
-                      TextButton(
+                      Button.filled(
                         onPressed: () {
                           EhNetwork().igneous = text;
                           EhNetwork().cookieJar.saveFromResponse(

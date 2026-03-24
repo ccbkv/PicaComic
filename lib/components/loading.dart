@@ -6,6 +6,7 @@ class NetworkError extends StatelessWidget {
     required this.message,
     this.retry,
     this.withAppbar = true,
+    this.buttonText,
   });
 
   final String message;
@@ -14,6 +15,8 @@ class NetworkError extends StatelessWidget {
 
   final bool withAppbar;
 
+  final String? buttonText;
+
   @override
   Widget build(BuildContext context) {
     var cfe = CloudflareException.fromString(message);
@@ -21,22 +24,39 @@ class NetworkError extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.error_outline,
-            size: 60,
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 28,
+                  color: context.colorScheme.error,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "错误".tl,
+                  style: ts.withColor(context.colorScheme.error).s16,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(
-            height: 4,
-          ),
+          const SizedBox(height: 8),
           Text(
             cfe == null ? message : "需要进行Cloudflare验证".tl,
             textAlign: TextAlign.center,
             maxLines: 3,
           ),
-          if (retry != null)
-            const SizedBox(
-              height: 4,
-            ),
+          TextButton(
+            onPressed: () {
+              saveFile(
+                data: utf8.encode(LogManager().toString()),
+                filename: 'log.txt',
+              );
+            },
+            child: Text("导出日志".tl),
+          ),
+          const SizedBox(height: 8),
           if (retry != null)
             if (cfe != null)
               FilledButton(
@@ -44,7 +64,7 @@ class NetworkError extends StatelessWidget {
                 child: Text('继续'.tl),
               )
             else
-              FilledButton(onPressed: retry, child: Text('重试'.tl))
+              FilledButton(onPressed: retry, child: Text(buttonText ?? '重试'.tl))
         ],
       ),
     );

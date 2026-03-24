@@ -336,7 +336,7 @@ class ComicSourceParser {
         title: title,
         categories: categoryParts,
         enableRankingPage: enableRankingPage ?? false,
-        key: title);
+        key: doc["key"] ?? title);
   }
 
   CategoryComicsData? _loadCategoryComicsData() {

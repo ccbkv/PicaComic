@@ -49,11 +49,16 @@ class JmSettings extends StatefulWidget {
         msg += "${"域名".tl}${domains.indexOf(domain) + 1}: $domain\n";
     }
     msg = msg.trim();
-    showConfirmDialog(App.globalContext!, title, msg, () async {
-      appdata.appSettings.jmApiDomains = domains;
-      await updateAppVersionCode();
-      JmNetwork().loginFromAppdata();
-    });
+    showConfirmDialog(
+      context: App.globalContext!,
+      title: title,
+      content: msg,
+      onConfirm: () async {
+        appdata.appSettings.jmApiDomains = domains;
+        await updateAppVersionCode();
+        JmNetwork().loginFromAppdata();
+      },
+    );
   }
 
   static void daily([bool showLoading = false]) async {

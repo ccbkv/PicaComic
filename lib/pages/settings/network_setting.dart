@@ -35,10 +35,18 @@ class _NetworkSettingsState extends State<NetworkSettings> {
               ),
               InkWell(
                 borderRadius: const BorderRadius.all(Radius.circular(18)),
-                onTap: () => showDialogMessage(
-                  context,
-                  "警告".tl,
-                  "${"此功能已不再受支持".tl}\n${"请勿反馈相关问题".tl}"
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (context) => ContentDialog(
+                    title: "警告".tl,
+                    content: Text("${"此功能已不再受支持".tl}\n${"请勿反馈相关问题".tl}").paddingHorizontal(16).paddingVertical(8),
+                    actions: [
+                      Button.filled(
+                        onPressed: () => context.pop(),
+                        child: Text("了解".tl),
+                      ),
+                    ],
+                  ),
                 ),
                 child: const Icon(
                   Icons.warning_amber_rounded,
@@ -221,8 +229,8 @@ class _ProxySettingViewState extends State<_ProxySettingView> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text("代理设置".tl),
+    return ContentDialog(
+      title: "代理设置".tl,
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -271,12 +279,6 @@ class _ProxySettingViewState extends State<_ProxySettingView> {
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text("取消".tl),
-        ),
-      ],
     );
   }
 
@@ -413,7 +415,7 @@ class __DownloadThreadsSettingState extends State<_DownloadThreadsSetting> {
   Widget build(BuildContext context) {
     return ListTile(
       leading: const Icon(Icons.download_outlined),
-      title: Text("下载线程".tl),
+      title: Text("下载线程数".tl),
       subtitle: Slider(
         value: currentIndex.toDouble(),
         min: 0,

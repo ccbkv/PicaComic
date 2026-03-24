@@ -99,33 +99,29 @@ class _BlockingKeywordPageState extends State<BlockingKeywordPage>
               Navigator.pop(dialogContext);
             }
           },
-          child: SimpleDialog(
-            title: Text("添加屏蔽关键词".tl),
-            children: [
-              const SizedBox(width: 300),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                child: TextField(
-                  controller: logic.controller,
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    hintText: "添加关键词".tl,
-                  ),
-                  onEditingComplete: () {
-                    logic.addKeyword();
-                    App.globalBack();
-                  },
+          child: ContentDialog(
+            title: "添加屏蔽关键词".tl,
+            content: SizedBox(
+              width: 300,
+              child: TextField(
+                controller: logic.controller,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  hintText: "添加关键词".tl,
                 ),
+                onEditingComplete: () {
+                  logic.addKeyword();
+                  App.globalBack();
+                },
               ),
-              const SizedBox(height: 8),
-              Center(
-                child: FilledButton(
-                  child: Text("提交".tl),
-                  onPressed: () {
-                    logic.addKeyword();
-                    App.globalBack();
-                  },
-                ),
+            ),
+            actions: [
+              FilledButton(
+                child: Text("提交".tl),
+                onPressed: () {
+                  logic.addKeyword();
+                  App.globalBack();
+                },
               )
             ],
           ),

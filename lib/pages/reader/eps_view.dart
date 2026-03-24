@@ -9,119 +9,212 @@ class EpsView extends StatefulWidget {
 }
 
 class _EpsViewState extends State<EpsView> {
-  var controller = ItemScrollController();
+  bool desc = false;
+
+  late final ScrollController _scrollController;
+
   var logic = StateController.find<ComicReadingPageLogic>();
-  var value = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    // 延迟滚动到当前章节，避免构建时调度帧的错误
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        int epIndex = logic.order - 2;
+        double offset = (epIndex * 48.0).clamp(0, double.infinity);
+        _scrollController.jumpTo(offset);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     var type = widget.data.type;
     var data = widget.data;
-    var epsWidgets = <Widget>[];
-    for(int index = 0; index<data.eps!.length; index++){
-      String title = data.eps!.values.elementAt(index);
-      epsWidgets.add(
-          InkWell(
-            onTap: (){
-              Navigator.pop(App.globalContext!);
-              logic.jumpToChapter(index+1);
-            },
-            child: SizedBox(
-              height: 60,
-              child: Row(
-                children: [
-                  const SizedBox(width: 16,),
-                  Expanded(
-                    child: Text(title, overflow: TextOverflow.clip,),
-                  ),
-                  if(data.downloadedEps.contains(index))
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        borderRadius: const BorderRadius.all(Radius.circular(5)),
-                      ),
-                      margin: const EdgeInsets.all(5),
-                      padding: const EdgeInsets.fromLTRB(5, 2, 5, 2),
-                      child: Text("已下载".tl, style: const TextStyle(fontSize: 14),),
-                    ),
-                  if(logic.order == index+1)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        borderRadius: const BorderRadius.all(Radius.circular(5)),
-                      ),
-                      margin: const EdgeInsets.all(5),
-                      padding: const EdgeInsets.fromLTRB(5, 2, 5, 2),
-                      child: Text("当前".tl, style: const TextStyle(fontSize: 14),),
-                    )
-                ],
-              ),
-            ),
-          )
-      );
-    }
+    var epsCount = data.eps!.length;
+    var current = logic.order - 1;
 
-    return SizedBox(
-      height: 500,
-      width: double.infinity,
-      child: Column(
-        children: [
-          SizedBox(
-            height: 60,
-            child: Row(
-              children: [
-                const SizedBox(width: 16,),
-                Icon(Icons.format_list_numbered, color: Theme.of(context).colorScheme.secondary,),
-                const SizedBox(width: 8,),
-                Text("章节".tl, style: const TextStyle(fontSize: 18),),
-                const Spacer(),
-                if(type == ReadingType.jm)
+    return Scaffold(
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          // AppBar - 使用 SliverPersistentHeader 实现固定颜色+阴影效果
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _EpsViewAppBarDelegate(
+              title: "章节".tl,
+              topPadding: MediaQuery.of(context).padding.top,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
+                // JM评论按钮
+                if (type == ReadingType.jm)
                   IconButton(
-                    icon: Icon(Icons.comment_outlined, color: Theme.of(context).colorScheme.secondary,),
-                    onPressed: (){
-                      showComments(context, data.eps!.keys.elementAt(logic.order-1),
+                    icon: Icon(Icons.comment_outlined,
+                        color: Theme.of(context).colorScheme.secondary),
+                    onPressed: () {
+                      showComments(context, data.eps!.keys.elementAt(logic.order - 1),
                           (logic.data as JmReadingData).commentsLength ?? 9999);
                     },
                   ),
-                IconButton(
-                  icon: Icon(Icons.my_location_outlined, color: Theme.of(context).colorScheme.secondary,size: 23,),
-                  onPressed: (){
-                    var length = data.eps!.length;
-                    if(!value) {
-                      controller.jumpTo(index: logic.order-1);
-                    } else {
-                      controller.jumpTo(index: length - logic.order);
-                    }
-                  },
-                ),
-                Text(" 倒序".tl),
-                Transform.scale(
-                  scale: 0.8,
-                  child: Switch(
-                    value: value,
-                    onChanged: (b)=>setState(() {
-                      value = ! value;
-                    }),
+                // 排序按钮
+                Tooltip(
+                  message: "点击切换排序".tl,
+                  child: TextButton.icon(
+                    icon: Icon(
+                      !desc ? Icons.arrow_upward : Icons.arrow_downward,
+                      size: 18,
+                    ),
+                    label: Text(!desc ? "升序".tl : "倒序".tl),
+                    onPressed: () {
+                      setState(() {
+                        desc = !desc;
+                      });
+                    },
                   ),
                 ),
+                const SizedBox(width: 8),
               ],
             ),
           ),
-          Expanded(child: ScrollablePositionedList.builder(
-            initialScrollIndex: logic.order-1,
-            itemCount: data.eps!.length,
-            itemBuilder: (context, index){
-              if(value){
-                return epsWidgets[epsWidgets.length - index -1];
-              }else{
-                return epsWidgets[index];
-              }
-            },
-            scrollController: ScrollController(),
-            itemScrollController: controller,
-          )),
-          SizedBox(height: MediaQuery.of(context).padding.bottom,)
+          // 章节列表
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                if (desc) {
+                  index = epsCount - 1 - index;
+                }
+                String title = data.eps!.values.elementAt(index);
+                bool isActive = current == index;
+                bool isDownloaded = data.downloadedEps.contains(index);
+
+                return _ChapterListTile(
+                  onTap: () {
+                    Navigator.pop(App.globalContext!);
+                    logic.jumpToChapter(index + 1);
+                  },
+                  title: title,
+                  isActive: isActive,
+                  isDownloaded: isDownloaded,
+                );
+              },
+              childCount: epsCount,
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// 自定义 AppBar Delegate - 固定颜色 + 滑动阴影
+class _EpsViewAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final String title;
+  final Widget? leading;
+  final List<Widget> actions;
+  final double topPadding;
+
+  _EpsViewAppBarDelegate({
+    required this.title,
+    this.leading,
+    required this.actions,
+    required this.topPadding,
+  });
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        elevation: shrinkOffset > 0 ? 2 : 0,
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            leading ?? const SizedBox(),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+            ...actions,
+          ],
+        ).paddingTop(topPadding),
+      ),
+    );
+  }
+
+  @override
+  double get maxExtent => 52.0 + topPadding;
+
+  @override
+  double get minExtent => 52.0 + topPadding;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return oldDelegate is! _EpsViewAppBarDelegate ||
+        title != oldDelegate.title ||
+        leading != oldDelegate.leading ||
+        actions != oldDelegate.actions;
+  }
+}
+
+/// 章节列表项 
+class _ChapterListTile extends StatelessWidget {
+  const _ChapterListTile({
+    required this.title,
+    required this.isActive,
+    required this.isDownloaded,
+    required this.onTap,
+  });
+
+  final String title;
+  final bool isActive;
+  final bool isDownloaded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: isActive
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.transparent,
+              width: 4,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                color: isActive
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              ),
+            ),
+            const Spacer(),
+            if (isDownloaded)
+              Icon(
+                Icons.download_done_rounded,
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+          ],
+        ),
       ),
     );
   }

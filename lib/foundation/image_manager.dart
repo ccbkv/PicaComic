@@ -11,6 +11,7 @@ import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/image_loader/image_recombine.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/app_dio.dart';
+import 'package:pica_comic/network/cloudflare.dart';
 import 'package:pica_comic/network/cookie_jar.dart';
 import 'package:pica_comic/network/eh_network/eh_models.dart';
 import 'package:pica_comic/network/eh_network/get_gallery_id.dart';
@@ -52,7 +53,10 @@ class ImageManager {
   ImageManager._create();
 
   final dio = logDio(BaseOptions())
-    ..interceptors.add(CookieManagerSql(SingleInstanceCookieJar.instance!));
+    ..interceptors.addAll([
+      CookieManagerSql(SingleInstanceCookieJar.instance!),
+      CloudflareInterceptor(),
+    ]);
 
   int ehgtLoading = 0;
 

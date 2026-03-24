@@ -268,7 +268,6 @@ void downloadComic(JmComicInfo comic, BuildContext context) async {
           downloadManager.addJmDownload(comic, selectedEps);
           App.globalBack();
           showToast(message: "已加入下载队列".tl);
-        }, downloaded),
-        useSurfaceTintColor: true);
+        }, downloaded));
   }
 }

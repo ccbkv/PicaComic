@@ -10,9 +10,11 @@ class ComicTileMenuOption {
 
 abstract class ComicTile extends StatelessWidget {
   /// Show a comic brief information. Usually displayed in comic list page.
-  const ComicTile({Key? key, this.sourceKey}) : super(key: key);
+  const ComicTile({Key? key, this.sourceKey, this.heroID}) : super(key: key);
 
   final String? sourceKey;
+  
+  final String? heroID;
 
   Widget get image;
 
@@ -62,138 +64,97 @@ abstract class ComicTile extends StatelessWidget {
   }
 
   void onLongTap_() {
-    bool favorite = false;
-    showDialog(
-      context: App.globalContext!,
-      builder: (context) {
-        return StatefulBuilder(builder: (context, setState) {
-          Widget child;
-          if (!favorite) {
-            child = Dialog(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Column(
-                  key: const Key("1"),
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: SelectableText(
-                        title.replaceAll("\n", ""),
-                        style: const TextStyle(fontSize: 22),
-                      ),
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.article),
-                      title: Text("查看详情".tl),
-                      onTap: () {
-                        context.pop();
-                        onTap_();
-                      },
-                    ),
-                    if (favoriteItem != null)
-                      ListTile(
-                        leading: const Icon(Icons.bookmark_rounded),
-                        title: Text("本地收藏".tl),
-                        onTap: () {
-                          setState(() {
-                            favorite = true;
-                          });
-                        },
-                      ),
-                    if (read != null)
-                      ListTile(
-                        leading: const Icon(Icons.chrome_reader_mode),
-                        title: Text("阅读".tl),
-                        onTap: () {
-                          context.pop();
-                          read!();
-                        },
-                      ),
-                    ListTile(
-                      leading: const Icon(Icons.search),
-                      title: Text("搜索".tl),
-                      onTap: () {
-                        context.pop();
-                        context.to(() => PreSearchPage(
-                          initialValue: title,
-                        ));
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.block),
-                      title: Text("屏蔽".tl),
-                      onTap: () {
-                        context.pop();
-                        showBlockPane();
-                      },
-                    ),
-                    if (addonMenuOptions != null)
-                      for (var option in addonMenuOptions!)
-                        ListTile(
-                          leading: Icon(option.icon),
-                          title: Text(option.title),
-                          onTap: () => option.onTap(comicID),
-                        ),
-                    const SizedBox(
-                      height: 16,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          } else {
-            child = buildFavoriteDialog(context);
-          }
-          return AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: child,
-          );
-        });
-      },
+    final RenderBox renderBox = App.globalContext!.findRenderObject() as RenderBox;
+    final size = renderBox.size;
+    showMenuX(
+      App.globalContext!,
+      Offset((size.width - 242) / 2, size.height / 2),
+      [
+        MenuEntry(
+          icon: Icons.article,
+          text: '查看详情'.tl,
+          onClick: () {
+            onTap_();
+          },
+        ),
+        if (favoriteItem != null)
+          MenuEntry(
+            icon: Icons.bookmark_rounded,
+            text: '本地收藏'.tl,
+            onClick: () {
+              showDialog(
+                context: App.globalContext!,
+                builder: (context) => buildFavoriteDialog(context),
+              );
+            },
+          ),
+        if (read != null)
+          MenuEntry(
+            icon: Icons.chrome_reader_mode,
+            text: '阅读'.tl,
+            onClick: () {
+              read!();
+            },
+          ),
+        MenuEntry(
+          icon: Icons.search,
+          text: '搜索'.tl,
+          onClick: () {
+            App.mainNavigatorKey?.currentContext?.to(() => PreSearchPage(
+              initialValue: title,
+            ));
+          },
+        ),
+        MenuEntry(
+          icon: Icons.block,
+          text: '屏蔽'.tl,
+          onClick: () => showBlockPane(),
+        ),
+        ...?addonMenuOptions?.map((option) => MenuEntry(
+          icon: option.icon,
+          text: option.title,
+          onClick: () => option.onTap(comicID),
+        )),
+      ],
+      title: SelectableText(
+        title.replaceAll("\n", ""),
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
     );
   }
 
   Widget buildFavoriteDialog(BuildContext context) {
-    String? folder = appdata.settings[51];
-    int? initialFolderIndex =
-    LocalFavoritesManager().folderNames.indexOf(appdata.settings[51]);
-    if (initialFolderIndex == -1) {
-      folder = null;
-      initialFolderIndex = null;
-    }
-    return SimpleDialog(
-      title: Text("添加收藏".tl),
-      children: [
-        ListTile(
+    String? selectedFolder = appdata.settings[51];
+    var folders = LocalFavoritesManager().folderNames;
+    return StatefulBuilder(builder: (context, setState) {
+      return ContentDialog(
+        title: "添加收藏".tl,
+        content: ListTile(
           title: Text("收藏夹".tl),
           trailing: Select(
-            outline: true,
-            width: 156,
-            values: LocalFavoritesManager().folderNames,
-            initialValue: initialFolderIndex,
-            onChange: (i) => folder = LocalFavoritesManager().folderNames[i],
-          ),
-        ),
-        const SizedBox(
-          height: 16,
-        ),
-        Center(
-          child: FilledButton(
-            child: const Text("确认"),
-            onPressed: () {
-              LocalFavoritesManager().addComic(folder!, favoriteItem!);
-              context.pop();
+            current: selectedFolder,
+            values: folders,
+            minWidth: 112,
+            onTap: (v) {
+              setState(() {
+                selectedFolder = folders[v];
+              });
             },
           ),
         ),
-        const SizedBox(
-          height: 16,
-        ),
-      ],
-    );
+        actions: [
+          FilledButton(
+            onPressed: () {
+              if (selectedFolder != null) {
+                LocalFavoritesManager().addComic(selectedFolder!, favoriteItem!);
+                context.pop();
+              }
+            },
+            child: Text("确认".tl),
+          ),
+        ],
+      );
+    });
   }
 
   void onTap_();
@@ -320,6 +281,32 @@ abstract class ComicTile extends StatelessWidget {
   Widget _buildDetailedMode(BuildContext context) {
     return LayoutBuilder(builder: (context, constrains) {
       final height = constrains.maxHeight - 16;
+      
+      Widget imageWidget = Container(
+        width: height * 0.68,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: context.colorScheme.outlineVariant,
+              blurRadius: 1,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: image,
+      );
+      
+      if (heroID != null) {
+        imageWidget = Hero(
+          tag: "cover$heroID",
+          child: imageWidget,
+        );
+      }
+      
       return InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap_,
@@ -329,14 +316,7 @@ abstract class ComicTile extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 24, 8),
             child: Row(
               children: [
-                Container(
-                    width: height * 0.68,
-                    height: double.infinity,
-                    decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(8)),
-                    clipBehavior: Clip.antiAlias,
-                    child: image),
+                imageWidget,
                 SizedBox.fromSize(
                   size: const Size(16, 5),
                 ),
@@ -363,21 +343,37 @@ abstract class ComicTile extends StatelessWidget {
   }
 
   Widget _buildBriefMode(BuildContext context) {
+    Widget imageWidget = Container(
+      decoration: BoxDecoration(
+        color: context.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 2,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: image,
+    );
+    
+    if (heroID != null) {
+      imageWidget = Hero(
+        tag: "cover$heroID",
+        child: imageWidget,
+      );
+    }
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(8),
-        elevation: 1,
         child: Stack(
           children: [
-            Positioned.fill(
-                child: Container(
-                    decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(8)),
-                    clipBehavior: Clip.antiAlias,
-                    child: image)),
+            Positioned.fill(child: imageWidget),
             Positioned(
                 bottom: 0,
                 left: 0,

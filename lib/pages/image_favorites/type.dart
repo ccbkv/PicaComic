@@ -1,11 +1,11 @@
 import 'package:pica_comic/utils/ext.dart';
 
 enum ImageFavoriteSortType {
-  title('按标题'),
-  timeAsc('按时间升序'),
-  timeDesc('按时间降序'),
-  maxFavorites('按收藏数量'),
-  favoritesCompareComicPages('收藏数比上总页数');
+  title('标题'),
+  timeAsc('时间升序'),
+  timeDesc('时间降序'),
+  maxFavorites('收藏数'),
+  favoritesCompareComicPages('收藏数比漫画页数');
 
   const ImageFavoriteSortType(this.value);
 
@@ -18,10 +18,10 @@ enum ImageFavoriteSortType {
 
 enum TimeRangeType {
   all('全部'),
-  lastWeek('最近一周'),
-  lastMonth('最近一个月'),
-  lastHalfYear('最近半年'),
-  lastYear('最近一年');
+  lastWeek('上周'),
+  lastMonth('上月'),
+  lastHalfYear('半年'),
+  lastYear('一年');
   //custom('自定义');
 
   const TimeRangeType(this.value);

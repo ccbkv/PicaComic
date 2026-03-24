@@ -22,13 +22,18 @@ class _NhSettingsState extends State<NhSettings> {
     } else {
       var title = "${"确认删除".tl}?";
       var msg = "${"删除全部".tl}(${cookies.length}) nhentai cookie\n${"删除后需重新登录".tl}\n";
-      showConfirmDialog(App.globalContext!, title, msg, () {
-        NhentaiNetwork().logged = false;
-        cookieJar.deleteUri(Uri.parse(baseUrl));
-        var source = ComicSource.find('nhentai')!;
-        source.data["account"] = null;
-        source.saveData();
-      });
+      showConfirmDialog(
+        context: App.globalContext!,
+        title: title,
+        content: msg,
+        onConfirm: () {
+          NhentaiNetwork().logged = false;
+          cookieJar.deleteUri(Uri.parse(baseUrl));
+          var source = ComicSource.find('nhentai')!;
+          source.data["account"] = null;
+          source.saveData();
+        },
+      );
     }
   }
 

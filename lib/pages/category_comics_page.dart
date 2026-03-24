@@ -164,7 +164,9 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     }
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: Appbar(
+        scrolledUnderElevation: 0,
         title: Text(
           widget.displayTitle ??
               (selectedCategories.length > 1

@@ -136,24 +136,136 @@ void showDialogMessage(BuildContext context, String title, String message) {
           ));
 }
 
-void showConfirmDialog(BuildContext context, String title, String content,
-    void Function() onConfirm) {
-  showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-            title: Text(title),
-            content: Text(content),
+Future<void> showConfirmDialog({
+  required BuildContext context,
+  required String title,
+  required String content,
+  required void Function() onConfirm,
+  String confirmText = "确认",
+  Color? btnColor,
+}) {
+  return showDialog(
+    context: context,
+    builder: (context) => ContentDialog(
+      title: title,
+      content: Text(content).paddingHorizontal(16).paddingVertical(8),
+      actions: [
+        FilledButton(
+          onPressed: () {
+            context.pop();
+            onConfirm();
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: btnColor,
+          ),
+          child: Text(confirmText.tl),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> showInputDialog({
+  required BuildContext context,
+  required String title,
+  String? hintText,
+  required FutureOr<Object?> Function(String) onConfirm,
+  String? initialValue,
+  String confirmText = "确认",
+  String cancelText = "取消",
+  RegExp? inputValidator,
+  String? image,
+  Uint8List? imageData,
+  TextInputType? keyboardType,
+  List<TextInputFormatter>? inputFormatters,
+  String? labelText,
+  Widget? prefix,
+  String? suffixText,
+}) {
+  var controller = TextEditingController(text: initialValue);
+  bool isLoading = false;
+  String? error;
+
+  return showDialog(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return ContentDialog(
+            title: title,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (image != null)
+                  SizedBox(
+                    height: 108,
+                    child: Image.network(image, fit: BoxFit.none),
+                  ).paddingBottom(8),
+                if (image == null && imageData != null)
+                  SizedBox(
+                    height: 108,
+                    child: Image.memory(imageData, fit: BoxFit.none),
+                  ).paddingBottom(8),
+                TextField(
+                  controller: controller,
+                  keyboardType: keyboardType,
+                  inputFormatters: inputFormatters,
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    labelText: labelText,
+                    prefix: prefix,
+                    suffixText: suffixText,
+                    border: const OutlineInputBorder(),
+                    errorText: error,
+                  ),
+                ).paddingHorizontal(12),
+              ],
+            ),
             actions: [
-              TextButton(
-                  onPressed: () => App.back(context), child: Text("取消".tl)),
-              TextButton(
-                  onPressed: () {
-                    App.back(context);
-                    onConfirm();
-                  },
-                  child: Text("确认".tl)),
+              FilledButton(
+                onPressed: () {
+                  context.pop();
+                },
+                child: Text(cancelText.tl),
+              ),
+              FilledButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (inputValidator != null &&
+                            !inputValidator.hasMatch(controller.text)) {
+                          setState(() => error = "Invalid input");
+                          return;
+                        }
+                        var futureOr = onConfirm(controller.text);
+                        Object? result;
+                        if (futureOr is Future) {
+                          setState(() => isLoading = true);
+                          result = await futureOr;
+                          setState(() => isLoading = false);
+                        } else {
+                          result = futureOr;
+                        }
+                        if (result == null) {
+                          context.pop();
+                        } else {
+                          setState(() => error = result.toString());
+                        }
+                      },
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(confirmText.tl),
+              ),
             ],
-          ));
+          );
+        },
+      );
+    },
+  );
 }
 
 class LoadingDialogController {
@@ -279,57 +391,75 @@ LoadingDialogController showLoadingDialog(BuildContext context,
 class ContentDialog extends StatelessWidget {
   const ContentDialog({
     super.key,
-    required this.title,
+    this.title,
     required this.content,
+    this.dismissible = true,
     this.actions = const [],
   });
 
-  final String title;
+  final String? title;
 
   final Widget content;
 
   final List<Widget> actions;
 
+  final bool dismissible;
+
   @override
   Widget build(BuildContext context) {
-    if (App.isFluent) {
-      return fluent.ContentDialog(
-        title: Text(title),
-        content: this.content,
-        actions: actions,
-      );
-    }
-    var dialogContent = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Appbar(
-          title: Text(title),
-          backgroundColor: Colors.transparent,
-        ),
-        this.content,
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: actions,
-        ).paddingRight(12),
-        const SizedBox(height: 16),
-      ],
+    var dialogContent = SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          title != null
+              ? Appbar(
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: dismissible ? context.pop : null,
+                  ),
+                  title: Text(title!),
+                  backgroundColor: Colors.transparent,
+                )
+              : const SizedBox.shrink(),
+          this.content,
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: actions,
+          ).paddingRight(12),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
     return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: context.brightness == Brightness.dark
+            ? BorderSide(color: context.colorScheme.outlineVariant)
+            : BorderSide.none,
+      ),
       insetPadding: context.width < 400
           ? const EdgeInsets.symmetric(horizontal: 4)
           : const EdgeInsets.symmetric(horizontal: 16),
-      child: IntrinsicWidth(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: 600,
-            minWidth: math.min(400, context.width - 16),
-          ),
-          child: MediaQuery.removePadding(
-            removeTop: true,
-            removeBottom: true,
-            context: context,
-            child: dialogContent,
+      elevation: 2,
+      shadowColor: context.colorScheme.shadow,
+      backgroundColor: context.colorScheme.surface,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        alignment: Alignment.topCenter,
+        child: IntrinsicWidth(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 600,
+              minWidth: math.min(400, context.width - 16),
+            ),
+            child: MediaQuery.removePadding(
+              removeTop: true,
+              removeBottom: true,
+              context: context,
+              child: dialogContent,
+            ),
           ),
         ),
       ),

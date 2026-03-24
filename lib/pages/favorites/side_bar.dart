@@ -128,55 +128,39 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
         children: [
           Icon(
             Icons.local_activity,
-            color: Theme.of(context).colorScheme.secondary,
+            color: Colors.grey[700],
           ),
           const SizedBox(width: 12),
           Text("本地".tl),
           const Spacer(),
-          PopupMenuButton(
-            tooltip: "更多".tl,
-            icon: const Icon(Icons.more_horiz),
-            itemBuilder: (context) => [
-                PopupMenuItem(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.add),
-                      const SizedBox(width: 8),
-                      Text('创建收藏夹'.tl),
-                    ],
-                  ),
-                  onTap: () {
-                    Future.delayed(const Duration(milliseconds: 100), () {
-                      newFolder().then((value) {
-                        setState(() {
-                          folders = LocalFavoritesManager().folderNames;
-                        });
+          MenuButton(
+            entries: [
+              MenuEntry(
+                icon: Icons.add,
+                text: '创建收藏夹'.tl,
+                onClick: () {
+                  newFolder().then((value) {
+                    setState(() {
+                      folders = LocalFavoritesManager().folderNames;
+                    });
+                  });
+                },
+              ),
+              MenuEntry(
+                icon: Icons.reorder,
+                text: '排序'.tl,
+                onClick: () {
+                  sortFolders(
+                    onReorder: () {
+                      setState(() {
+                        folders = LocalFavoritesManager().folderNames;
                       });
-                    });
-                  },
-                ),
-                PopupMenuItem(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.reorder),
-                      const SizedBox(width: 8),
-                      Text('排序'.tl),
-                    ],
-                  ),
-                  onTap: () {
-                    Future.delayed(const Duration(milliseconds: 100), () {
-                      sortFolders(
-                        onReorder: () {
-                          setState(() {
-                            folders = LocalFavoritesManager().folderNames;
-                          });
-                        },
-                      );
-                    });
-                  },
-                ),
-              ],
-            ),
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
         ],
       ).paddingHorizontal(16),
     );
@@ -198,13 +182,13 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
         children: [
           Icon(
             Icons.cloud,
-            color: Theme.of(context).colorScheme.secondary,
+            color: Colors.grey[700],
           ),
           const SizedBox(width: 12),
           Text("网络".tl),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: Icon(Icons.settings, color: Colors.grey[700]),
             onPressed: () {
               showPopUpWidget(
                 App.globalContext!,
@@ -453,11 +437,16 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
   }
 
   void _deleteFolder(String folder) {
-    showConfirmDialog(App.globalContext!, "确认删除".tl, "此操作无法撤销, 是否继续?".tl, () {
-      App.globalBack();
-      LocalFavoritesManager().deleteFolder(folder);
-      updateFolders();
-    });
+    showConfirmDialog(
+      context: App.globalContext!,
+      title: "确认删除".tl,
+      content: "此操作无法撤销, 是否继续?".tl,
+      onConfirm: () {
+        App.globalBack();
+        LocalFavoritesManager().deleteFolder(folder);
+        updateFolders();
+      },
+    );
   }
 
   void _rename(String folder) async {

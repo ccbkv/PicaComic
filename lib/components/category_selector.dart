@@ -190,87 +190,72 @@ class _CategorySelectorDialogState extends State<CategorySelectorDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        // 确保在用户点击返回按钮时正确关闭对话框
-        return true;
-      },
-      child: AlertDialog(
-        title: Row(
+    return ContentDialog(
+      title: "选择分类 (${_selectedCategories.length}/${widget.categories.length})",
+      content: SizedBox(
+        //width: MediaQuery.of(context).size.width * 0.8,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("选择分类"),
-            const Spacer(),
-            Text(
-              "(${_selectedCategories.length}/${widget.categories.length})",
-              style: Theme.of(context).textTheme.bodySmall,
+            // 全选/取消全选按钮
+            Row(
+              children: [
+                TextButton(
+                  onPressed: _selectAll,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                  child: const Text("全选"),
+                ),
+                TextButton(
+                  onPressed: _clearAll,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                  child: const Text("取消全选"),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // 分类选择器
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: SingleChildScrollView(
+                child: Wrap(
+                    spacing: 5,
+                    runSpacing: 5,
+                    children: widget.categories.map<Widget>((category) {
+                       final isSelected = _selectedCategories.contains(category);
+                       return FilterChipFixedWidth(
+                         label: Text(category, style: const TextStyle(fontSize: 15)),
+                         selected: isSelected,
+                         onSelected: (selected) => _toggleCategory(category),
+                       );
+                     }).toList(),
+                  ),
+              ),
             ),
           ],
         ),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.8,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 全选/取消全选按钮
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: _selectAll,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                    ),
-                    child: const Text("全选"),
-                  ),
-                  TextButton(
-                    onPressed: _clearAll,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                    ),
-                    child: const Text("取消全选"),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // 分类选择器
-              SizedBox(
-                height: 300,
-                child: SingleChildScrollView(
-                  child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: widget.categories.map<Widget>((category) {
-                         final isSelected = _selectedCategories.contains(category);
-                         return FilterChipFixedWidth(
-                           label: Text(category),
-                           selected: isSelected,
-                           onSelected: (selected) => _toggleCategory(category),
-                         );
-                       }).toList(),
-                    ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text("取消"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              widget.onCategoriesSelected(_selectedCategories);
-              Navigator.of(context).pop();
-            },
-            child: const Text("确定"),
-          ),
-        ],
       ),
+      actions: [
+        Button.outlined(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text("取消"),
+        ),
+        Button.filled(
+          onPressed: () {
+            widget.onCategoriesSelected(_selectedCategories);
+            Navigator.of(context).pop();
+          },
+          child: const Text("确定"),
+        ),
+      ],
     );
   }
 }

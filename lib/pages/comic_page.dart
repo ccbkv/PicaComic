@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/base.dart';
@@ -117,8 +118,7 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
             DownloadManager().addCustomDownload(data!, selectedEps);
             App.globalBack();
             showToast(message: "已加入下载队列".tl);
-          }, downloaded),
-          useSurfaceTintColor: true);
+          }, downloaded));
     }
   }
 
@@ -1003,43 +1003,53 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
     );
   }
 
-  void showMoreActions() {
-    final width = MediaQuery.of(context).size.width;
-    showMenu(
-      context: context,
-      position: RelativeRect.fromLTRB(width, 0, 0, 0),
-      items: [
-        PopupMenuItem(
-          child: Text("复制标题".tl),
-          onTap: () {
+ void showMoreActions() {
+    var context = App.globalContext!;
+    showMenuX(
+        context,
+        Offset(
+          context.width - 16,
+          context.padding.top,
+        ),
+        [
+        MenuEntry(
+          icon: Icons.copy,
+          text: "复制标题".tl,
+          onClick: () {
             var text = title!;
             if (url != null) {
               text += ":$url";
             }
             Clipboard.setData(ClipboardData(text: text));
-            showToast(message: "已复制".tl, icon: const Icon(Icons.check));
+            context.showMessage(message: "已复制".tl);
           },
         ),
-        if (url != null)
-          PopupMenuItem(
-            child: Text("复制链接".tl),
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: url!));
-              showToast(message: "已复制".tl, icon: const Icon(Icons.check));
+          MenuEntry(
+            icon: Icons.copy_rounded,
+            text: "复制ID".tl,
+            onClick: () {
+              Clipboard.setData(ClipboardData(text: id));
+              context.showMessage(message: "已复制".tl);
             },
           ),
-        PopupMenuItem(
-          child: Text("分享".tl),
-          onTap: () {
-            var text = title!;
-            if (url != null) {
-              text += ":$url";
-            }
-            Share.share(text);
-          },
-        ),
-      ],
-    );
+          if (url != null)
+            MenuEntry(
+              icon: Icons.link,
+              text: "复制URL".tl,
+              onClick: () {
+                Clipboard.setData(ClipboardData(text: url!));
+                context.showMessage(message: "已复制".tl);
+              },
+            ),
+          if (url != null)
+            MenuEntry(
+              icon: Icons.open_in_browser,
+              text: "打开网页".tl,
+              onClick: () {
+                launchUrlString(url!);
+              },
+            ),
+        ]);
   }
 
   Widget buildComicInfo(ComicPageLogic<T> logic, BuildContext context,
@@ -1153,7 +1163,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
         ),
       ),
       onTap: () =>
-          App.globalTo(() => ShowImagePageWithHero(cover!, "image$tag")),
+          App.globalTo(() => ShowImagePageWithHero(cover!, "image$tag", title: title)),
     );
   }
 
@@ -1437,25 +1447,23 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                   onPressed: () {
                     showDialog(
                       context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text("从本地下载中删除?".tl),
+                      builder: (context) => ContentDialog(
+                        title: "从本地下载中删除?".tl,
+                        content: const SizedBox.shrink(),
                         actions: [
-                          TextButton(
+                          FilledButton(
                             onPressed: () async {
-                              Navigator.of(context).pop();
+                              context.pop();
                               await downloadManager.delete([downloadedId]);
                               showToast(message: "已删除".tl);
                               logic.update();
                               StateController.findOrNull(tag: "me_page_downloads")
                                   ?.update();
                             },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color.fromARGB(255, 197, 52, 42),
+                            ),
                             child: Text("删除".tl),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: Text("取消".tl),
                           ),
                         ],
                       ),
@@ -1914,7 +1922,6 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
         App.globalContext!,
         widget,
         title: "收藏漫画".tl,
-        useSurfaceTintColor: true,
       );
     }
   }
@@ -2128,7 +2135,7 @@ class _FavoriteComicWidgetState extends State<FavoriteComicWidget> {
                     ),
                   ),
                 const Spacer(),
-                if (isSelected) const AnimatedCheckIcon()
+                if (isSelected) AnimatedCheckIcon()
               ],
             ),
           ),

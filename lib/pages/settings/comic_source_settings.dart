@@ -58,9 +58,12 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            title: Text("漫画源".tl),
+          SliverPersistentHeader(
             pinned: true,
+            delegate: _ComicSourceAppBarDelegate(
+              title: "漫画源".tl,
+              topPadding: MediaQuery.of(context).padding.top,
+            ),
           ),
           buildCard(context),
           const _SliverBuiltInSources(),
@@ -114,14 +117,20 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
 
 
   void delete(ComicSource source) {
-    showConfirmDialog(App.globalContext!, "删除".tl, "要删除此漫画源吗?".tl, () {
-      var file = File(source.filePath);
-      file.delete();
-      ComicSource.sources.remove(source);
-      _validatePages();
-      MyApp.updater?.call();
-      StateController.findOrNull(tag: "me_page_sources")?.update();
-    });
+    showConfirmDialog(
+      context: App.globalContext!,
+      title: "删除".tl,
+      content: "要删除漫画源 '${source.name}' 吗?".tl,
+      btnColor: context.colorScheme.error,
+      onConfirm: () {
+        var file = File(source.filePath);
+        file.delete();
+        ComicSource.sources.remove(source);
+        _validatePages();
+        MyApp.updater?.call();
+        StateController.findOrNull(tag: "me_page_sources")?.update();
+      },
+    );
   }
 
   void edit(ComicSource source) async {
@@ -191,7 +200,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
               children: [
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.article_outlined),
-                  label: Text("浏览列表".tl),
+                  label: Text("漫画源列表".tl),
                   onPressed: () {
                     showPopUpWidget(
                       context,
@@ -201,7 +210,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
                 ),
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.file_open_outlined),
-                  label: Text("选择文件".tl),
+                  label: Text("使用配置文件".tl),
                   onPressed: chooseFile,
                 ),
                 FilledButton.tonalIcon(
@@ -311,15 +320,11 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
     await showDialog(
       context: App.globalContext!,
       builder: (context) {
-        return AlertDialog(
-          title: Text("有可用更新".tl),
-          content: Text(text),
+        return ContentDialog(
+          title: "有可用更新".tl,
+          content: Text(text).paddingHorizontal(16).paddingVertical(8),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text("取消".tl),
-            ),
-            FilledButton(
+            Button.filled(
               onPressed: () {
                 doUpdate = true;
                 Navigator.pop(context);
@@ -1088,32 +1093,14 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
     required String initialValue,
     required void Function(String) onConfirm,
   }) {
-    final controller = TextEditingController(text: initialValue);
-    showDialog(
+    showInputDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("取消".tl),
-          ),
-          TextButton(
-            onPressed: () {
-              onConfirm(controller.text);
-              Navigator.pop(context);
-            },
-            child: Text("确定".tl),
-          ),
-        ],
-      ),
+      title: title,
+      initialValue: initialValue,
+      onConfirm: (value) {
+        onConfirm(value);
+        return null;
+      },
     );
   }
 }
@@ -1217,4 +1204,53 @@ void _addAllPagesWithComicSource(ComicSource source) {
   appdata.appSettings.networkFavorites = networkFavorites.toSet().toList();
 
   appdata.updateSettings();
+}
+
+class _ComicSourceAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final String title;
+  final double topPadding;
+
+  _ComicSourceAppBarDelegate({
+    required this.title,
+    required this.topPadding,
+  });
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        elevation: shrinkOffset > 0 ? 2 : 0,
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ).paddingTop(topPadding),
+      ),
+    );
+  }
+
+  @override
+  double get maxExtent => 52.0 + topPadding;
+
+  @override
+  double get minExtent => 52.0 + topPadding;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return oldDelegate is! _ComicSourceAppBarDelegate ||
+        title != oldDelegate.title;
+  }
 }

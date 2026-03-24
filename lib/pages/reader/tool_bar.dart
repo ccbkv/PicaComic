@@ -58,58 +58,10 @@ extension ToolBar on ComicReadingPage {
                       padding: const EdgeInsets.fromLTRB(6, 2, 6, 0),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.tertiaryContainer,
-                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(text),
                     ),
                     const Spacer(),
-                    if (App.isWindows)
-                      Tooltip(
-                        message: "${"全屏".tl}(F12)",
-                        child: IconButton(
-                          icon: const Icon(Icons.fullscreen),
-                          onPressed: () {
-                            logic.fullscreen();
-                          },
-                        ),
-                      ),
-                    if (App.isAndroid && appdata.settings[76] == "0")
-                      Tooltip(
-                        message: "屏幕方向".tl,
-                        child: IconButton(
-                          icon: () {
-                            if (logic.rotation == null) {
-                              return const Icon(Icons.screen_rotation_alt);
-                            } else if (logic.rotation == false) {
-                              return const Icon(Icons.screen_lock_portrait);
-                            } else {
-                              return const Icon(Icons.screen_lock_landscape);
-                            }
-                          }.call(),
-                          onPressed: () {
-                            if (logic.rotation == null) {
-                              logic.rotation = false;
-                              logic.update();
-                              SystemChrome.setPreferredOrientations([
-                                DeviceOrientation.portraitUp,
-                                DeviceOrientation.portraitDown,
-                              ]);
-                            } else if (logic.rotation == false) {
-                              logic.rotation = true;
-                              logic.update();
-                              SystemChrome.setPreferredOrientations([
-                                DeviceOrientation.landscapeLeft,
-                                DeviceOrientation.landscapeRight
-                              ]);
-                            } else {
-                              logic.rotation = null;
-                              logic.update();
-                              SystemChrome.setPreferredOrientations(
-                                  DeviceOrientation.values);
-                            }
-                          },
-                        ),
-                      ),
                     Tooltip(
                       message: "收藏图片".tl,
                       child: IconButton(
@@ -172,6 +124,53 @@ extension ToolBar on ComicReadingPage {
                         },
                       ),
                     ),
+                    if (App.isWindows)
+                      Tooltip(
+                        message: "${"全屏".tl}(F12)",
+                        child: IconButton(
+                          icon: const Icon(Icons.fullscreen),
+                          onPressed: () {
+                            logic.fullscreen();
+                          },
+                        ),
+                      ),
+                    if (App.isAndroid && appdata.settings[76] == "0")
+                      Tooltip(
+                        message: "屏幕方向".tl,
+                        child: IconButton(
+                          icon: () {
+                            if (logic.rotation == null) {
+                              return const Icon(Icons.screen_rotation_alt);
+                            } else if (logic.rotation == false) {
+                              return const Icon(Icons.screen_lock_portrait);
+                            } else {
+                              return const Icon(Icons.screen_lock_landscape);
+                            }
+                          }.call(),
+                          onPressed: () {
+                            if (logic.rotation == null) {
+                              logic.rotation = false;
+                              logic.update();
+                              SystemChrome.setPreferredOrientations([
+                                DeviceOrientation.portraitUp,
+                                DeviceOrientation.portraitDown,
+                              ]);
+                            } else if (logic.rotation == false) {
+                              logic.rotation = true;
+                              logic.update();
+                              SystemChrome.setPreferredOrientations([
+                                DeviceOrientation.landscapeLeft,
+                                DeviceOrientation.landscapeRight
+                              ]);
+                            } else {
+                              logic.rotation = null;
+                              logic.update();
+                              SystemChrome.setPreferredOrientations(
+                                  DeviceOrientation.values);
+                            }
+                          },
+                        ),
+                      ),
                     Tooltip(
                       message: "自动翻页".tl,
                       child: IconButton(
@@ -190,14 +189,14 @@ extension ToolBar on ComicReadingPage {
                       Tooltip(
                         message: "章节".tl,
                         child: IconButton(
-                          icon: const Icon(Icons.format_list_numbered),
+                          icon: const Icon(Icons.library_books),
                           onPressed: openEpsDrawer,
                         ),
                       ),
                     Tooltip(
                       message: "保存图片".tl,
                       child: IconButton(
-                        icon: const Icon(Icons.save_alt),
+                        icon: const Icon(Icons.download),
                         onPressed: saveCurrentImage,
                       ),
                     ),
@@ -217,11 +216,16 @@ extension ToolBar on ComicReadingPage {
             ),
           );
 
-          child = Material(
-            borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-            surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
-            elevation: 3,
+          child = Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 0.6,
+                ),
+              ),
+            ),
             child: child,
           );
 
@@ -258,7 +262,7 @@ extension ToolBar on ComicReadingPage {
         min: 1,
         reversed: isReversed,
         max: logic.urls.length.toDouble(),
-        divisions: logic.urls.length - 1,
+        divisions: (logic.urls.length - 1).clamp(2, 1 << 16),
         onChanged: (i) {
           if (logic.readingMethod == ReadingMethod.topToBottomContinuously) {
             logic.jumpToPage(i.toInt());
@@ -352,11 +356,16 @@ extension ToolBar on ComicReadingPage {
           reverseDuration: const Duration(milliseconds: 150),
           switchInCurve: Curves.fastOutSlowIn,
           child: comicReadingPageLogic.tools
-              ? Material(
-                  surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
-                  elevation: 3,
-                  shadowColor:
-                      Theme.of(context).colorScheme.shadow.withOpacity(0.3),
+              ? Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                        width: 0.6,
+                      ),
+                    ),
+                  ),
                   child: SizedBox(
                     width: MediaQuery.of(context).size.width,
                     child: Row(
@@ -378,14 +387,37 @@ extension ToolBar on ComicReadingPage {
                             constraints: BoxConstraints(
                                 maxWidth:
                                     MediaQuery.of(context).size.width - 75),
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: Text(
-                                readingData.title,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 20),
-                              ),
-                            ),
+                            child: Builder(builder: (context) {
+                              var epName = readingData.eps?.values.elementAtOrNull(
+                                      comicReadingPageLogic.order - 1);
+                              if (epName == null) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: Text(
+                                    readingData.title,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 20),
+                                  ),
+                                );
+                              } else {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      readingData.title,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                    Text(
+                                      epName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                );
+                              }
+                            }),
                           ),
                         ),
                         //const Spacer(),

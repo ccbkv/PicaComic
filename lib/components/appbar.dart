@@ -6,6 +6,7 @@ class Appbar extends StatefulWidget implements PreferredSizeWidget {
       this.leading,
       this.actions,
       this.backgroundColor,
+      this.scrolledUnderElevation,
       super.key});
 
   final Widget title;
@@ -15,6 +16,8 @@ class Appbar extends StatefulWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
 
   final Color? backgroundColor;
+
+  final double? scrolledUnderElevation;
 
   @override
   State<Appbar> createState() => _AppbarState();
@@ -105,8 +108,10 @@ class _AppbarState extends State<Appbar> {
       ),
     ).paddingTop(context.padding.top);
     if (widget.backgroundColor != Colors.transparent) {
+      final elevation = widget.scrolledUnderElevation ??
+          ((_scrolledUnder && UiMode.m1(context)) ? 1 : 0);
       return Material(
-        elevation: (_scrolledUnder && UiMode.m1(context)) ? 1 : 0,
+        elevation: elevation,
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         color: widget.backgroundColor ?? Theme.of(context).colorScheme.surface,
         child: content,
@@ -619,5 +624,288 @@ class _IndicatorPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return false;
+  }
+}
+
+class AppTabBar extends StatefulWidget {
+  const AppTabBar({
+    super.key,
+    this.controller,
+    required this.tabs,
+    this.actionButton,
+    this.withUnderLine = true,
+  });
+
+  final TabController? controller;
+
+  final List<Tab> tabs;
+
+  final Widget? actionButton;
+
+  final bool withUnderLine;
+
+  @override
+  State<AppTabBar> createState() => _AppTabBarState();
+}
+
+class _AppTabBarState extends State<AppTabBar> {
+  late TabController _controller;
+
+  late List<GlobalKey> keys;
+
+  static const _kTabHeight = 48.0;
+
+  static const tabPadding = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
+
+  static const tabRadius = 8.0;
+
+  _IndicatorPainter? painter;
+
+  var scrollController = ScrollController();
+
+  var tabBarKey = GlobalKey();
+
+  var offsets = <double>[];
+
+  @override
+  void initState() {
+    keys = widget.tabs.map((e) => GlobalKey()).toList();
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  PageStorageBucket get bucket => PageStorage.of(context);
+
+  @override
+  void didChangeDependencies() {
+    _controller = widget.controller ?? DefaultTabController.of(context);
+    initPainter();
+    super.didChangeDependencies();
+    var prevIndex = bucket.readState(context) as int?;
+    if (prevIndex != null &&
+        prevIndex != _controller.index &&
+        prevIndex >= 0 &&
+        prevIndex < widget.tabs.length) {
+      _controller.index = prevIndex;
+    }
+    _controller.animation!.addListener(onTabChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant AppTabBar oldWidget) {
+    if (widget.controller != oldWidget.controller) {
+      _controller = widget.controller ?? DefaultTabController.of(context);
+      _controller.animation!.addListener(onTabChanged);
+      initPainter();
+    }
+    super.didUpdateWidget(oldWidget);
+  }
+
+  void initPainter() {
+    var old = painter;
+    painter = _IndicatorPainter(
+      controller: _controller,
+      color: context.colorScheme.primary,
+      padding: tabPadding,
+      radius: tabRadius,
+    );
+    if (old != null && old.offsets != null && old.itemHeight != null) {
+      painter!.update(old.offsets!, old.itemHeight!);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller.animation ?? _controller,
+      builder: buildTabBar,
+    );
+  }
+
+  void _tabLayoutCallback(List<double> offsets, double itemHeight) {
+    painter!.update(offsets, itemHeight);
+    this.offsets = offsets;
+  }
+
+  Widget buildTabBar(BuildContext context, Widget? _) {
+    var child = SingleChildScrollView(
+      key: const PageStorageKey('scroll'),
+      scrollDirection: Axis.horizontal,
+      padding: EdgeInsets.zero,
+      controller: scrollController,
+      child: CustomPaint(
+        painter: painter,
+        child: _TabRow(
+          callback: _tabLayoutCallback,
+          children: List.generate(widget.tabs.length, buildTab)
+            ..addIfNotNull(widget.actionButton?.padding(tabPadding)),
+        ),
+      ).paddingHorizontal(4),
+    );
+    return Container(
+      key: tabBarKey,
+      height: _kTabHeight,
+      width: double.infinity,
+      decoration: widget.withUnderLine
+          ? BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: context.colorScheme.outlineVariant,
+                  width: 0.6,
+                ),
+              ),
+            )
+          : null,
+      child: widget.tabs.isEmpty ? const SizedBox() : child,
+    );
+  }
+
+  int? previousIndex;
+
+  void onTabChanged() {
+    final int i = _controller.index;
+    if (i == previousIndex) {
+      return;
+    }
+    updateScrollOffset(i);
+    previousIndex = i;
+    bucket.writeState(context, i);
+  }
+
+  void updateScrollOffset(int i) {
+    final RenderBox tabBarBox =
+        tabBarKey.currentContext!.findRenderObject() as RenderBox;
+    final double tabLeft = offsets[i];
+    final double tabRight = offsets[i + 1];
+    final double tabWidth = tabRight - tabLeft;
+    final double tabCenter = tabLeft + tabWidth / 2;
+    final double tabBarWidth = tabBarBox.size.width;
+    double scrollOffset = tabCenter - tabBarWidth / 2;
+    if (scrollOffset == scrollController.offset) {
+      return;
+    }
+    scrollOffset = scrollOffset.clamp(
+      0.0,
+      scrollController.position.maxScrollExtent,
+    );
+    scrollController.animateTo(
+      scrollOffset,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void onTabClicked(int i) {
+    _controller.animateTo(i);
+  }
+
+  Widget buildTab(int i) {
+    return InkWell(
+      onTap: () => onTabClicked(i),
+      borderRadius: BorderRadius.circular(tabRadius),
+      child: KeyedSubtree(
+        key: keys[i],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: DefaultTextStyle(
+            style: DefaultTextStyle.of(context).style.copyWith(
+                  color: i == _controller.animation?.value.round()
+                      ? context.colorScheme.primary
+                      : context.colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+            child: widget.tabs[i],
+          ),
+        ),
+      ),
+    ).padding(tabPadding);
+  }
+}
+
+class TabActionButton extends StatelessWidget {
+  const TabActionButton({
+    super.key,
+    required this.icon,
+    required this.text,
+    required this.onPressed,
+  });
+
+  final Icon icon;
+
+  final String text;
+
+  final void Function() onPressed;
+
+  static const _kTabHeight = 46.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: _kTabHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: IconTheme(
+          data: IconThemeData(size: 20, color: context.colorScheme.primary),
+          child: Row(
+            children: [
+              icon,
+              const SizedBox(width: 8),
+              Text(text, style: TextStyle(color: context.colorScheme.primary)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TabViewBody extends StatefulWidget {
+  /// Create a tab view body, which will show the child at the current tab index.
+  const TabViewBody({super.key, required this.children, this.controller});
+
+  final List<Widget> children;
+
+  final TabController? controller;
+
+  @override
+  State<TabViewBody> createState() => _TabViewBodyState();
+}
+
+class _TabViewBodyState extends State<TabViewBody> {
+  late TabController _controller;
+
+  int _currentIndex = 0;
+
+  void updateIndex() {
+    if (_controller.index != _currentIndex) {
+      setState(() {
+        _currentIndex = _controller.index;
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller = widget.controller ?? DefaultTabController.of(context);
+    _currentIndex = _controller.index;
+    _controller.addListener(updateIndex);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _controller.removeListener(updateIndex);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.children[_currentIndex];
   }
 }

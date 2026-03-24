@@ -330,28 +330,29 @@ class NaviPaneState extends State<NaviPane>
   }
 
   Widget buildTop() {
-    return Material(
-      child: Container(
-        padding: const EdgeInsets.only(left: 16, right: 16),
-        height: _kTopBarHeight,
-        width: double.infinity,
-        child: Row(
-          children: [
-            Text(
-              widget.paneItems[currentPage].label,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const Spacer(),
-            for (var action in widget.paneActions)
-              Tooltip(
-                message: action.label,
-                child: IconButton(
-                  icon: Icon(action.icon),
-                  onPressed: action.onTap,
-                ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.86),
+      ),
+      height: _kTopBarHeight,
+      width: double.infinity,
+      padding: const EdgeInsets.only(left: 16, right: 16),
+      child: Row(
+        children: [
+          Text(
+            widget.paneItems[currentPage].label,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const Spacer(),
+          for (var action in widget.paneActions)
+            Tooltip(
+              message: action.label,
+              child: IconButton(
+                icon: Icon(action.icon),
+                onPressed: action.onTap,
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -802,8 +803,10 @@ class _NaviMainViewState extends State<_NaviMainView> {
         appBar: shouldShowAppBar
             ? AppBar(
                 elevation: 0,
+                scrolledUnderElevation: 0,
                 toolbarHeight: NaviPaneState._kTopBarHeight,
                 titleSpacing: 16,
+                backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.86),
                 title: Text(
                   state.widget.paneItems[state.currentPage].label,
                   style: const TextStyle(

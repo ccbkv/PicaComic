@@ -100,90 +100,114 @@ class _NormalFavoriteComicsPage extends ComicsPage<BaseComic> {
   final VoidCallback showFolders;
 
   @override
-  Future<Res<List<BaseComic>>> getComics(int i) {
-    return data.loadComic(i);
-  }
-
-  @override
-  String? get tag => "Network Comics Page: ${data.title}";
-
-  @override
   String? get title => null;
 
   @override
   bool get centerTitle => false;
 
   @override
+  Future<Res<List<BaseComic>>> getComics(int i) {
+    return data.loadComic(i);
+  }
+
+  @override
   String get sourceKey => data.key;
+
+  @override
+  String? get tag => "Network Comics Page: ${data.title}";
 
   @override
   Widget? get header {
     final context = App.globalContext!;
-    return SliverAppBar(
+    final shouldShowMenuButton = MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth;
+    final isMobileView = MediaQuery.of(context).size.width <= changePoint;
+    return SliverPersistentHeader(
       pinned: true,
-      leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-          ? IconButton(
-              icon: const Icon(Icons.menu),
-              color: Theme.of(context).colorScheme.primary,
-              onPressed: showFolders,
-            )
-          : null,
-      title: Text(data.title),
-      actions: [
-        Tooltip(
-          message: "刷新".tl,
-          child: IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              refresh();
-            },
-          ),
-        ),
-        PopupMenuButton(
-          tooltip: "更多".tl,
-          icon: const Icon(Icons.more_horiz),
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              child: Row(
-                children: [
-                  const Icon(Icons.sync),
-                  const SizedBox(width: 8),
-                  Text("转换为本地".tl),
-                ],
-              ),
-              onTap: () {
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  importNetworkFolder(data.key, 9999999, null, null);
-                });
+      delegate: _NetworkFavoritesAppBarDelegate(
+        title: data.title,
+        topPadding: isMobileView ? 0 : MediaQuery.of(context).padding.top,
+        leading: shouldShowMenuButton
+            ? IconButton(
+                icon: const Icon(Icons.menu),
+                color: Theme.of(context).colorScheme.primary,
+                onPressed: showFolders,
+              )
+            : null,
+        actions: [
+          Tooltip(
+            message: "刷新".tl,
+            child: IconButton(
+              icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              onPressed: () {
+                refresh();
               },
             ),
+          ),
+          MenuButton(entries: [
+            MenuEntry(
+              icon: Icons.sync,
+              text: "转换为本地".tl,
+              onClick: () {
+                importNetworkFolder(data.key, 9999999, null, null);
+              },
+            )
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+class _NetworkFavoritesAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final String title;
+  final Widget? leading;
+  final List<Widget> actions;
+  final double topPadding;
+
+  _NetworkFavoritesAppBarDelegate({
+    required this.title,
+    this.leading,
+    required this.actions,
+    required this.topPadding,
+  });
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        elevation: shrinkOffset > 0 ? 2 : 0,
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            leading ?? const SizedBox(),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+            ...actions,
+            const SizedBox(width: 8),
           ],
-        ),
-      ],
+        ).paddingTop(topPadding),
+      ),
     );
   }
 
   @override
-  List<ComicTileMenuOption>? get addonMenuOptions {
-    return [
-      if (data.addOrDelFavorite != null)
-        ComicTileMenuOption(
-          "取消收藏".tl,
-          Icons.playlist_remove_outlined,
-          (id) {
-            if (id == null) return;
-            var dialog = showLoadingDialog(App.globalContext!);
-            data.addOrDelFavorite!(id, "0", false).then((res) {
-              dialog.close();
-              if (res.error) {
-                showToast(message: res.errorMessage!);
-              } else {
-                refresh();
-              }
-            });
-          },
-        )
-    ];
+  double get maxExtent => 52.0 + topPadding;
+
+  @override
+  double get minExtent => 52.0 + topPadding;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return oldDelegate is! _NetworkFavoritesAppBarDelegate ||
+        title != oldDelegate.title ||
+        leading != oldDelegate.leading ||
+        actions != oldDelegate.actions;
   }
 }
 
@@ -233,72 +257,93 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
 
   @override
   Widget build(BuildContext context) {
-    var sliverAppBar = SliverAppBar(
-      leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-          ? IconButton(
-              icon: const Icon(Icons.menu),
-              color: Theme.of(context).colorScheme.primary,
-              onPressed: showFolders,
-            )
-          : null,
-      title: GestureDetector(
-        onTap: MediaQuery.of(context).size.width < _kTwoPanelChangeWidth ? showFolders : null,
-        child: Text(widget.data.title),
-      ),
-    );
-
-    var appBar = AppBar(
-      leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-          ? IconButton(
-              icon: const Icon(Icons.menu),
-              color: Theme.of(context).colorScheme.primary,
-              onPressed: showFolders,
-            )
-          : null,
-      title: GestureDetector(
-        onTap: MediaQuery.of(context).size.width < _kTwoPanelChangeWidth ? showFolders : null,
-        child: Text(widget.data.title),
-      ),
-    );
-
     if (_loading) {
       loadPage();
-      return Column(
-        children: [
-          appBar,
-          const Expanded(
-            child: Center(
-              child: CircularProgressIndicator(),
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _NetworkFavoritesAppBarDelegate(
+                title: widget.data.title,
+                topPadding: MediaQuery.of(context).size.width <= changePoint ? 0 : MediaQuery.of(context).padding.top,
+                leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
+                    ? IconButton(
+                        icon: const Icon(Icons.menu),
+                        color: Theme.of(context).colorScheme.primary,
+                        onPressed: showFolders,
+                      )
+                    : null,
+                actions: const [],
+              ),
             ),
-          ),
-        ],
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ],
+        ),
       );
     } else if (_errorMessage != null) {
-      return Column(
-        children: [
-          appBar,
-          Expanded(
-            child: NetworkError(
-              message: _errorMessage!,
-              retry: () {
-                setState(() {
-                  _loading = true;
-                  _errorMessage = null;
-                });
-              },
-              withAppbar: false,
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _NetworkFavoritesAppBarDelegate(
+                title: widget.data.title,
+                topPadding: MediaQuery.of(context).size.width <= changePoint ? 0 : MediaQuery.of(context).padding.top,
+                leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
+                    ? IconButton(
+                        icon: const Icon(Icons.menu),
+                        color: Theme.of(context).colorScheme.primary,
+                        onPressed: showFolders,
+                      )
+                    : null,
+                actions: const [],
+              ),
             ),
-          ),
-        ],
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: NetworkError(
+                message: _errorMessage!,
+                retry: () {
+                  setState(() {
+                    _loading = true;
+                    _errorMessage = null;
+                  });
+                },
+                withAppbar: false,
+              ),
+            ),
+          ],
+        ),
       );
     } else {
       var length = folders!.length;
       if (widget.data.allFavoritesId != null) length++;
       final keys = folders!.keys.toList();
 
-      return CustomScrollView(
-        slivers: [
-          sliverAppBar,
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _NetworkFavoritesAppBarDelegate(
+                title: widget.data.title,
+                topPadding: MediaQuery.of(context).size.width <= changePoint ? 0 : MediaQuery.of(context).padding.top,
+                leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
+                    ? IconButton(
+                        icon: const Icon(Icons.menu),
+                        color: Theme.of(context).colorScheme.primary,
+                        onPressed: showFolders,
+                      )
+                    : null,
+                actions: const [],
+              ),
+            ),
           SliverGrid(
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 450,
@@ -375,7 +420,8 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
                 ),
               ),
             ),
-        ],
+          ],
+        ),
       );
     }
   }
@@ -566,8 +612,8 @@ class _FavoriteFolderState extends State<_FavoriteFolder> {
   }
 }
 
-class _FavoriteFolderComicsPage extends ComicsPage<BaseComic> {
-  _FavoriteFolderComicsPage(
+class _FavoriteFolderComicsPage extends StatefulWidget {
+  const _FavoriteFolderComicsPage(
       this.data, this.folderID, this.folderTitle, this.showFolders);
 
   final FavoriteData data;
@@ -576,80 +622,189 @@ class _FavoriteFolderComicsPage extends ComicsPage<BaseComic> {
   final VoidCallback showFolders;
 
   @override
-  Future<Res<List<BaseComic>>> getComics(int i) {
-    return data.loadComic(i, folderID);
+  State<_FavoriteFolderComicsPage> createState() => _FavoriteFolderComicsPageState();
+}
+
+class _FavoriteFolderComicsPageState extends State<_FavoriteFolderComicsPage> {
+  int _page = 1;
+  int? _maxPage;
+  bool _loading = false;
+  String? _errorMessage;
+  List<BaseComic> _comics = [];
+
+  Future<void> _loadComics(int page) async {
+    if (_loading) return;
+    setState(() {
+      _loading = true;
+    });
+    var res = await widget.data.loadComic(page, widget.folderID);
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        if (res.error) {
+          _errorMessage = res.errorMessage;
+        } else {
+          _maxPage = res.subData;
+          if (page == 1) {
+            _comics = res.data;
+          } else {
+            _comics.addAll(res.data);
+          }
+        }
+      });
+    }
+  }
+
+  void _refresh() {
+    _page = 1;
+    _comics = [];
+    _loadComics(1);
+  }
+
+  void _loadNextPage() {
+    if (_maxPage != null && _page >= _maxPage!) return;
+    _page++;
+    _loadComics(_page);
   }
 
   @override
-  String? get tag => "Network Folder: $folderTitle";
+  void initState() {
+    super.initState();
+    _loadComics(1);
+  }
 
   @override
-  String? get title => null;
-
-  @override
-  bool get centerTitle => false;
-
-  @override
-  String get sourceKey => data.key;
-
-  @override
-  Widget? get header {
-    final context = App.globalContext!;
-    return SliverAppBar(
-      pinned: true,
-      leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-          ? IconButton(
-              icon: const Icon(Icons.menu),
-              color: Theme.of(context).colorScheme.primary,
-              onPressed: showFolders,
-            )
-          : null,
-      title: Text(folderTitle),
-      actions: [
-        PopupMenuButton(
-          tooltip: "更多".tl,
-          icon: const Icon(Icons.more_horiz),
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              child: Row(
-                children: [
-                  const Icon(Icons.sync),
-                  const SizedBox(width: 8),
-                  Text("转换为本地".tl),
+  Widget build(BuildContext context) {
+    if (_loading && _comics.isEmpty) {
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _NetworkFavoritesAppBarDelegate(
+                title: widget.folderTitle,
+                topPadding: MediaQuery.of(context).size.width <= changePoint ? 0 : MediaQuery.of(context).padding.top,
+                leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
+                    ? IconButton(
+                        icon: const Icon(Icons.menu),
+                        color: Theme.of(context).colorScheme.primary,
+                        onPressed: widget.showFolders,
+                      )
+                    : null,
+                actions: [
+                  MenuButton(entries: [
+                    MenuEntry(
+                      icon: Icons.sync,
+                      text: "转换为本地".tl,
+                      onClick: () {
+                        importNetworkFolder(widget.data.key, 9999999, widget.folderTitle, widget.folderID);
+                      },
+                    )
+                  ]),
                 ],
               ),
-              onTap: () {
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  importNetworkFolder(data.key, 9999999, folderTitle, folderID);
-                });
-              },
+            ),
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
             ),
           ],
         ),
-      ],
-    );
-  }
+      );
+    }
 
-  @override
-  List<ComicTileMenuOption>? get addonMenuOptions {
-    return [
-      if (data.addOrDelFavorite != null)
-        ComicTileMenuOption(
-          "取消收藏".tl,
-          Icons.playlist_remove_outlined,
-          (id) {
-            if (id == null) return;
-            var dialog = showLoadingDialog(App.globalContext!);
-            data.addOrDelFavorite!(id, folderID, false).then((res) {
-              dialog.close();
-              if (res.error) {
-                showToast(message: res.errorMessage!);
-              } else {
-                refresh();
-              }
-            });
-          },
-        )
-    ];
+    if (_errorMessage != null && _comics.isEmpty) {
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _NetworkFavoritesAppBarDelegate(
+                title: widget.folderTitle,
+                topPadding: MediaQuery.of(context).size.width <= changePoint ? 0 : MediaQuery.of(context).padding.top,
+                leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
+                    ? IconButton(
+                        icon: const Icon(Icons.menu),
+                        color: Theme.of(context).colorScheme.primary,
+                        onPressed: widget.showFolders,
+                      )
+                    : null,
+                actions: [
+                  MenuButton(entries: [
+                    MenuEntry(
+                      icon: Icons.sync,
+                      text: "转换为本地".tl,
+                      onClick: () {
+                        importNetworkFolder(widget.data.key, 9999999, widget.folderTitle, widget.folderID);
+                      },
+                    )
+                  ]),
+                ],
+              ),
+            ),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: NetworkError(
+                message: _errorMessage!,
+                retry: _refresh,
+                withAppbar: false,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _NetworkFavoritesAppBarDelegate(
+              title: widget.folderTitle,
+              topPadding: MediaQuery.of(context).padding.top,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              actions: [
+                MenuButton(entries: [
+                  MenuEntry(
+                    icon: Icons.sync,
+                    text: "转换为本地".tl,
+                    onClick: () {
+                      importNetworkFolder(widget.data.key, 9999999, widget.folderTitle, widget.folderID);
+                    },
+                  )
+                ]),
+              ],
+            ),
+          ),
+          SliverGrid(
+            delegate: SliverChildBuilderDelegate(
+              childCount: _comics.length,
+              (context, i) {
+                if (i == _comics.length - 1 && !_loading) {
+                  _loadNextPage();
+                }
+                return buildComicTile(context, _comics[i], widget.data.key);
+              },
+            ),
+            gridDelegate: SliverGridDelegateWithComics(),
+          ),
+          if (_loading)
+            const SliverToBoxAdapter(
+              child: ListLoadingIndicator(),
+            )
+          else
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 80),
+            ),
+        ],
+      ),
+    );
   }
 }

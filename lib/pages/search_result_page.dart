@@ -679,10 +679,6 @@ class _SearchResultPageState extends State<_SearchResultPage> {
       context: context,
       builder: (context) => CategorySelectorDialog(
         categories: const [
-          "大家都在看",
-          "大濕推薦",
-          "那年今天",
-          "官方都在看",
           "嗶咔漢化",
           "全彩",
           "長篇",

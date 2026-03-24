@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:pica_comic/base.dart';
+import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/main.dart';
 import 'package:pica_comic/utils/font_manager.dart';
@@ -70,15 +71,11 @@ class _FontManagementPageState extends State<FontManagementPage> {
                         icon: const Icon(Icons.delete),
                         onPressed: () => showDialog(
                           context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text("确认删除".tl),
-                            content: Text("要删除字体 $name 吗?".tl),
+                          builder: (context) => ContentDialog(
+                            title: "确认删除".tl,
+                            content: Text("要删除字体 $name 吗?".tl).paddingHorizontal(16).paddingVertical(8),
                             actions: [
-                              TextButton(
-                                onPressed: () => App.globalBack(),
-                                child: Text("取消".tl),
-                              ),
-                              TextButton(
+                              Button.filled(
                                 onPressed: () async {
                                   App.globalBack();
                                   var fontName = name.split('.').first;

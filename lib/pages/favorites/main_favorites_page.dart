@@ -1139,16 +1139,21 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
 
 mixin class _LocalFavoritesManager {
   void deleteFolder(String folder) {
-    showConfirmDialog(App.globalContext!, "确认删除".tl, "此操作无法撤销, 是否继续?".tl, () {
-      App.globalBack();
-      LocalFavoritesManager().deleteFolder(folder);
-      final controller = StateController.find<FavoritesPageController>();
-      if (controller.current == folder && !controller.isNetwork!) {
-        controller.current = null;
-        controller.isNetwork = null;
-      }
-      controller.update();
-    });
+    showConfirmDialog(
+      context: App.globalContext!,
+      title: "确认删除".tl,
+      content: "此操作无法撤销, 是否继续?".tl,
+      onConfirm: () {
+        App.globalBack();
+        LocalFavoritesManager().deleteFolder(folder);
+        final controller = StateController.find<FavoritesPageController>();
+        if (controller.current == folder && !controller.isNetwork!) {
+          controller.current = null;
+          controller.isNetwork = null;
+        }
+        controller.update();
+      },
+    );
   }
 
   void rename(String folder) async {

@@ -38,14 +38,11 @@ void findUpdate(BuildContext context) {
           showDialog(
               context: context,
               builder: (context) {
-                return AlertDialog(
-                  title: Text("有可用更新".tl),
-                  content: Text(s),
+                return ContentDialog(
+                  title: "有可用更新".tl,
+                  content: Text(s).paddingHorizontal(16).paddingVertical(8),
                   actions: [
-                    TextButton(
-                        onPressed: () => App.globalBack(),
-                        child: Text("取消".tl)),
-                    TextButton(
+                    Button.filled(
                         onPressed: () {
                           getDownloadUrl().then((s) {
                             launchUrlString(s,
@@ -359,195 +356,177 @@ class _SetDownloadFolderDialogState extends State<SetDownloadFolderDialog> {
         ],
       );
     }
-    return SimpleDialog(
-      title: Text("设置下载目录".tl),
-      children: [
-        if (App.isDesktop || widget.haveManageFilesPermission)
-          SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: TextField(
-                    controller: controller,
-                    decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: "路径".tl,
-                        hintText: "为空表示使用App数据目录".tl),
+    return ContentDialog(
+      title: "设置下载目录".tl,
+      content: SizedBox(
+        width: 400,
+        child: (App.isDesktop || widget.haveManageFilesPermission)
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
+                    child: TextField(
+                      controller: controller,
+                      decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: "路径".tl,
+                          hintText: "为空表示使用App数据目录".tl),
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: CheckboxListTile(
-                    value: transform,
-                    onChanged: (b) => setState(() {
-                      transform = b!;
-                    }),
-                    title: Text("转移数据".tl),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+                    child: CheckboxListTile(
+                      value: transform,
+                      onChanged: (b) => setState(() {
+                        transform = b!;
+                      }),
+                      title: Text("转移数据".tl),
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.info_outline,
-                        size: 18,
-                      ),
-                      const SizedBox(
-                        width: 4,
-                      ),
-                      Expanded(
-                        child: SizedBox(
-                          child: Text("如需还原之前的下载, 将路径填写为下载数据的位置, 并取消勾选转移数据".tl),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          size: 18,
                         ),
-                      )
-                    ],
+                        const SizedBox(
+                          width: 4,
+                        ),
+                        Expanded(
+                          child: SizedBox(
+                            child: Text("如需还原之前的下载, 将路径填写为下载数据的位置, 并取消勾选转移数据".tl),
+                          ),
+                        )
+                      ],
+                    ),
                   ),
-                ),
-                Center(
-                  child: FilledButton(
-                    onPressed: () async {
-                      if (controller.text == appdata.settings[22]) return;
-                      var directory = Directory(controller.text);
-                      if (directory.existsSync() || controller.text == "") {
-                        var oldPath = appdata.settings[22];
-                        appdata.settings[22] = controller.text;
-                        if (transform) {
-                          showToast(message: "正在复制文件".tl);
-                          await Future.delayed(
-                              const Duration(milliseconds: 200));
-                        }
-                        var res = await downloadManager
-                            .updatePath(controller.text, transform: transform);
-                        if (res == "ok") {
-                          hideAllMessages();
-                          if (context.mounted) {
-                            context.pop();
-                          }
-                          showToast(message: "更新成功".tl);
-                          appdata.updateSettings();
-                        } else {
-                          appdata.settings[22] = oldPath;
-                          showToast(message: res);
-                        }
-                      } else {
-                        showToast(message: "目录不存在".tl);
-                      }
-                    },
-                    child: Text("提交".tl),
-                  ),
-                ),
-                const SizedBox(
-                  height: 8,
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
-                  child: Text("${"现在的路径为".tl}: ${DownloadManager().path}"),
-                )
-              ],
-            ),
-          )
-        else
-          SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RadioListTile<String>(
-                    title: Text("App数据目录".tl),
-                    value: "",
-                    groupValue: current,
-                    onChanged: (value) => setState(() {
-                          current = value!;
-                        })),
-                for (int i = 0; i < widget.paths!.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+                    child: Text("${"现在的路径为".tl}: ${DownloadManager().path}"),
+                  )
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   RadioListTile<String>(
-                      title: Text(widget.paths![i]),
-                      value: widget.paths![i],
+                      title: Text("App数据目录".tl),
+                      value: "",
                       groupValue: current,
                       onChanged: (value) => setState(() {
                             current = value!;
                           })),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: ListTile(
-                    title: Text("允许储存权限".tl),
-                    subtitle: Text("需要储存权限以选取任意目录".tl),
-                    onTap: () {
-                      const MethodChannel("pica_comic/settings")
-                          .invokeMethod("files");
-                      App.globalBack();
-                    },
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: CheckboxListTile(
-                    value: transform,
-                    onChanged: (b) => setState(() {
-                      transform = b!;
-                    }),
-                    title: Text("转移数据".tl),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.info_outline,
-                        size: 18,
-                      ),
-                      const SizedBox(
-                        width: 2,
-                      ),
-                      Expanded(
-                        child: SizedBox(
-                          child: Text("如需还原之前的下载, 将路径填写为下载数据的位置, 并取消勾选转移数据".tl),
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  height: 60,
-                  child: Center(
-                    child: FilledButton(
-                      child: Text("确认".tl),
-                      onPressed: () async {
-                        if (appdata.settings[22] != current) {
-                          var oldPath = appdata.settings[22];
-                          appdata.settings[22] = current;
-                          if (transform) {
-                            showToast(message: "正在复制文件".tl);
-                            await Future.delayed(
-                                const Duration(milliseconds: 200));
-                          }
-                          var res = await downloadManager.updatePath(current,
-                              transform: transform);
-                          if (res == "ok") {
-                            App.globalBack();
-                            showToast(message: "更新成功".tl);
-                            appdata.updateSettings();
-                          } else {
-                            appdata.settings[22] = oldPath;
-                            showToast(message: res);
-                          }
-                        } else {
-                          App.globalBack();
-                        }
+                  for (int i = 0; i < widget.paths!.length; i++)
+                    RadioListTile<String>(
+                        title: Text(widget.paths![i]),
+                        value: widget.paths![i],
+                        groupValue: current,
+                        onChanged: (value) => setState(() {
+                              current = value!;
+                            })),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: ListTile(
+                      title: Text("允许储存权限".tl),
+                      subtitle: Text("需要储存权限以选取任意目录".tl),
+                      onTap: () {
+                        const MethodChannel("pica_comic/settings")
+                            .invokeMethod("files");
+                        App.globalBack();
                       },
                     ),
                   ),
-                ),
-              ],
-            ),
-          )
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: CheckboxListTile(
+                      value: transform,
+                      onChanged: (b) => setState(() {
+                        transform = b!;
+                      }),
+                      title: Text("转移数据".tl),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          size: 18,
+                        ),
+                        const SizedBox(
+                          width: 2,
+                        ),
+                        Expanded(
+                          child: SizedBox(
+                            child: Text("如需还原之前的下载, 将路径填写为下载数据的位置, 并取消勾选转移数据".tl),
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () async {
+            if (App.isDesktop || widget.haveManageFilesPermission) {
+              if (controller.text == appdata.settings[22]) return;
+              var directory = Directory(controller.text);
+              if (directory.existsSync() || controller.text == "") {
+                var oldPath = appdata.settings[22];
+                appdata.settings[22] = controller.text;
+                if (transform) {
+                  showToast(message: "正在复制文件".tl);
+                  await Future.delayed(const Duration(milliseconds: 200));
+                }
+                var res = await downloadManager.updatePath(controller.text,
+                    transform: transform);
+                if (res == "ok") {
+                  hideAllMessages();
+                  if (context.mounted) {
+                    context.pop();
+                  }
+                  showToast(message: "更新成功".tl);
+                  appdata.updateSettings();
+                } else {
+                  appdata.settings[22] = oldPath;
+                  showToast(message: res);
+                }
+              } else {
+                showToast(message: "目录不存在".tl);
+              }
+            } else {
+              if (appdata.settings[22] != current) {
+                var oldPath = appdata.settings[22];
+                appdata.settings[22] = current;
+                if (transform) {
+                  showToast(message: "正在复制文件".tl);
+                  await Future.delayed(const Duration(milliseconds: 200));
+                }
+                var res = await downloadManager.updatePath(current,
+                    transform: transform);
+                if (res == "ok") {
+                  App.globalBack();
+                  showToast(message: "更新成功".tl);
+                  appdata.updateSettings();
+                } else {
+                  appdata.settings[22] = oldPath;
+                  showToast(message: res);
+                }
+              } else {
+                App.globalBack();
+              }
+            }
+          },
+          child: Text("确认".tl),
+        ),
       ],
     );
   }
@@ -786,13 +765,11 @@ void clearUserData(BuildContext context) {
   }
   showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-            title: Text("警告".tl),
-            content: Text("此操作无法撤销, 是否继续?".tl),
+      builder: (context) => ContentDialog(
+            title: "警告".tl,
+            content: Text("此操作无法撤销, 是否继续?".tl).paddingHorizontal(16).paddingVertical(8),
             actions: [
-              TextButton(
-                  onPressed: () => App.globalBack(), child: Text("取消".tl)),
-              TextButton(
+              Button.filled(
                   onPressed: () async {
                     await clearAppdata();
                     App.offAll(() => const WelcomePage());
@@ -846,19 +823,17 @@ void exportDataSetting(BuildContext context) {
 
   showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-            title: Text("导出用户数据".tl),
-            content: Text("将导出设置, 账号, 历史记录, 下载内容, 本地收藏等数据".tl),
+      builder: (context) => ContentDialog(
+            title: "导出用户数据".tl,
+            content: Text("将导出设置, 账号, 历史记录, 下载内容, 本地收藏等数据".tl).paddingHorizontal(16).paddingVertical(8),
             actions: [
-              TextButton(
-                  onPressed: () => App.globalBack(), child: Text("取消".tl)),
-              TextButton(
+              Button.text(
                   onPressed: () {
                     App.globalBack();
                     export(false);
                   },
                   child: Text("导出不含下载的数据".tl)),
-              TextButton(
+              Button.filled(
                   onPressed: () {
                     App.globalBack();
                     export(true);
@@ -871,14 +846,12 @@ void exportDataSetting(BuildContext context) {
 void importDataSetting(BuildContext context) {
   showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-            title: Text("导入用户数据".tl),
+      builder: (context) => ContentDialog(
+            title: "导入用户数据".tl,
             content: Text("${"将导入设置, 账号, 历史记录, 下载内容, 本地收藏等数据, 现在的所有数据将会被覆盖".tl}"
-                "\n${"如果导入的数据中包含下载数据, 则当前的下载数据也将被覆盖".tl}"),
+                "\n${"如果导入的数据中包含下载数据, 则当前的下载数据也将被覆盖".tl}").paddingHorizontal(16).paddingVertical(8),
             actions: [
-              TextButton(
-                  onPressed: () => App.globalBack(), child: Text("取消".tl)),
-              TextButton(
+              Button.filled(
                   onPressed: () {
                     App.globalBack();
                     var dialog = showLoadingDialog(context, allowCancel: false);

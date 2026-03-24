@@ -15,18 +15,19 @@ class FlyoutController {
 }
 
 class Flyout extends StatefulWidget {
-  const Flyout(
-      {super.key,
-      required this.flyoutBuilder,
-      required this.child,
-      this.enableTap = false,
-      this.enableDoubleTap = false,
-      this.enableLongPress = false,
-      this.enableSecondaryTap = false,
-      this.withInkWell = false,
-      this.borderRadius = 0,
-      this.controller,
-      this.navigator});
+  const Flyout({
+    super.key,
+    required this.flyoutBuilder,
+    required this.child,
+    this.enableTap = false,
+    this.enableDoubleTap = false,
+    this.enableLongPress = false,
+    this.enableSecondaryTap = false,
+    this.withInkWell = false,
+    this.borderRadius = 0,
+    this.controller,
+    this.navigator,
+  });
 
   final WidgetBuilder flyoutBuilder;
 
@@ -49,10 +50,14 @@ class Flyout extends StatefulWidget {
   final FlyoutController? controller;
 
   @override
-  State<Flyout> createState() => _FlyoutState();
+  State<Flyout> createState() => FlyoutState();
+
+  static FlyoutState of(BuildContext context) {
+    return context.findAncestorStateOfType<FlyoutState>()!;
+  }
 }
 
-class _FlyoutState extends State<Flyout> {
+class FlyoutState extends State<Flyout> {
   @override
   void initState() {
     if (widget.controller != null) {
@@ -93,7 +98,11 @@ class _FlyoutState extends State<Flyout> {
   void show() {
     var renderBox = context.findRenderObject() as RenderBox;
     var rect = renderBox.localToGlobal(Offset.zero) & renderBox.size;
-    var navigator = widget.navigator ?? Navigator.of(context);
+    var navigator = widget.navigator ??
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        );
     navigator.push(PageRouteBuilder(
         fullscreenDialog: true,
         barrierDismissible: true,
@@ -164,7 +173,7 @@ class FlyoutContent extends StatelessWidget {
 
   final String title;
 
-  final String? content;
+  final Widget? content;
 
   final List<Widget> actions;
 
@@ -172,15 +181,20 @@ class FlyoutContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return IntrinsicWidth(
       child: Material(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         type: MaterialType.card,
-        elevation: 1,
-        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+        color: context.colorScheme.surface,
         child: Container(
           constraints: const BoxConstraints(
             minWidth: minFlyoutWidth,
           ),
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: context.brightness == Brightness.dark
+                ? Border.all(color: context.colorScheme.outlineVariant)
+                : null,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,7 +205,7 @@ class FlyoutContent extends StatelessWidget {
               if (content != null)
                 Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Text(content!, style: const TextStyle(fontSize: 12)),
+                  child: content!,
                 ),
               const SizedBox(
                 height: 12,

@@ -99,10 +99,10 @@ class _LocalSearchPageState extends StateWithController<LocalSearchPage> {
                       icon: const Icon(Icons.create_new_folder_outlined),
                       onPressed: () {
                         showConfirmDialog(
-                          App.globalContext!,
-                          "创建收藏夹".tl,
-                          "从当前的搜索结果创建新的收藏夹".tl,
-                          () {
+                          context: App.globalContext!,
+                          title: "创建收藏夹".tl,
+                          content: "从当前的搜索结果创建新的收藏夹".tl,
+                          onConfirm: () {
                             var name = LocalFavoritesManager()
                                 .createFolder("search result", true);
                             for (var comic in comics) {

@@ -1,22 +1,10 @@
 part of pica_reader;
 
 void showSettings(BuildContext context) {
-  if (UiMode.m1(context)) {
-    showModalBottomSheet(
-        context: context,
-        builder: (context) => AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              child: const ReadingSettings(),
-            ));
-  } else {
-    showSideBar(
-        context,
-        const SingleChildScrollView(
-          child: ReadingSettings(),
-        ),
-        useSurfaceTintColor: true,
-        width: 450);
-  }
+  showSideBar(
+      context,
+      const ReadingSettings(),
+      width: 400);
 }
 
 class ReadingSettings extends StatefulWidget {
@@ -33,99 +21,128 @@ class _ReadingSettingsState extends State<ReadingSettings> {
   bool lowBrightness = appdata.settings[18] == "1";
   var value = int.parse(appdata.settings[9]);
   int i = 0;
-  double opacityLevel = 1.0;
+
+  void setValue(int newValue) {
+    App.globalBack();
+    value = newValue;
+    appdata.settings[9] = value.toString();
+    appdata.writeData();
+    var logic = StateController.find<ComicReadingPageLogic>();
+    logic.tools = false;
+    logic.showSettings = false;
+    logic.index = 1;
+    logic.pageController = PageController(initialPage: 1);
+    logic.clearPhotoViewControllers();
+    logic.update();
+  }
 
   @override
   Widget build(BuildContext context) {
     var logic = StateController.find<ComicReadingPageLogic>();
-    var pages = <Widget>[
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 0, 5),
-            child: Text(
-              "阅读设置".tl,
-              style: const TextStyle(fontSize: 18),
-            ),
-          ),
-          ListTile(
+
+    return Scaffold(
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        reverseDuration: const Duration(milliseconds: 0),
+        switchInCurve: Curves.ease,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          Tween<Offset> tween;
+          if (i == 0) {
+            tween = Tween<Offset>(
+                begin: const Offset(-0.1, 0), end: const Offset(0, 0));
+          } else {
+            tween = Tween<Offset>(
+                begin: const Offset(0.1, 0), end: const Offset(0, 0));
+          }
+          return SlideTransition(
+            position: tween.animate(animation),
+            child: child,
+          );
+        },
+        child: KeyedSubtree(
+          key: Key(i.toString()),
+          child: i == 0 
+            ? _buildMainSettings(context, logic)
+            : i == 1 
+              ? _buildReadingModeSettings(context)
+              : _buildProxySettings(context),
+        ),
+      ),
+    );
+  }
+
+  /// 主设置页面 - venera 风格
+  Widget _buildMainSettings(BuildContext context, ComicReadingPageLogic logic) {
+    return CustomScrollView(
+      slivers: [
+        // AppBar
+        SliverAppBar(
+          pinned: true,
+          title: Text("阅读设置".tl),
+        ),
+        // 阅读模式
+        SliverToBoxAdapter(
+          child: ListTile(
             leading: const Icon(Icons.chrome_reader_mode),
             title: Text("阅读模式".tl),
-            subtitle: Text([
-              "从左至右".tl,
-              "从右至左".tl,
-              "从上至下".tl,
-              "从上至下(连续)".tl,
-              "双页".tl,
-              "双页(反向)".tl
-            ][int.parse(appdata.settings[9]) - 1]),
-            trailing: const Icon(Icons.arrow_right),
-            onTap: () => setState(() {
-              i = 1;
-            }),
-          ),
-          if (appdata.settings[9] == "5" ||
-              appdata.settings[9] == "6")
-            ListTile(
-              leading: const Icon(Icons.auto_awesome_motion),
-              title: Text("首页显示单张图片".tl),
-              trailing: Switch(
-                value: appdata.implicitData[1] == '1',
-                onChanged: (b) {
-                  appdata.implicitData[1] = b ? '1' : '0';
-                  appdata.writeData();
-                  setState(() {});
-                  logic.update();
-                },
-              ),
-              onTap: () {},
+            trailing: Select(
+              width: 136,
+              initialValue: int.parse(appdata.settings[9]) - 1,
+              values: [
+                "从左至右".tl,
+                "从右至左".tl,
+                "从上至下".tl,
+                "从上至下(连续)".tl,
+                "双页".tl,
+                "双页(反向)".tl
+              ],
+              onChange: (i) => setValue(i + 1),
             ),
-          ListTile(
-            leading: const Icon(Icons.touch_app_outlined),
-            title: Text("点按翻页".tl),
-            trailing: Switch(
-              value: pageChangeValue,
+          ),
+        ),
+        // 首页显示单张图片（双页模式）
+        if (appdata.settings[9] == "5" || appdata.settings[9] == "6")
+          SliverToBoxAdapter(
+            child: SwitchListTile(
+              title: Text("首页显示单张图片".tl),
+              value: appdata.implicitData[1] == '1',
               onChanged: (b) {
-                b ? appdata.settings[0] = "1" : appdata.settings[0] = "0";
-                setState(() {
-                  pageChangeValue = b;
-                });
+                appdata.implicitData[1] = b ? '1' : '0';
                 appdata.writeData();
+                setState(() {});
+                logic.update();
               },
             ),
-            onTap: () {},
           ),
-          if (appdata.settings[0] == "1")
-            ListTile(
-              leading: const SizedBox(),
+        // 点按翻页
+        SliverToBoxAdapter(
+          child: SwitchListTile(
+            title: Text("点按翻页".tl),
+            value: pageChangeValue,
+            onChanged: (b) {
+              b ? appdata.settings[0] = "1" : appdata.settings[0] = "0";
+              setState(() => pageChangeValue = b);
+              appdata.writeData();
+            },
+          ),
+        ),
+        // 点按翻页识别范围
+        if (appdata.settings[0] == "1")
+          SliverToBoxAdapter(
+            child: ListTile(
+              leading: const SizedBox(width: 40),
               title: Text("点按翻页识别范围".tl),
-              subtitle: SizedBox(
-                height: 25,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned(
-                        top: 0,
-                        bottom: 0,
-                        left: -20,
-                        right: 0,
-                        child: Slider(
-                          max: 40,
-                          min: 0,
-                          divisions: 40,
-                          value: int.parse(appdata.settings[40]).toDouble(),
-                          overlayColor: WidgetStateColor.resolveWith(
-                              (states) => Colors.transparent),
-                          onChanged: (v) {
-                            if (v == 0) return;
-                            appdata.settings[40] = v.toInt().toString();
-                            appdata.updateSettings();
-                            setState(() {});
-                          },
-                        ))
-                  ],
-                ),
+              subtitle: Slider(
+                max: 40,
+                min: 0,
+                divisions: 40,
+                value: int.parse(appdata.settings[40]).toDouble(),
+                onChanged: (v) {
+                  if (v == 0) return;
+                  appdata.settings[40] = v.toInt().toString();
+                  appdata.updateSettings();
+                  setState(() {});
+                },
               ),
               trailing: SizedBox(
                 width: 40,
@@ -135,61 +152,47 @@ class _ReadingSettingsState extends State<ReadingSettings> {
                 ),
               ),
             ),
-          ListTile(
-            leading: const Icon(Icons.swap_horiz),
+          ),
+        // 反转点按翻页
+        SliverToBoxAdapter(
+          child: SwitchListTile(
             title: Text("反转点按翻页".tl),
-            trailing: Switch(
-              value: appdata.settings[70] == "1",
-              onChanged: (b) => setState(() {
-                appdata.settings[70] = b ? "1" : "0";
-                appdata.updateSettings();
-              }),
-            ),
+            value: appdata.settings[70] == "1",
+            onChanged: (b) => setState(() {
+              appdata.settings[70] = b ? "1" : "0";
+              appdata.updateSettings();
+            }),
           ),
-          ListTile(
-            leading: const Icon(Icons.volume_mute),
+        ),
+        // 使用音量键翻页
+        SliverToBoxAdapter(
+          child: SwitchListTile(
             title: Text("使用音量键翻页".tl),
-            trailing: Switch(
-              value: useVolumeKeyChangePage,
-              onChanged: (b) {
-                b ? appdata.settings[7] = "1" : appdata.settings[7] = "0";
-                setState(() {
-                  useVolumeKeyChangePage = b;
-                });
-                appdata.writeData();
-                logic.update();
-              },
-            ),
-            onTap: () {},
+            value: useVolumeKeyChangePage,
+            onChanged: (b) {
+              b ? appdata.settings[7] = "1" : appdata.settings[7] = "0";
+              setState(() => useVolumeKeyChangePage = b);
+              appdata.writeData();
+              logic.update();
+            },
           ),
-          ListTile(
+        ),
+        // 自动翻页时间间隔
+        SliverToBoxAdapter(
+          child: ListTile(
             leading: const Icon(Icons.timer_sharp),
-            subtitle: SizedBox(
-              height: 25,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                      top: 0,
-                      bottom: 0,
-                      left: -20,
-                      right: 0,
-                      child: Slider(
-                        max: 20,
-                        min: 0,
-                        divisions: 20,
-                        value: int.parse(appdata.settings[33]).toDouble(),
-                        overlayColor: WidgetStateColor.resolveWith(
-                                (states) => Colors.transparent),
-                        onChanged: (v) {
-                          if (v == 0) return;
-                          appdata.settings[33] = v.toInt().toString();
-                          appdata.updateSettings();
-                          setState(() {});
-                        },
-                      ))
-                ],
-              ),
+            title: Text("自动翻页时间间隔".tl),
+            subtitle: Slider(
+              max: 20,
+              min: 0,
+              divisions: 20,
+              value: int.parse(appdata.settings[33]).toDouble(),
+              onChanged: (v) {
+                if (v == 0) return;
+                appdata.settings[33] = v.toInt().toString();
+                appdata.updateSettings();
+                setState(() {});
+              },
             ),
             trailing: SizedBox(
               width: 40,
@@ -198,46 +201,41 @@ class _ReadingSettingsState extends State<ReadingSettings> {
                 style: const TextStyle(fontSize: 14),
               ),
             ),
-            title: Text("自动翻页时间间隔".tl),
           ),
-          if (App.isAndroid)
-            ListTile(
-              leading: const Icon(Icons.screenshot_outlined),
+        ),
+        // 保持屏幕常亮
+        if (App.isAndroid)
+          SliverToBoxAdapter(
+            child: SwitchListTile(
               title: Text("保持屏幕常亮".tl),
-              onTap: () {},
-              trailing: Switch(
-                value: keepScreenOn,
-                onChanged: (b) {
-                  b ? setKeepScreenOn() : cancelKeepScreenOn();
-                  b ? appdata.settings[14] = "1" : appdata.settings[14] = "0";
-                  setState(() {
-                    keepScreenOn = b;
-                  });
-                  appdata.writeData();
-                },
-              ),
-            ),
-          ListTile(
-            leading: const Icon(Icons.brightness_4),
-            title: Text("深色模式下降低图片亮度".tl),
-            onTap: () {},
-            trailing: Switch(
-              value: lowBrightness,
+              value: keepScreenOn,
               onChanged: (b) {
-                b ? appdata.settings[18] = "1" : appdata.settings[18] = "0";
-                setState(() {
-                  lowBrightness = b;
-                });
+                b ? setKeepScreenOn() : cancelKeepScreenOn();
+                b ? appdata.settings[14] = "1" : appdata.settings[14] = "0";
+                setState(() => keepScreenOn = b);
                 appdata.writeData();
-                logic.update();
               },
             ),
           ),
-          if(App.isAndroid)
-            ListTile(
+        // 深色模式下降低图片亮度
+        SliverToBoxAdapter(
+          child: SwitchListTile(
+            title: Text("深色模式下降低图片亮度".tl),
+            value: lowBrightness,
+            onChanged: (b) {
+              b ? appdata.settings[18] = "1" : appdata.settings[18] = "0";
+              setState(() => lowBrightness = b);
+              appdata.writeData();
+              logic.update();
+            },
+          ),
+        ),
+        // 固定屏幕方向
+        if (App.isAndroid)
+          SliverToBoxAdapter(
+            child: ListTile(
               leading: const Icon(Icons.screen_lock_rotation),
               title: Text("固定屏幕方向".tl),
-              onTap: () {},
               trailing: Select(
                 initialValue: int.parse(appdata.settings[76]),
                 values: [
@@ -264,11 +262,13 @@ class _ReadingSettingsState extends State<ReadingSettings> {
                 },
               ),
             ),
-          if (logic.readingMethod != ReadingMethod.topToBottomContinuously)
-            ListTile(
+          ),
+        // 图片缩放
+        if (logic.readingMethod != ReadingMethod.topToBottomContinuously)
+          SliverToBoxAdapter(
+            child: ListTile(
               leading: const Icon(Icons.fit_screen_outlined),
               title: Text("图片缩放".tl),
-              onTap: () {},
               trailing: Select(
                 initialValue: int.parse(appdata.settings[41]),
                 values: ["容纳".tl, "适应宽度".tl, "适应高度".tl],
@@ -284,161 +284,79 @@ class _ReadingSettingsState extends State<ReadingSettings> {
                 },
               ),
             ),
-          ListTile(
-            leading: const Icon(Icons.zoom_out_map),
+          ),
+        // 双击缩放
+        SliverToBoxAdapter(
+          child: SwitchListTile(
             title: Text("双击缩放".tl),
-            onTap: () {},
-            trailing: Switch(
-              value: appdata.settings[49] == "1",
-              onChanged: (value) {
-                appdata.settings[49] = value ? "1" : "0";
-                logic.update();
-                appdata.updateSettings();
-                setState(() {});
-              },
-            ),
+            value: appdata.settings[49] == "1",
+            onChanged: (value) {
+              appdata.settings[49] = value ? "1" : "0";
+              logic.update();
+              appdata.updateSettings();
+              setState(() {});
+            },
           ),
-          if (logic.readingMethod == ReadingMethod.topToBottomContinuously)
-            ListTile(
-              leading: const Icon(Icons.width_normal_sharp),
+        ),
+        // 限制图片最大显示宽度
+        if (logic.readingMethod == ReadingMethod.topToBottomContinuously)
+          SliverToBoxAdapter(
+            child: SwitchListTile(
               title: Text("限制图片最大显示宽度".tl),
-              trailing: Switch(
-                value: appdata.settings[43] == "1",
-                onChanged: (b) => setState(() {
-                  appdata.settings[43] = b ? "1" : "0";
-                  appdata.updateSettings();
-                  Future.microtask(() => logic.update());
-                }),
-              ),
+              value: appdata.settings[43] == "1",
+              onChanged: (b) => setState(() {
+                appdata.settings[43] = b ? "1" : "0";
+                appdata.updateSettings();
+                Future.microtask(() => logic.update());
+              }),
             ),
-          ListTile(
-            leading: const Icon(Icons.zoom_in),
+          ),
+        // 长按缩放
+        SliverToBoxAdapter(
+          child: SwitchListTile(
             title: Text("长按缩放".tl),
-            trailing: Switch(
-              value: appdata.settings[55] == "1",
-              onChanged: (b) => setState(() {
-                appdata.settings[55] = b ? "1" : "0";
-                appdata.updateSettings();
-                Future.microtask(() => logic.update());
-              }),
-            ),
+            value: appdata.settings[55] == "1",
+            onChanged: (b) => setState(() {
+              appdata.settings[55] = b ? "1" : "0";
+              appdata.updateSettings();
+              Future.microtask(() => logic.update());
+            }),
           ),
-          ListTile(
-            leading: const Icon(Icons.insert_drive_file_outlined),
+        ),
+        // 显示页面信息
+        SliverToBoxAdapter(
+          child: SwitchListTile(
             title: Text("显示页面信息".tl),
-            trailing: Switch(
-              value: appdata.settings[57] == "1",
-              onChanged: (b) => setState(() {
-                appdata.settings[57] = b ? "1" : "0";
-                appdata.updateSettings();
-                Future.microtask(() => logic.update());
-              }),
-            ),
+            value: appdata.settings[57] == "1",
+            onChanged: (b) => setState(() {
+              appdata.settings[57] = b ? "1" : "0";
+              appdata.updateSettings();
+              Future.microtask(() => logic.update());
+            }),
           ),
-          if (!logic.data.downloaded &&
-              (logic.data.type == ReadingType.picacg ||
-                  logic.data.type == ReadingType.jm))
-            ListTile(
+        ),
+        // 设置分流
+        if (!logic.data.downloaded &&
+            (logic.data.type == ReadingType.picacg ||
+                logic.data.type == ReadingType.jm))
+          SliverToBoxAdapter(
+            child: ListTile(
               leading: const Icon(Icons.account_tree_sharp),
               title: Text("设置分流".tl),
               trailing: const Icon(Icons.arrow_right),
-              onTap: () => setState(() {
-                i = 2;
-              }),
-            ),
-        ],
-      ),
-      buildReadingMethodSetting(),
-      Column(
-        children: [
-          SizedBox(
-            height: 60,
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 6,
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_outlined,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  onPressed: () => setState(() {
-                    i = 0;
-                  }),
-                ),
-                Text(
-                  "设置分流".tl,
-                  style: const TextStyle(fontSize: 18),
-                ),
-              ],
+              onTap: () => setState(() => i = 2),
             ),
           ),
-          const SizedBox(
-            height: 40,
-          ),
-          Center(
-            child: FilledButton(
-              child: Text("重启阅读器".tl),
-              onPressed: () {
-                App.globalBack();
-                logic.refresh_();
-              },
-            ),
-          ),
-          const SizedBox(
-            height: 20,
-          ),
-        ],
-      ),
-    ];
-
-    return ClipRect(
-      clipBehavior: Clip.antiAlias,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        reverseDuration: const Duration(milliseconds: 0),
-        switchInCurve: Curves.ease,
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          Tween<Offset> tween;
-          if (i == 0) {
-            tween = Tween<Offset>(
-                begin: const Offset(-0.1, 0), end: const Offset(0, 0));
-          } else {
-            tween = Tween<Offset>(
-                begin: const Offset(0.1, 0), end: const Offset(0, 0));
-          }
-          return SlideTransition(
-            position: tween.animate(animation),
-            child: child,
-          );
-        },
-        child: SingleChildScrollView(
-          primary: false,
-          key: Key(i.toString()),
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-          child: pages[i],
+        // 底部安全区域
+        SliverToBoxAdapter(
+          child: SizedBox(height: MediaQuery.of(context).padding.bottom),
         ),
-      ),
+      ],
     );
   }
 
-  void setValue(int i) {
-    App.globalBack();
-    value = i;
-    appdata.settings[9] = value.toString();
-    appdata.writeData();
-    var logic = StateController.find<ComicReadingPageLogic>();
-    logic.tools = false;
-    logic.showSettings = false;
-    logic.index = 1;
-    logic.pageController = PageController(initialPage: 1);
-    logic.clearPhotoViewControllers();
-    logic.update();
-  }
-
-  Widget buildReadingMethodSetting() {
+  /// 阅读模式设置页面
+  Widget _buildReadingModeSettings(BuildContext context) {
     var options = [
       "从左至右".tl,
       "从右至左".tl,
@@ -447,46 +365,74 @@ class _ReadingSettingsState extends State<ReadingSettings> {
       "双页".tl,
       "双页(反向)".tl
     ];
-    return Column(
-      children: [
-        SizedBox(
-          height: 60,
-          child: Row(
-            children: [
-              const SizedBox(
-                width: 6,
+
+    return CustomScrollView(
+      slivers: [
+        // AppBar with back button
+        SliverAppBar(
+          pinned: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => setState(() => i = 0),
+          ),
+          title: Text("阅读模式".tl),
+        ),
+        // 阅读模式选项
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => ListTile(
+              trailing: Radio<int>(
+                value: index + 1,
+                groupValue: value,
+                onChanged: (i) => setValue(i!),
               ),
-              IconButton(
-                icon: Icon(
-                  Icons.arrow_back_outlined,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                onPressed: () => setState(() {
-                  i = 0;
-                }),
-              ),
-              Text(
-                "阅读模式".tl,
-                style: const TextStyle(fontSize: 18),
-              ),
-            ],
+              title: Text(options[index]),
+              onTap: () => setValue(index + 1),
+            ),
+            childCount: 6,
           ),
         ),
-        ...List.generate(
-            6,
-            (index) => ListTile(
-                  trailing: Radio<int>(
-                    value: index + 1,
-                    groupValue: value,
-                    onChanged: (i) {
-                      setValue(i!);
-                    },
-                  ),
-                  title: Text(options[index]),
-                  onTap: () {
-                    setValue(index + 1);
-                  },
-                ))
+        // 底部安全区域
+        SliverToBoxAdapter(
+          child: SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ),
+      ],
+    );
+  }
+
+  /// 分流设置页面
+  Widget _buildProxySettings(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        // AppBar with back button
+        SliverAppBar(
+          pinned: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => setState(() => i = 0),
+          ),
+          title: Text("设置分流".tl),
+        ),
+        // 重启阅读器按钮
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: FilledButton(
+                child: Text("重启阅读器".tl),
+                onPressed: () {
+                  App.globalBack();
+                  var logic = StateController.find<ComicReadingPageLogic>();
+                  logic.refresh_();
+                },
+              ),
+            ),
+          ),
+        ),
+        // 底部安全区域
+        SliverToBoxAdapter(
+          child: SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ),
       ],
     );
   }

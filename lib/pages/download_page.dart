@@ -42,6 +42,16 @@ import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 import 'htmanga/ht_comic_page.dart';
 
+enum DownloadSortType {
+  time(0),
+  name(1),
+  author(2),
+  size(3);
+
+  final int value;
+  const DownloadSortType(this.value);
+}
+
 extension ReadComic on DownloadedItem {
   void read({int? ep}) async {
     final comic = this;
@@ -640,64 +650,52 @@ class _DownloadPageState extends State<DownloadPage> {
                   buildAppbar(context, logic),
                   if (logic.isPaginationMode)
                     SliverToBoxAdapter(
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 8, top: 8),
-                          child: SizedBox(
-                            width: 300,
-                            height: 42,
-                            child: Row(
-                              children: [
-                                const SizedBox(
-                                  width: 16,
-                                ),
-                                FilledButton.tonal(
-                                    onPressed: logic.currentPage > 1
-                                        ? () {
-                                            logic.currentPage--;
-                                            getComics(logic).then((_) {
-                                              logic.resetSelected(
-                                                  logic.comics.length);
-                                              logic.update();
-                                            });
-                                          }
-                                        : null,
-                                    child: Text("上一页".tl)),
-                                const Spacer(),
-                                ActionChip(
-                                  label: Text(
-                                      "${"页面".tl}: ${logic.currentPage}/${logic.maxPage}"),
-                                  onPressed: () async {
+                      child: Row(
+                        children: [
+                          FilledButton(
+                            onPressed: logic.currentPage > 1
+                                ? () {
+                                    logic.currentPage--;
+                                    getComics(logic).then((_) {
+                                      logic.resetSelected(logic.comics.length);
+                                      logic.update();
+                                    });
+                                  }
+                                : null,
+                            child: Text("后退".tl),
+                          ).fixWidth(84),
+                          Expanded(
+                            child: Center(
+                              child: Material(
+                                color: Theme.of(context).colorScheme.surfaceContainer,
+                                borderRadius: BorderRadius.circular(8),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () async {
                                     int? page = await showDialog<int>(
                                       context: context,
                                       builder: (context) {
                                         TextEditingController controller =
                                             TextEditingController(
-                                                text: logic.currentPage
-                                                    .toString());
-                                        return AlertDialog(
-                                          title: Text("输入页码".tl),
+                                                text: logic.currentPage.toString());
+                                        return ContentDialog(
+                                          title: "输入页码".tl,
                                           content: TextField(
                                             controller: controller,
                                             keyboardType: TextInputType.number,
                                             decoration: InputDecoration(
+                                              labelText: "页码".tl,
                                               hintText: "1-${logic.maxPage}",
                                             ),
-                                          ),
+                                            inputFormatters: <TextInputFormatter>[
+                                              FilteringTextInputFormatter.digitsOnly
+                                            ],
+                                          ).paddingHorizontal(16),
                                           actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context),
-                                              child: Text("取消".tl),
-                                            ),
-                                            TextButton(
+                                            Button.filled(
                                               onPressed: () {
-                                                int? p = int.tryParse(
-                                                    controller.text);
-                                                if (p != null &&
-                                                    p >= 1 &&
-                                                    p <= logic.maxPage) {
+                                                int? p = int.tryParse(controller.text);
+                                                if (p != null && p >= 1 && p <= logic.maxPage) {
                                                   Navigator.pop(context, p);
                                                 } else {
                                                   showToast(message: "页码无效".tl);
@@ -712,132 +710,124 @@ class _DownloadPageState extends State<DownloadPage> {
                                     if (page != null) {
                                       logic.currentPage = page;
                                       getComics(logic).then((_) {
-                                        logic
-                                            .resetSelected(logic.comics.length);
+                                        logic.resetSelected(logic.comics.length);
                                         logic.update();
                                       });
                                     }
                                   },
-                                  elevation: 1,
-                                  side: BorderSide.none,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                    child: Text("${"页面".tl} ${logic.currentPage} / ${logic.maxPage}"),
+                                  ),
                                 ),
-                                const Spacer(),
-                                FilledButton.tonal(
-                                    onPressed: logic.currentPage < logic.maxPage
-                                        ? () {
-                                            logic.currentPage++;
-                                            getComics(logic).then((_) {
-                                              logic.resetSelected(
-                                                  logic.comics.length);
-                                              logic.update();
-                                            });
-                                          }
-                                        : null,
-                                    child: Text("下一页".tl)),
-                                const SizedBox(
-                                  width: 16,
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                          FilledButton(
+                            onPressed: logic.currentPage < logic.maxPage
+                                ? () {
+                                    logic.currentPage++;
+                                    getComics(logic).then((_) {
+                                      logic.resetSelected(logic.comics.length);
+                                      logic.update();
+                                    });
+                                  }
+                                : null,
+                            child: Text("前进".tl),
+                          ).fixWidth(84),
+                        ],
+                      ).paddingVertical(8).paddingHorizontal(16),
                     ),
                   buildComicsSliver(context, logic),
                   if (logic.isPaginationMode)
                     SliverToBoxAdapter(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Row(
-                          children: [
-                            const SizedBox(width: 16),
-                            FilledButton.tonal(
-                              onPressed: logic.currentPage > 1
-                                  ? () {
-                                      logic.currentPage--;
-                                      getComics(logic).then((_) {
-                                        logic
-                                            .resetSelected(logic.comics.length);
-                                        logic.update();
-                                      });
-                                    }
-                                  : null,
-                              child: Text("上一页".tl),
-                            ),
-                            const Spacer(),
-                            ActionChip(
-                              label: Text(
-                                  "${"页面".tl}: ${logic.currentPage}/${logic.maxPage}"),
-                              onPressed: () async {
-                                // 实现页码选择逻辑
-                                int? page = await showDialog<int>(
-                                  context: context,
-                                  builder: (context) {
-                                    TextEditingController controller =
-                                        TextEditingController(
-                                            text: logic.currentPage.toString());
-                                    return AlertDialog(
-                                      title: Text("输入页码".tl),
-                                      content: TextField(
-                                        controller: controller,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          hintText: "1-${logic.maxPage}",
-                                        ),
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context),
-                                          child: Text("取消".tl),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {
-                                            int? p =
-                                                int.tryParse(controller.text);
-                                            if (p != null &&
-                                                p >= 1 &&
-                                                p <= logic.maxPage) {
-                                              Navigator.pop(context, p);
-                                            } else {
-                                              showToast(message: "页码无效".tl);
-                                            }
-                                          },
-                                          child: Text("确认".tl),
-                                        ),
-                                      ],
+                      child: Row(
+                        children: [
+                          FilledButton(
+                            onPressed: logic.currentPage > 1
+                                ? () {
+                                    logic.currentPage--;
+                                    getComics(logic).then((_) {
+                                      logic.resetSelected(logic.comics.length);
+                                      logic.update();
+                                    });
+                                  }
+                                : null,
+                            child: Text("后退".tl),
+                          ).fixWidth(84),
+                          Expanded(
+                            child: Center(
+                              child: Material(
+                                color: Theme.of(context).colorScheme.surfaceContainer,
+                                borderRadius: BorderRadius.circular(8),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () async {
+                                    int? page = await showDialog<int>(
+                                      context: context,
+                                      builder: (context) {
+                                        TextEditingController controller =
+                                            TextEditingController(
+                                                text: logic.currentPage.toString());
+                                        return ContentDialog(
+                                          title: "输入页码".tl,
+                                          content: TextField(
+                                            controller: controller,
+                                            keyboardType: TextInputType.number,
+                                            decoration: InputDecoration(
+                                              labelText: "页码".tl,
+                                              hintText: "1-${logic.maxPage}",
+                                            ),
+                                            inputFormatters: <TextInputFormatter>[
+                                              FilteringTextInputFormatter.digitsOnly
+                                            ],
+                                          ).paddingHorizontal(16),
+                                          actions: [
+                                            Button.filled(
+                                              onPressed: () {
+                                                int? p = int.tryParse(controller.text);
+                                                if (p != null && p >= 1 && p <= logic.maxPage) {
+                                                  Navigator.pop(context, p);
+                                                } else {
+                                                  showToast(message: "页码无效".tl);
+                                                }
+                                              },
+                                              child: Text("确认".tl),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     );
-                                  },
-                                );
-                                if (page != null) {
-                                  logic.currentPage = page;
-                                  getComics(logic).then((_) {
-                                    logic.resetSelected(logic.comics.length);
-                                    logic.update();
-                                  });
-                                }
-                              },
-                              elevation: 1,
-                              side: BorderSide.none,
-                            ),
-                            const Spacer(),
-                            FilledButton.tonal(
-                              onPressed: logic.currentPage < logic.maxPage
-                                  ? () {
-                                      logic.currentPage++;
+                                    if (page != null) {
+                                      logic.currentPage = page;
                                       getComics(logic).then((_) {
-                                        logic
-                                            .resetSelected(logic.comics.length);
+                                        logic.resetSelected(logic.comics.length);
                                         logic.update();
                                       });
                                     }
-                                  : null,
-                              child: Text("下一页".tl),
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                    child: Text("${"页面".tl} ${logic.currentPage} / ${logic.maxPage}"),
+                                  ),
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 16),
-                          ],
-                        ),
-                      ),
+                          ),
+                          FilledButton(
+                            onPressed: logic.currentPage < logic.maxPage
+                                ? () {
+                                    logic.currentPage++;
+                                    getComics(logic).then((_) {
+                                      logic.resetSelected(logic.comics.length);
+                                      logic.update();
+                                    });
+                                  }
+                                : null,
+                            child: Text("前进".tl),
+                          ).fixWidth(84),
+                        ],
+                      ).paddingVertical(8).paddingHorizontal(16),
                     ),
                 ],
               ),
@@ -866,7 +856,7 @@ class _DownloadPageState extends State<DownloadPage> {
                             });
                           }
                         : null,
-                    child: Text("上一页".tl),
+                    child: Text("后退".tl),
                   ),
                   const SizedBox(width: 16),
                   Text("${"页面".tl}: ${logic.currentPage}/${logic.maxPage}"),
@@ -881,7 +871,7 @@ class _DownloadPageState extends State<DownloadPage> {
                             });
                           }
                         : null,
-                    child: Text("下一页".tl),
+                    child: Text("前进".tl),
                   ),
                 ],
               ),
@@ -905,7 +895,7 @@ class _DownloadPageState extends State<DownloadPage> {
                             });
                           }
                         : null,
-                    child: Text("上一页".tl),
+                    child: Text("后退".tl),
                   ),
                   const SizedBox(width: 16),
                   Text("${"页面".tl}: ${logic.currentPage}/${logic.maxPage}"),
@@ -920,7 +910,7 @@ class _DownloadPageState extends State<DownloadPage> {
                             });
                           }
                         : null,
-                    child: Text("下一页".tl),
+                    child: Text("前进".tl),
                   ),
                 ],
               ),
@@ -1444,8 +1434,12 @@ class _DownloadPageState extends State<DownloadPage> {
     }
     var file = File("${App.dataPath}/font.ttf");
     if (!App.isWindows && !await file.exists()) {
-      showConfirmDialog(App.globalContext!, "缺少字体".tl,
-          "需要下载字体文件(10.1MB), 是否继续?".tl, downloadFont);
+      showConfirmDialog(
+        context: App.globalContext!,
+        title: "缺少字体".tl,
+        content: "需要下载字体文件(10.1MB), 是否继续?".tl,
+        onConfirm: downloadFont,
+      );
     } else {
       bool canceled = false;
       var controller = showLoadingDialog(
@@ -1520,8 +1514,7 @@ class _DownloadPageState extends State<DownloadPage> {
               if (logic.selectedNum == 0) {
                 logic.selecting = false;
               }
-              // 所有分支中已包含UI更新，无需重复调用
-              // logic.update();
+              logic.update();
             } else {
               showInfo(index, logic, context);
             }
@@ -1571,15 +1564,19 @@ class _DownloadPageState extends State<DownloadPage> {
                   DesktopMenuEntry(
                     text: "删除".tl,
                     onClick: () {
-                      showConfirmDialog(context, "确认删除".tl, "此操作无法撤销, 是否继续?".tl,
-                          () {
-                        downloadManager.delete([logic.comics[index].id]);
-                        logic.comics.removeAt(index);
-                        logic.selected.removeAt(index);
-                        logic.update();
-                        StateController.findOrNull(tag: "me_page_downloads")
-                            ?.update();
-                      });
+                      showConfirmDialog(
+                        context: context,
+                        title: "确认删除".tl,
+                        content: "此操作无法撤销, 是否继续?".tl,
+                        onConfirm: () {
+                          downloadManager.delete([logic.comics[index].id]);
+                          logic.comics.removeAt(index);
+                          logic.selected.removeAt(index);
+                          logic.update();
+                          StateController.findOrNull(tag: "me_page_downloads")
+                              ?.update();
+                        },
+                      );
                     },
                   ),
               DesktopMenuEntry(
@@ -1675,8 +1672,7 @@ class _DownloadPageState extends State<DownloadPage> {
           });
     } else {
       showSideBar(App.globalContext!,
-          DownloadedComicInfoView(logic.comics[index], logic),
-          useSurfaceTintColor: true);
+          DownloadedComicInfoView(logic.comics[index], logic));
     }
   }
 
@@ -1689,34 +1685,23 @@ class _DownloadPageState extends State<DownloadPage> {
             logic.update();
           } else {
             if (logic.selectedNum == 0) return;
-            showDialog(
-                context: context,
-                builder: (dialogContext) {
-                  return AlertDialog(
-                    title: Text("删除".tl),
-                    content: Text("要删除已选择的项目吗? 此操作无法撤销".tl),
-                    actions: [
-                      TextButton(
-                          onPressed: () => App.globalBack(),
-                          child: Text("取消".tl)),
-                      TextButton(
-                          onPressed: () async {
-                            App.globalBack();
-                            var comics = <String>[];
-                            for (int i = 0; i < logic.selected.length; i++) {
-                              if (logic.selected[i]) {
-                                comics.add(logic.comics[i].id);
-                              }
-                            }
-                            await downloadManager.delete(comics);
-                            logic.refresh();
-                            StateController.findOrNull(tag: "me_page_downloads")
-                                ?.update();
-                          },
-                          child: Text("确认".tl)),
-                    ],
-                  );
-                });
+            showConfirmDialog(
+              context: context,
+              title: "删除".tl,
+              content: "要删除已选择的项目吗? 此操作无法撤销".tl,
+              btnColor: context.colorScheme.error,
+              onConfirm: () async {
+                var comics = <String>[];
+                for (int i = 0; i < logic.selected.length; i++) {
+                  if (logic.selected[i]) {
+                    comics.add(logic.comics[i].id);
+                  }
+                }
+                await downloadManager.delete(comics);
+                logic.refresh();
+                StateController.findOrNull(tag: "me_page_downloads")?.update();
+              },
+            );
           }
         },
         child: logic.selecting
@@ -1867,58 +1852,77 @@ class _DownloadPageState extends State<DownloadPage> {
             icon: const Icon(Icons.sort),
             onPressed: () async {
               bool changed = false;
-              await showDelayedDialog(
-                  context: context,
-                  builder: (context) => SimpleDialog(
-                        title: Text("漫画排序模式".tl),
+              var sortType = DownloadSortType.values[int.parse(appdata.settings[26][0])];
+              await showDialog(
+                context: context,
+                builder: (context) {
+                  return StatefulBuilder(builder: (context, setState) {
+                    return ContentDialog(
+                      title: "漫画排序模式".tl,
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(
-                            width: 400,
+                          RadioGroup<DownloadSortType>(
+                            groupValue: sortType,
+                            onChanged: (v) {
+                              setState(() {
+                                sortType = v ?? sortType;
+                              });
+                            },
                             child: Column(
                               children: [
-                                ListTile(
-                                  title: Text("漫画排序模式".tl),
-                                  trailing: Select(
-                                    initialValue:
-                                        int.parse(appdata.settings[26][0]),
-                                    onChange: (i) {
-                                      appdata.settings[26] = appdata
-                                          .settings[26]
-                                          .setValueAt(i.toString(), 0);
-                                      appdata.updateSettings();
-                                      changed = true;
-                                    },
-                                    values: ["时间", "漫画名", "作者名", "大小"].tl,
-                                  ),
+                                RadioListTile<DownloadSortType>(
+                                  title: Text("时间".tl),
+                                  value: DownloadSortType.time,
                                 ),
-                                ListTile(
-                                  title: Text("倒序".tl),
-                                  trailing: StatefulSwitch(
-                                    initialValue:
-                                        appdata.settings[26][1] == "1",
-                                    onChanged: (b) {
-                                      if (b) {
-                                        appdata.settings[26] = appdata
-                                            .settings[26]
-                                            .setValueAt("1", 1);
-                                      } else {
-                                        appdata.settings[26] = appdata
-                                            .settings[26]
-                                            .setValueAt("0", 1);
-                                      }
-                                      appdata.updateSettings();
-                                      changed = true;
-                                    },
-                                  ),
+                                RadioListTile<DownloadSortType>(
+                                  title: Text("漫画名".tl),
+                                  value: DownloadSortType.name,
+                                ),
+                                RadioListTile<DownloadSortType>(
+                                  title: Text("作者名".tl),
+                                  value: DownloadSortType.author,
+                                ),
+                                RadioListTile<DownloadSortType>(
+                                  title: Text("大小".tl),
+                                  value: DownloadSortType.size,
                                 ),
                               ],
                             ),
-                          )
+                          ),
+                          ListTile(
+                            title: Text("倒序".tl),
+                            trailing: StatefulSwitch(
+                              initialValue: appdata.settings[26][1] == "1",
+                              onChanged: (b) {
+                                if (b) {
+                                  appdata.settings[26] = appdata.settings[26].setValueAt("1", 1);
+                                } else {
+                                  appdata.settings[26] = appdata.settings[26].setValueAt("0", 1);
+                                }
+                                appdata.updateSettings();
+                                changed = true;
+                              },
+                            ),
+                          ),
                         ],
-                      ));
-              if (changed) {
-                logic.refresh();
-              }
+                      ),
+                      actions: [
+                        FilledButton(
+                          onPressed: () {
+                            appdata.settings[26] = appdata.settings[26].setValueAt(sortType.index.toString(), 0);
+                            appdata.updateSettings();
+                            changed = true;
+                            Navigator.pop(context);
+                            logic.refresh();
+                          },
+                          child: Text("确认".tl),
+                        ),
+                      ],
+                    );
+                  });
+                },
+              );
             },
           ),
         ),
@@ -1945,56 +1949,56 @@ class _DownloadPageState extends State<DownloadPage> {
           child: IconButton(
             icon: const Icon(Icons.more_horiz),
             onPressed: () {
-              showMenu(
-                  context: context,
-                  position: RelativeRect.fromLTRB(
-                      MediaQuery.of(context).size.width - 60,
-                      50,
-                      MediaQuery.of(context).size.width - 60,
-                      50),
-                  items: [
-                    PopupMenuItem(
-                      child: Text("全选".tl),
-                      onTap: () {
+              showMenuX(
+                context,
+                Offset(
+                  MediaQuery.of(context).size.width - 16,
+                  MediaQuery.of(context).padding.top,
+                ),
+                [
+                  MenuEntry(
+                    icon: Icons.select_all,
+                    text: "全选".tl,
+                    onClick: () {
+                      for (int i = 0; i < logic.selected.length; i++) {
+                        logic.selected[i] = true;
+                      }
+                      logic.selectedNum = logic.comics.length;
+                      logic.update();
+                    },
+                  ),
+                  MenuEntry(
+                    icon: Icons.favorite_border,
+                    text: "添加至本地收藏".tl,
+                    onClick: () => addToLocalFavoriteFolder(App.globalContext!, logic),
+                  ),
+                  MenuEntry(
+                    icon: Icons.chrome_reader_mode_outlined,
+                    text: "查看漫画详情".tl,
+                    onClick: () {
+                      if (logic.selectedNum != 1) {
+                        showToast(message: "请选择一个漫画".tl);
+                      } else {
                         for (int i = 0; i < logic.selected.length; i++) {
-                          logic.selected[i] = true;
-                        }
-                        logic.selectedNum = logic.comics.length;
-                        logic.update();
-                      },
-                    ),
-                    PopupMenuItem(
-                      child: Text("导出".tl),
-                      onTap: () => exportSelectedComic(context, logic),
-                    ),
-                    PopupMenuItem(
-                      child: Text("导出为pdf".tl),
-                      onTap: () => exportAsPdf(null, logic),
-                    ),
-                    PopupMenuItem(
-                      child: Text("查看漫画详情".tl),
-                      onTap: () =>
-                          Future.delayed(const Duration(milliseconds: 200), () {
-                        if (logic.selectedNum != 1) {
-                          showToast(message: "请选择一个漫画".tl);
-                        } else {
-                          for (int i = 0; i < logic.selected.length; i++) {
-                            if (logic.selected[i]) {
-                              toComicInfoPage(logic.comics[i]);
-                            }
+                          if (logic.selected[i]) {
+                            toComicInfoPage(logic.comics[i]);
                           }
                         }
-                      }),
-                    ),
-                    PopupMenuItem(
-                      child: Text("添加至本地收藏".tl),
-                      onTap: () => Future.delayed(
-                        const Duration(milliseconds: 200),
-                        () =>
-                            addToLocalFavoriteFolder(App.globalContext!, logic),
-                      ),
-                    ),
-                  ]);
+                      }
+                    },
+                  ),
+                  MenuEntry(
+                    icon: Icons.outbox_outlined,
+                    text: "导出为zip".tl,
+                    onClick: () => exportSelectedComic(context, logic),
+                  ),
+                  MenuEntry(
+                    icon: Icons.picture_as_pdf_outlined,
+                    text: "导出为pdf".tl,
+                    onClick: () => exportAsPdf(null, logic),
+                  ),
+                ],
+              );
             },
           ),
         ),
@@ -2334,14 +2338,19 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView> {
   late final comic = widget.item;
 
   deleteEpisode(int i) {
-    showConfirmDialog(context, "确认删除".tl, "要删除这个章节吗".tl, () async {
-      var message = await DownloadManager().deleteEpisode(comic, i);
-      if (message == null) {
-        setState(() {});
-      } else {
-        showToast(message: message);
-      }
-    });
+    showConfirmDialog(
+      context: context,
+      title: "确认删除".tl,
+      content: "要删除这个章节吗".tl,
+      onConfirm: () async {
+        var message = await DownloadManager().deleteEpisode(comic, i);
+        if (message == null) {
+          setState(() {});
+        } else {
+          showToast(message: message);
+        }
+      },
+    );
   }
 
   @override

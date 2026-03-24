@@ -15,7 +15,7 @@ import 'package:pica_comic/utils/tags_translation.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:sliver_tools/sliver_tools.dart';
 
-typedef FilterChip = FilterChipFixedWidth;
+
 
 class _FloatingSearchBar extends StatefulWidget {
   const _FloatingSearchBar(
@@ -579,7 +579,7 @@ class PreSearchPage extends StatelessWidget {
   Widget buildTargetSelector(BuildContext context) {
     buildItem(PreSearchController logic, String id, String text) => Padding(
           padding: const EdgeInsets.all(4),
-          child: FilterChip(
+          child: FilterChipFixedWidth(
             label: Text(text),
             selected: logic.target == id || logic.aggregatedSearch,
             onSelected: (b) {
@@ -671,7 +671,7 @@ class PreSearchPage extends StatelessWidget {
             children.add(Wrap(
               runSpacing: 8,
               spacing: 8,
-              children: option.options.entries.map((e) {
+              children: option.options.entries.map<Widget>((e) {
                 return OptionChip(
                   text: e.value.tl,
                   isSelected: logic.options[i] == e.key,

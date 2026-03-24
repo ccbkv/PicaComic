@@ -441,7 +441,6 @@ class ComicReadingPage extends StatelessWidget {
                           context,
                           buildEpsView(),
                           title: null,
-                          useSurfaceTintColor: true,
                           addTopPadding: true,
                           width: 400,
                         );
@@ -484,24 +483,13 @@ class ComicReadingPage extends StatelessWidget {
 
   void openEpsDrawer() {
     var context = App.globalContext!;
-    if (MediaQuery.of(context).size.width > 600) {
-      showSideBar(
-        context,
-        buildEpsView(),
-        title: null,
-        useSurfaceTintColor: true,
-        width: 400,
-        addTopPadding: true,
-      );
-    } else {
-      showModalBottomSheet(
-        context: context,
-        useSafeArea: false,
-        builder: (context) {
-          return buildEpsView();
-        },
-      );
-    }
+    showSideBar(
+      context,
+      buildEpsView(),
+      title: null,
+      width: 400,
+      addTopPadding: true,
+    );
   }
 
   /// Used when [ComicReadingPageLogic.readingMethod] is [ReadingMethod.topToBottomContinuously].

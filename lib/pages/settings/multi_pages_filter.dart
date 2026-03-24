@@ -155,59 +155,140 @@ class _MultiPagesFilterState extends State<MultiPagesFilter> {
         canAdd[key] = value;
       }
     });
+    var selected = <String>[];
     if (App.isFluent) {
       fluent.showDialog(
         context: context,
         builder: (context) {
-          return fluent.ContentDialog(
-            title: const Text("Add"),
-            content: SizedBox(
-              height: 300,
-              child: ListView(
-                children: canAdd.entries
-                    .map((e) => fluent.ListTile(
-                          title: Text(e.value),
-                          onPressed: () {
-                            App.back(context);
-                            setState(() {
-                              keys.add(e.key);
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return fluent.ContentDialog(
+                title: Text("Add".tl),
+                content: SizedBox(
+                  height: 300,
+                  child: ListView(
+                    children: canAdd.entries
+                        .map((e) => fluent.Checkbox(
+                              checked: selected.contains(e.key),
+                              content: Text(e.value),
+                              onChanged: (value) {
+                                setState(() {
+                                  if (value!) {
+                                    selected.add(e.key);
+                                  } else {
+                                    selected.remove(e.key);
+                                  }
+                                });
+                              },
+                            ))
+                        .toList(),
+                  ),
+                ),
+                actions: [
+                  if (selected.length < canAdd.length)
+                    fluent.Button(
+                      child: Text("全选".tl),
+                      onPressed: () {
+                        setState(() {
+                          selected = canAdd.keys.toList();
+                        });
+                      },
+                    )
+                  else
+                    fluent.Button(
+                      child: Text("取消全选".tl),
+                      onPressed: () {
+                        setState(() {
+                          selected.clear();
+                        });
+                      },
+                    ),
+                  const SizedBox(width: 8),
+                  fluent.FilledButton(
+                    onPressed: selected.isNotEmpty
+                        ? () {
+                            this.setState(() {
+                              keys.addAll(selected);
                             });
                             updateSetting();
-                          },
-                        ))
-                    .toList(),
-              ),
-            ),
-            actions: [
-              fluent.Button(
-                onPressed: () => App.back(context),
-                child: Text("取消".tl),
-              )
-            ],
+                            App.back(context);
+                          }
+                        : null,
+                    child: Text("Add".tl),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
       return;
     }
     showDialog(
-        context: context,
-        builder: (context) {
-          return SimpleDialog(
-            title: const Text("Add"),
-            children: canAdd.entries
-                .map((e) => InkWell(
-                      child: ListTile(title: Text(e.value), key: Key(e.key)),
-                      onTap: () {
-                        App.back(context);
-                        setState(() {
-                          keys.add(e.key);
-                        });
-                        updateSetting();
-                      },
-                    ))
-                .toList(),
-          );
-        });
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return ContentDialog(
+              title: "添加".tl,
+              content: SizedBox(
+                width: 300,
+                height: 400,
+                child: ListView(
+                  children: canAdd.entries
+                      .map((e) => CheckboxListTile(
+                            value: selected.contains(e.key),
+                            title: Text(e.value),
+                            key: Key(e.key),
+                            onChanged: (value) {
+                              setState(() {
+                                if (value!) {
+                                  selected.add(e.key);
+                                } else {
+                                  selected.remove(e.key);
+                                }
+                              });
+                            },
+                          ))
+                      .toList(),
+                ),
+              ),
+              actions: [
+                if (selected.length < canAdd.length)
+                  Button.text(
+                    onPressed: () {
+                      setState(() {
+                        selected = canAdd.keys.toList();
+                      });
+                    },
+                    child: Text("全选".tl),
+                  )
+                else
+                  Button.text(
+                    onPressed: () {
+                      setState(() {
+                        selected.clear();
+                      });
+                    },
+                    child: Text("取消全选".tl),
+                  ),
+                Button.filled(
+                  onPressed: () {
+                    this.setState(() {
+                      keys.addAll(selected);
+                    });
+                    updateSetting();
+                    Navigator.pop(context);
+                  },
+                  disabled: selected.isEmpty,
+                  child: Text("添加".tl),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void updateSetting() {

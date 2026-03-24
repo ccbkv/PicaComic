@@ -280,73 +280,75 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
       controller: scrollController,
       slivers: [
         if (!searchMode && !multiSelectMode)
-          SliverAppBar(
+          SliverPersistentHeader(
             pinned: true,
-            leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-                ? IconButton(
-                    icon: const Icon(Icons.menu),
-                    color: Theme.of(context).colorScheme.primary,
-                    onPressed: favPage.showFolderSelector,
-                  )
-                : null,
-            title: GestureDetector(
-              onTap: MediaQuery.of(context).size.width < _kTwoPanelChangeWidth
+            delegate: _LocalFavoritesAppBarDelegate(
+              title: title,
+              topPadding: MediaQuery.of(context).padding.top,
+              leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
+                  ? IconButton(
+                      icon: const Icon(Icons.menu),
+                      color: Theme.of(context).colorScheme.primary,
+                      onPressed: favPage.showFolderSelector,
+                    )
+                  : null,
+              titleGesture: MediaQuery.of(context).size.width < _kTwoPanelChangeWidth
                   ? favPage.showFolderSelector
                   : null,
-              child: Text(title),
-            ),
-            actions: [
+              actions: [
               if (networkSource != null && !isAllFolder)
                 Tooltip(
                   message: "同步".tl,
-                  child: IconButton(
-                    icon: const Icon(Icons.sync),
-                    onPressed: () {
+                  child: Flyout(
+                    flyoutBuilder: (context) {
                       final GlobalKey<_SelectUpdatePageNumState>
                           selectUpdatePageNumKey =
                           GlobalKey<_SelectUpdatePageNumState>();
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text("同步".tl),
-                          content: _SelectUpdatePageNum(
-                            networkSource: networkSource!,
-                            networkFolder: networkFolder,
-                            key: selectUpdatePageNumKey,
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: Text("取消".tl),
-                            ),
-                            FilledButton(
-                              child: Text("更新".tl),
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                                importNetworkFolder(
-                                  networkSource!,
-                                  selectUpdatePageNumKey
-                                      .currentState!.updatePageNum,
-                                  widget.folder,
-                                  networkFolder,
-                                ).then((_) {
+                      var updatePageWidget = _SelectUpdatePageNum(
+                        networkSource: networkSource!,
+                        networkFolder: networkFolder,
+                        key: selectUpdatePageNumKey,
+                      );
+                      return FlyoutContent(
+                        title: "同步".tl,
+                        content: updatePageWidget,
+                        actions: [
+                          Button.filled(
+                            child: Text("更新".tl),
+                            onPressed: () {
+                              context.pop();
+                              importNetworkFolder(
+                                networkSource!,
+                                selectUpdatePageNumKey
+                                    .currentState!.updatePageNum,
+                                widget.folder,
+                                networkFolder,
+                              ).then(
+                                (value) {
                                   updateComics();
-                                });
-                              },
-                            ),
-                          ],
-                        ),
+                                },
+                              );
+                            },
+                          ),
+                        ],
                       );
                     },
+                    child: Builder(builder: (context) {
+                      return IconButton(
+                        icon: Icon(Icons.sync, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        onPressed: () {
+                          Flyout.of(context).show();
+                        },
+                      );
+                    }),
                   ),
                 ),
               Tooltip(
                 message: "筛选".tl,
                 child: IconButton(
-                  icon: const Icon(Icons.sort_rounded),
-                  color: readFilterSelect != "全部"
+                  icon: Icon(Icons.sort_rounded, color: readFilterSelect != "全部"
                       ? Theme.of(context).colorScheme.onSurface
-                      : null,
+                      : Theme.of(context).colorScheme.onSurfaceVariant),
                   onPressed: () {
                     showDialog(
                       context: context,
@@ -368,7 +370,7 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
               Tooltip(
                 message: "搜索".tl,
                 child: IconButton(
-                  icon: const Icon(Icons.search),
+                  icon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   onPressed: () {
                     setState(() {
                       keyword = "";
@@ -379,113 +381,61 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                 ),
               ),
               if (!isAllFolder)
-                PopupMenuButton(
-                  tooltip: "更多".tl,
-                  icon: const Icon(Icons.more_horiz),
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.edit_outlined),
-                          const SizedBox(width: 8),
-                          Text("重命名".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          showDialog(
-                            context: App.globalContext!,
-                            builder: (context) => RenameFolderDialog(widget.folder),
-                          ).then((_) => favPage.folderList?.updateFolders());
-                        });
+                MenuButton(
+                  entries: [
+                    MenuEntry(
+                      icon: Icons.edit_outlined,
+                      text: "重命名".tl,
+                      onClick: () {
+                        showDialog(
+                          context: App.globalContext!,
+                          builder: (context) => RenameFolderDialog(widget.folder),
+                        ).then((_) => favPage.folderList?.updateFolders());
                       },
                     ),
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.reorder),
-                          const SizedBox(width: 8),
-                          Text("排序".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          App.globalTo(() => LocalFavoritesFolder(widget.folder));
-                        });
+                    MenuEntry(
+                      icon: Icons.reorder,
+                      text: "排序".tl,
+                      onClick: () {
+                        App.globalTo(() => LocalFavoritesFolder(widget.folder));
                       },
                     ),
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.upload_file),
-                          const SizedBox(width: 8),
-                          Text("导出".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        Future.delayed(const Duration(milliseconds: 100), () async {
-                          var json = LocalFavoritesManager().folderToJsonString(widget.folder);
-                          await exportStringDataAsFile(json, "${widget.folder}.json");
-                        });
+                    MenuEntry(
+                      icon: Icons.upload_file,
+                      text: "导出".tl,
+                      onClick: () async {
+                        var json = LocalFavoritesManager().folderToJsonString(widget.folder);
+                        await exportStringDataAsFile(json, "${widget.folder}.json");
                       },
                     ),
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.update),
-                          const SizedBox(width: 8),
-                          Text("更新漫画信息".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          UpdateFavoritesInfoDialog.show(comics, widget.folder);
-                        });
+                    MenuEntry(
+                      icon: Icons.update,
+                      text: "更新漫画信息".tl,
+                      onClick: () {
+                        UpdateFavoritesInfoDialog.show(comics, widget.folder);
                       },
                     ),
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
-                          const SizedBox(width: 8),
-                          Text("删除收藏夹".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          showDialog(
-                            context: App.globalContext!,
-                            builder: (context) => AlertDialog(
-                              title: Text("删除".tl),
-                              content: Text("Delete folder '@f' ?".tlParams({"f": widget.folder})),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  child: Text("取消".tl),
-                                ),
-                                FilledButton(
-                                  onPressed: () {
-                                    favPage.setFolder(false, null);
-                                    LocalFavoritesManager().deleteFolder(widget.folder);
-                                    favPage.folderList?.updateFolders();
-                                    Navigator.of(context).pop();
-                                  },
-                                  style: ButtonStyle(
-                                    backgroundColor: MaterialStateProperty.all(
-                                      Theme.of(context).colorScheme.error,
-                                    ),
-                                  ),
-                                  child: Text("删除".tl),
-                                ),
-                              ],
-                            ),
-                          );
-                        });
+                    MenuEntry(
+                      icon: Icons.delete_outline,
+                      text: "删除收藏夹".tl,
+                      color: context.colorScheme.error,
+                      onClick: () {
+                        showConfirmDialog(
+                          context: App.globalContext!,
+                          title: "删除".tl,
+                          content: "Delete folder '@f' ?".tlParams({"f": widget.folder}),
+                          onConfirm: () {
+                            favPage.setFolder(false, null);
+                            LocalFavoritesManager().deleteFolder(widget.folder);
+                            favPage.folderList?.updateFolders();
+                          },
+                        );
                       },
                     ),
                   ],
                 ),
             ],
+            ),
           )
         else if (multiSelectMode)
           SliverAppBar(
@@ -504,193 +454,104 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
             title: Text(
                 "已选择 @c 本漫画".tlParams({"c": selectedComics.length.toString()})),
             actions: [
-              PopupMenuButton(
-                itemBuilder: (context) => [
-                  if (!isAllFolder)
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.drive_file_move),
-                          const SizedBox(width: 8),
-                          Text("移动到文件夹".tl),
-                        ],
-                      ),
-                      onTap: () => favoriteOption('move'),
-                    ),
-                  if (!isAllFolder)
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.copy),
-                          const SizedBox(width: 8),
-                          Text("复制到文件夹".tl),
-                        ],
-                      ),
-                      onTap: () => favoriteOption('add'),
-                    ),
-                  PopupMenuItem(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.select_all),
-                        const SizedBox(width: 8),
-                        Text("全选".tl),
-                      ],
-                    ),
-                    onTap: selectAll,
-                  ),
-                  PopupMenuItem(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.deselect),
-                        const SizedBox(width: 8),
-                        Text("取消选择".tl),
-                      ],
-                    ),
-                    onTap: () => setState(() => selectedComics.clear()),
-                  ),
-                  PopupMenuItem(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.flip),
-                        const SizedBox(width: 8),
-                        Text("反选".tl),
-                      ],
-                    ),
-                    onTap: invertSelection,
-                  ),
-                  if (!isAllFolder)
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
-                          const SizedBox(width: 8),
-                          Text("删除漫画".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text("删除".tl),
-                              content: Text("删除 @c 本漫画？"
-                                  .tlParams({"c": selectedComics.length.toString()})),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  child: Text("取消".tl),
-                                ),
-                                FilledButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pop();
-                                    _deleteComicWithId();
-                                  },
-                                  style: ButtonStyle(
-                                    backgroundColor: MaterialStateProperty.all(
-                                      Theme.of(context).colorScheme.error,
-                                    ),
-                                  ),
-                                  child: Text("删除".tl),
-                                ),
-                              ],
-                            ),
-                          );
-                        });
-                      },
-                    ),
-                  PopupMenuItem(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.download),
-                        const SizedBox(width: 8),
-                        Text("下载".tl),
-                      ],
-                    ),
-                    onTap: downloadSelected,
-                  ),
-                  if (selectedComics.length == 1)
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.edit_note),
-                          const SizedBox(width: 8),
-                          Text("编辑标签".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          _editTags(selectedComics.keys.first);
-                        });
-                      },
-                    ),
-                  PopupMenuItem(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.update),
-                        const SizedBox(width: 8),
-                        Text("更新漫画信息".tl),
-                      ],
-                    ),
-                    onTap: () {
-                      Future.delayed(const Duration(milliseconds: 100), () {
-                        UpdateFavoritesInfoDialog.show(
-                          selectedComics.keys.toList(),
-                          widget.folder,
+              MenuButton(entries: [
+                if (!isAllFolder)
+                  MenuEntry(
+                      icon: Icons.drive_file_move,
+                      text: "移动到文件夹".tl,
+                      onClick: () => favoriteOption('move')),
+                if (!isAllFolder)
+                  MenuEntry(
+                      icon: Icons.copy,
+                      text: "复制到文件夹".tl,
+                      onClick: () => favoriteOption('add')),
+                MenuEntry(
+                    icon: Icons.select_all,
+                    text: "全选".tl,
+                    onClick: selectAll),
+                MenuEntry(
+                    icon: Icons.deselect,
+                    text: "取消选择".tl,
+                    onClick: () => setState(() => selectedComics.clear())),
+                MenuEntry(
+                    icon: Icons.flip,
+                    text: "反选".tl,
+                    onClick: invertSelection),
+                if (!isAllFolder)
+                  MenuEntry(
+                      icon: Icons.delete_outline,
+                      text: "删除漫画".tl,
+                      color: context.colorScheme.error,
+                      onClick: () {
+                        showConfirmDialog(
+                          context: context,
+                          title: "删除".tl,
+                          content: "删除 @c 本漫画？"
+                              .tlParams({"c": selectedComics.length.toString()}),
+                          btnColor: context.colorScheme.error,
+                          onConfirm: () {
+                            _deleteComicWithId();
+                          },
                         );
-                      });
+                      }),
+                MenuEntry(
+                  icon: Icons.download,
+                  text: "下载".tl,
+                  onClick: downloadSelected,
+                ),
+                if (selectedComics.length == 1)
+                  MenuEntry(
+                    icon: Icons.edit_note,
+                    text: "编辑标签".tl,
+                    onClick: () {
+                      _editTags(selectedComics.keys.first);
                     },
                   ),
-                  if (selectedComics.length == 1)
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.copy),
-                          const SizedBox(width: 8),
-                          Text("复制标题".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        Clipboard.setData(
-                          ClipboardData(
-                            text: selectedComics.keys.first.name,
-                          ),
-                        );
-                        showToast(message: "已复制".tl);
-                      },
-                    ),
-                  if (selectedComics.length == 1)
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.chrome_reader_mode_outlined),
-                          const SizedBox(width: 8),
-                          Text("阅读".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        final c = selectedComics.keys.first;
-                        _readComic(c);
-                      },
-                    ),
-                  if (selectedComics.length == 1)
-                    PopupMenuItem(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.arrow_forward_ios),
-                          const SizedBox(width: 8),
-                          Text("查看详情".tl),
-                        ],
-                      ),
-                      onTap: () {
-                        final c = selectedComics.keys.first;
-                        App.mainNavigatorKey?.currentContext?.to(() => ComicPage(
-                              id: c.target,
-                              sourceKey: c.type.comicSource?.key ?? '',
-                            ));
-                      },
-                    ),
-                ],
-              ),
+                MenuEntry(
+                  icon: Icons.update,
+                  text: "更新漫画信息".tl,
+                  onClick: () {
+                    UpdateFavoritesInfoDialog.show(
+                      selectedComics.keys.toList(),
+                      widget.folder,
+                    );
+                  },
+                ),
+                if (selectedComics.length == 1)
+                  MenuEntry(
+                    icon: Icons.copy,
+                    text: "复制标题".tl,
+                    onClick: () {
+                      Clipboard.setData(
+                        ClipboardData(
+                          text: selectedComics.keys.first.name,
+                        ),
+                      );
+                      showToast(message: "已复制".tl);
+                    },
+                  ),
+                if (selectedComics.length == 1)
+                  MenuEntry(
+                    icon: Icons.chrome_reader_mode_outlined,
+                    text: "阅读".tl,
+                    onClick: () {
+                      final c = selectedComics.keys.first;
+                      _readComic(c);
+                    },
+                  ),
+                if (selectedComics.length == 1)
+                  MenuEntry(
+                    icon: Icons.arrow_forward_ios,
+                    text: "查看详情".tl,
+                    onClick: () {
+                      final c = selectedComics.keys.first;
+                      App.mainNavigatorKey?.currentContext?.to(() => ComicPage(
+                            id: c.target,
+                            sourceKey: c.type.comicSource?.key ?? '',
+                          ));
+                    },
+                  ),
+              ]),
             ],
           )
         else if (searchMode)
@@ -950,97 +811,93 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
         builder: (context) {
           var tags = comic.tags;
           var controller = TextEditingController();
-          return SimpleDialog(
-            elevation: 1,
-            title: Text("编辑标签".tl),
-            children: [
-              StatefulBuilder(
-                  builder: (context, setState) => SizedBox(
-                        width: 400,
-                        child: Column(
-                          children: [
-                            Wrap(
-                              children: tags
-                                  .map((e) => Container(
-                                        margin: const EdgeInsets.all(4),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 6),
-                                        decoration: BoxDecoration(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .secondaryContainer,
+          return ContentDialog(
+            title: "编辑标签".tl,
+            content: StatefulBuilder(
+                builder: (context, setState) => SizedBox(
+                      width: 400,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Wrap(
+                            children: tags
+                                .map((e) => Container(
+                                      margin: const EdgeInsets.all(4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 6),
+                                      decoration: BoxDecoration(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .secondaryContainer,
+                                          borderRadius:
+                                              BorderRadius.circular(8)),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(e),
+                                          const SizedBox(
+                                            width: 4,
+                                          ),
+                                          InkWell(
                                             borderRadius:
-                                                BorderRadius.circular(8)),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(e),
-                                            const SizedBox(
-                                              width: 4,
+                                                BorderRadius.circular(10),
+                                            child: const Icon(
+                                              Icons.close,
+                                              size: 20,
                                             ),
-                                            InkWell(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              child: const Icon(
-                                                Icons.close,
-                                                size: 20,
-                                              ),
-                                              onTap: () {
-                                                tags.remove(e);
-                                                setState(() {});
-                                              },
-                                            )
-                                          ],
-                                        ),
-                                      ))
-                                  .toList(),
-                            ),
-                            const SizedBox(
-                              height: 8,
-                            ),
-                            SizedBox(
-                              height: 56,
-                              child: TextField(
-                                controller: controller,
-                                decoration: InputDecoration(
-                                  border: const UnderlineInputBorder(),
-                                  suffix: IconButton(
-                                    icon: const Icon(Icons.add),
-                                    onPressed: () {
-                                      var value = controller.text;
-                                      if (value.isNotEmpty) {
-                                        controller.clear();
-                                        tags.add(value);
-                                        setState(() {});
-                                      }
-                                    },
-                                  ).paddingTop(8),
-                                ),
-                                onSubmitted: (value) {
-                                  if (value.isNotEmpty) {
-                                    tags.add(value);
-                                    controller.clear();
-                                    setState(() {});
-                                  }
-                                },
-                              ),
-                            ).paddingHorizontal(36),
-                            const SizedBox(
-                              height: 16,
-                            ),
-                            Center(
-                              child: FilledButton(
+                                            onTap: () {
+                                              tags.remove(e);
+                                              setState(() {});
+                                            },
+                                          )
+                                        ],
+                                      ),
+                                    ))
+                                .toList(),
+                          ),
+                          const SizedBox(
+                            height: 8,
+                          ),
+                          SizedBox(
+                            height: 56,
+                            child: TextField(
+                              controller: controller,
+                              decoration: InputDecoration(
+                                border: const UnderlineInputBorder(),
+                                suffix: IconButton(
+                                  icon: const Icon(Icons.add),
                                   onPressed: () {
-                                    LocalFavoritesManager().editTags(
-                                        comic.target, widget.folder, tags);
-                                    App.globalBack();
-                                    updateComics();
+                                    var value = controller.text;
+                                    if (value.isNotEmpty) {
+                                      controller.clear();
+                                      tags.add(value);
+                                      setState(() {});
+                                    }
                                   },
-                                  child: Text("提交".tl)),
-                            )
-                          ],
-                        ),
-                      ))
+                                ).paddingTop(8),
+                              ),
+                              onSubmitted: (value) {
+                                if (value.isNotEmpty) {
+                                  tags.add(value);
+                                  controller.clear();
+                                  setState(() {});
+                                }
+                              },
+                            ),
+                          ).paddingHorizontal(16),
+                        ],
+                      ),
+                    )),
+            actions: [
+              Button.filled(
+                onPressed: () {
+                  LocalFavoritesManager().editTags(
+                      comic.target, widget.folder, tags);
+                  App.globalBack();
+                  updateComics();
+                },
+                child: Text("提交".tl),
+              ),
             ],
           );
         });
@@ -1069,35 +926,47 @@ class _LocalFavoritesFilterDialogState
       ? widget.initReadFilterSelect
       : readFilterList[0];
 
+  List<String> optionTypes = ['筛选'];
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text("筛选".tl),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            title: Text("过滤阅读状态".tl),
-            trailing: DropdownButton<String>(
-              value: readFilter,
-              items: readFilterList.map((e) => DropdownMenuItem(
-                value: e,
-                child: Text(e.tl),
-              )).toList(),
-              onChanged: (v) {
-                setState(() {
-                  readFilter = v!;
-                });
-              },
-            ),
-          ),
-        ],
+    Widget tabBar = Material(
+      borderRadius: BorderRadius.circular(8),
+      child: AppTabBar(
+        key: PageStorageKey(optionTypes),
+        tabs: optionTypes.map((e) => Tab(text: e.tl, key: Key(e))).toList(),
+      ),
+    ).paddingTop(context.padding.top);
+    return ContentDialog(
+      content: DefaultTabController(
+        length: 1,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            tabBar,
+            TabViewBody(children: [
+              Column(
+                children: [
+                  ListTile(
+                    title: Text("过滤阅读状态".tl),
+                    trailing: Select(
+                      current: readFilter.tl,
+                      values: readFilterList.map((e) => e.tl).toList(),
+                      minWidth: 64,
+                      onTap: (index) {
+                        setState(() {
+                          readFilter = readFilterList[index];
+                        });
+                      },
+                    ),
+                  )
+                ],
+              )
+            ]),
+          ],
+        ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text("取消".tl),
-        ),
         FilledButton(
           onPressed: () {
             appdata.implicitData[1] = readFilter;
@@ -1156,29 +1025,25 @@ class _SelectUpdatePageNumState extends State<_SelectUpdatePageNum> {
     }
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           children: [Text(text)],
         ),
-        const SizedBox(height: 16),
         Row(
           children: [
             Text("按最新收藏更新页数".tl),
-            const Spacer(),
-            DropdownButton<String>(
-              value: updatePageNum.toString() == '9999999'
+            Spacer(),
+            Select(
+              current: updatePageNum.toString() == '9999999'
                   ? _allPageText
                   : updatePageNum.toString(),
-              items: pageNumList.map((e) => DropdownMenuItem(
-                value: e,
-                child: Text(e),
-              )).toList(),
-              onChanged: (v) {
+              values: pageNumList,
+              minWidth: 48,
+              onTap: (index) {
                 setState(() {
-                  updatePageNum = int.parse(v == _allPageText
+                  updatePageNum = int.parse(pageNumList[index] == _allPageText
                       ? '9999999'
-                      : v!);
+                      : pageNumList[index]);
                   if (appdata.implicitData.length > 15) {
                     appdata.implicitData[15] = updatePageNum.toString();
                   } else {
@@ -1187,10 +1052,68 @@ class _SelectUpdatePageNumState extends State<_SelectUpdatePageNum> {
                   appdata.writeImplicitData();
                 });
               },
-            ),
+            )
           ],
         ),
       ],
     );
+  }
+}
+
+class _LocalFavoritesAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final String title;
+  final Widget? leading;
+  final VoidCallback? titleGesture;
+  final List<Widget> actions;
+  final double topPadding;
+
+  _LocalFavoritesAppBarDelegate({
+    required this.title,
+    this.leading,
+    this.titleGesture,
+    required this.actions,
+    required this.topPadding,
+  });
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        elevation: shrinkOffset > 0 ? 2 : 0,
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            leading ?? const SizedBox(),
+            const SizedBox(width: 16),
+            Expanded(
+              child: GestureDetector(
+                onTap: titleGesture,
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 20),
+                ),
+              ),
+            ),
+            ...actions,
+            const SizedBox(width: 8),
+          ],
+        ).paddingTop(topPadding),
+      ),
+    );
+  }
+
+  @override
+  double get maxExtent => 52.0 + topPadding;
+
+  @override
+  double get minExtent => 52.0 + topPadding;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return oldDelegate is! _LocalFavoritesAppBarDelegate ||
+        title != oldDelegate.title ||
+        leading != oldDelegate.leading ||
+        actions != oldDelegate.actions;
   }
 }

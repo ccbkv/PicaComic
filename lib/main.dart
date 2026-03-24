@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -217,9 +218,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       color = light?.primary ?? Colors.blueAccent;
     }
 
-    final lightScheme = ColorScheme.fromSeed(seedColor: color);
-    final darkScheme =
-        ColorScheme.fromSeed(seedColor: color, brightness: Brightness.dark);
+    // 使用与venera一致的flex_seed_scheme配色方案
+    final lightScheme = SeedColorScheme.fromSeeds(
+      primaryKey: color,
+      brightness: Brightness.light,
+      tones: FlexTones.vividBackground(Brightness.light),
+    );
+    final darkScheme = SeedColorScheme.fromSeeds(
+      primaryKey: color,
+      brightness: Brightness.dark,
+      tones: FlexTones.vividBackground(Brightness.dark),
+    );
 
     // 安全检查纯黑色模式设置
     try {
@@ -236,6 +245,43 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     return (lightScheme, darkScheme);
+  }
+
+  // 获取字体配置（与venera一致，支持自定义字体覆盖）
+  (String?, List<String>?) _getFontConfig() {
+    // 检查是否有自定义字体设置
+    if (appdata.settings.length > 95 && appdata.settings[95].isNotEmpty) {
+      return (appdata.settings[95], null);
+    }
+    
+    String? font;
+    List<String>? fallback;
+    if (App.isLinux || App.isWindows) {
+      font = 'Noto Sans CJK';
+      fallback = [
+        'Segoe UI',
+        'Noto Sans SC',
+        'Noto Sans TC',
+        'Noto Sans JP',
+        'Noto Sans KR',
+        'DejaVu Sans',
+        'Arial',
+        'sans-serif',
+      ];
+    } else if (App.isMacOS) {
+      font = 'PingFang SC';
+      fallback = [
+        'Heiti SC',
+        'STHeiti',
+        'Noto Sans SC',
+        'Noto Sans TC',
+        'Noto Sans JP',
+        'Noto Sans KR',
+        'Arial',
+        'sans-serif',
+      ];
+    }
+    return (font, fallback);
   }
 
   // 异步检查firstUse[3]的值
@@ -285,10 +331,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                'lightest': lightColor.primary,
              }),
              brightness: fluent.Brightness.light,
-             fontFamily: appdata.settings.length > 95 &&
-                     appdata.settings[95].isNotEmpty
-                 ? appdata.settings[95]
-                 : (App.isWindows ? "font" : ""),
+             fontFamily: _getFontConfig().$1,
            ),
            darkTheme: fluent.FluentThemeData(
              accentColor: fluent.AccentColor('normal', {
@@ -301,10 +344,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                'lightest': darkColor.primary,
              }),
              brightness: fluent.Brightness.dark,
-             fontFamily: appdata.settings.length > 95 &&
-                     appdata.settings[95].isNotEmpty
-                 ? appdata.settings[95]
-                 : (App.isWindows ? "font" : ""),
+             fontFamily: _getFontConfig().$1,
            ),
           themeMode: appdata.appSettings.darkMode == 2
               ? fluent.ThemeMode.dark
@@ -395,10 +435,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                         ? lightColor
                         : darkColor,
                     useMaterial3: true,
-                    fontFamily: appdata.settings.length > 95 &&
-                            appdata.settings[95].isNotEmpty
-                        ? appdata.settings[95]
-                        : (App.isWindows ? "font" : ""),
+                    fontFamily: _getFontConfig().$1,
+                    fontFamilyFallback: _getFontConfig().$2,
                     brightness: fluent.FluentTheme.of(context).brightness ==
                             fluent.Brightness.light
                         ? Brightness.light
@@ -417,16 +455,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         theme: ThemeData(
           colorScheme: lightColor,
           useMaterial3: true,
-          fontFamily: appdata.settings.length > 95 && appdata.settings[95].isNotEmpty
-              ? appdata.settings[95]
-              : (App.isWindows ? "font" : ""),
+          fontFamily: _getFontConfig().$1,
+          fontFamilyFallback: _getFontConfig().$2,
         ),
         darkTheme: ThemeData(
           colorScheme: darkColor,
           useMaterial3: true,
-          fontFamily: appdata.settings.length > 95 && appdata.settings[95].isNotEmpty
-              ? appdata.settings[95]
-              : (App.isWindows ? "font" : ""),
+          fontFamily: _getFontConfig().$1,
+          fontFamilyFallback: _getFontConfig().$2,
           brightness: Brightness.dark,
         ),
         themeMode: appdata.appSettings.darkMode == 2

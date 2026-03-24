@@ -294,7 +294,6 @@ void _downloadComic(
     showSideBar(
       App.globalContext!,
       content,
-      useSurfaceTintColor: true,
     );
   }
 }

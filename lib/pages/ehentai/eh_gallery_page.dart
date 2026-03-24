@@ -70,21 +70,16 @@ class EhGalleryPage extends BaseComicPage<Gallery> {
       bool shouldIgnore = false;
       await showDialog(
           context: App.globalContext!,
-          builder: (context) => AlertDialog(
-                title: Text("警告".tl),
-                content: Text("此画廊存在令人不适的内容\n在设置中可以禁用此警告".tl),
+          builder: (context) => ContentDialog(
+                title: "警告".tl,
+                content: Text("此画廊存在令人不适的内容\n在设置中可以禁用此警告".tl).paddingHorizontal(16).paddingVertical(8),
                 actions: [
-                  TextButton(
-                      onPressed: () {
-                        App.globalBack();
-                      },
-                      child: Text("返回".tl)),
-                  TextButton(
+                  Button.text(
                       onPressed: () {
                         shouldIgnore = true;
                         App.globalBack();
                       },
-                      child: Text("忽略".tl))
+                      child: Text("忽略".tl)),
                 ],
               ));
       if (shouldIgnore) {

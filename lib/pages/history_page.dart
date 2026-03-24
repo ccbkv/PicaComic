@@ -25,6 +25,7 @@ class _HistoryPageState extends State<HistoryPage> {
   String keyword = "";
   var results = <History>[];
   bool isModified = false;
+  final controller = FlyoutController();
 
   ModalRoute? _route;
 
@@ -203,45 +204,34 @@ class _HistoryPageState extends State<HistoryPage> {
             title: buildTitle() ?? Text("${"历史记录".tl}(${comics.length})"),
             actions: [
               Tooltip(
-                message: "清除".tl,
-                child: IconButton(
-                  icon: const Icon(Icons.delete_forever),
-                  onPressed: () {
-                    final now = DateTime.now();
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (dialogContext) => TapRegion(
-                        onTapOutside: (_) {
-                          // Workaround for https://github.com/flutter/flutter/issues/177992
-                          if (DateTime.now().difference(now) < const Duration(milliseconds: 500)) {
-                            return;
-                          }
-                          if (Navigator.canPop(dialogContext)) {
-                            Navigator.pop(dialogContext);
-                          }
-                        },
-                        child: AlertDialog(
-                          title: Text("清除记录".tl),
-                          content: Text("要清除历史记录吗?".tl),
-                          actions: [
-                            TextButton(
-                                onPressed: () => App.globalBack(),
-                                child: Text("取消".tl)),
-                            TextButton(
-                                onPressed: () {
-                                  appdata.history.clearHistory();
-                                  setState(() => comics.clear());
-                                  isModified = true;
-                                  StateController.find(tag: "me_page_history").update();
-                                  App.globalBack();
-                                },
-                                child: Text("清除".tl)),
-                          ],
+                message: '清除'.tl,
+                child: Flyout(
+                  controller: controller,
+                  flyoutBuilder: (context) {
+                    return FlyoutContent(
+                      title: '清除'.tl,
+                      content: Text('要清除历史记录吗?'.tl),
+                      actions: [
+                        Button.filled(
+                          color: context.colorScheme.error,
+                          onPressed: () {
+                            appdata.history.clearHistory();
+                            setState(() => comics.clear());
+                            isModified = true;
+                            StateController.find(tag: "me_page_history").update();
+                            context.pop();
+                          },
+                          child: Text('清除'.tl),
                         ),
-                      ),
+                      ],
                     );
                   },
+                  child: IconButton(
+                    icon: const Icon(Icons.delete_forever),
+                    onPressed: () {
+                      controller.show();
+                    },
+                  ),
                 ),
               ),
               Tooltip(
@@ -316,42 +306,20 @@ class _HistoryPageState extends State<HistoryPage> {
               );
               return;
             }
-            final now = DateTime.now();
-            showDialog(
+            showConfirmDialog(
               context: context,
-              barrierDismissible: false,
-              builder: (dialogContext) => TapRegion(
-                onTapOutside: (_) {
-                  // Workaround for https://github.com/flutter/flutter/issues/177992
-                  if (DateTime.now().difference(now) < const Duration(milliseconds: 500)) {
-                    return;
-                  }
-                  if (Navigator.canPop(dialogContext)) {
-                    Navigator.pop(dialogContext);
-                  }
-                },
-                child: AlertDialog(
-                  title: Text("删除".tl),
-                  content: Text("要删除这条历史记录吗".tl),
-                  actions: [
-                    TextButton(
-                        onPressed: () => App.globalBack(),
-                        child: Text("取消".tl)),
-                    TextButton(
-                        onPressed: () {
-                          appdata.history.remove(comics_[i].target);
-                          setState(() {
-                            isModified = true;
-                            comics.removeWhere((element) =>
-                                element.target == comics_[i].target);
-                          });
-                          StateController.find(tag: "me_page_history").update();
-                          App.globalBack();
-                        },
-                        child: Text("删除".tl)),
-                  ],
-                ),
-              ),
+              title: "删除".tl,
+              content: "要删除这条历史记录吗".tl,
+              btnColor: context.colorScheme.error,
+              onConfirm: () {
+                appdata.history.remove(comics_[i].target);
+                setState(() {
+                  isModified = true;
+                  comics.removeWhere((element) =>
+                      element.target == comics_[i].target);
+                });
+                StateController.find(tag: "me_page_history").update();
+              },
             );
           },
           description_: timeToString(comics_[i].time),

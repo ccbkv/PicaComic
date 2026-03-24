@@ -176,19 +176,18 @@ class MainPageState extends State<MainPage> {
     showDialog(
         context: App.globalContext!,
         builder: (dialogContext) {
-          return AlertDialog(
-            title: Text("有可用更新".tl),
-            content: Text(info),
+          return ContentDialog(
+            title: "有可用更新".tl,
+            content: Text(info).paddingHorizontal(16).paddingVertical(8),
             actions: [
-              TextButton(
+              Button.text(
                   onPressed: () {
                     dialogContext.pop();
                     appdata.settings[2] = "0";
                     appdata.writeData();
                   },
                   child: const Text("关闭更新检查")),
-              TextButton(onPressed: dialogContext.pop, child: Text("取消".tl)),
-              TextButton(
+              Button.filled(
                   onPressed: () {
                     getDownloadUrl().then((s) {
                       launchUrlString(s, mode: LaunchMode.externalApplication);
@@ -211,17 +210,16 @@ class MainPageState extends State<MainPage> {
           showDialog(
             context: context,
             builder: (dialogContext) {
-              return AlertDialog(
-                title: Text("下载管理器".tl),
-                content: Text("继续未完成的下载?".tl),
+              return ContentDialog(
+                title: "下载管理器".tl,
+                content: Text("继续未完成的下载?".tl).paddingHorizontal(16).paddingVertical(8),
                 actions: [
-                  TextButton(onPressed: dialogContext.pop, child: Text("否".tl)),
-                  TextButton(
+                  Button.text(
                       onPressed: () {
                         downloadManager.start();
                         dialogContext.pop();
                       },
-                      child: Text("是".tl))
+                      child: Text("是".tl)),
                 ],
               );
             },

@@ -83,7 +83,7 @@ class MePage extends StatelessWidget {
           const SizedBox(height: 12),
           buildComicSource(context, 1000),
           const SizedBox(height: 12),
-          buildTools(1000),
+          buildTools(context, 1000),
           const SizedBox(height: 24),
         ],
       );
@@ -137,7 +137,7 @@ class MePage extends StatelessWidget {
                             const SizedBox(
                               height: 12,
                             ),
-                            buildTools(width),
+                            buildTools(context, width),
                           ],
                         ),
                       ),
@@ -163,7 +163,7 @@ class MePage extends StatelessWidget {
                   const SizedBox(
                     height: 12,
                   ),
-                  buildTools(width),
+                  buildTools(context, width),
                 ],
               ],
             ),
@@ -436,7 +436,7 @@ class MePage extends StatelessWidget {
     );
   }
 
-  Widget buildTools(double width) {
+  Widget buildTools(BuildContext context, double width) {
     Widget buildItem(String name) {
       if (App.isFluent) {
           return Container(
@@ -469,7 +469,7 @@ class MePage extends StatelessWidget {
       icon: const Icon(Icons.build_circle),
       title: "工具".tl,
       description: "使用工具发现更多漫画".tl,
-      onTap: openTool,
+      onTap: () => openTool(context),
       child: Wrap(
         spacing: 8,
         runSpacing: 8,

@@ -1,44 +1,133 @@
 part of 'components.dart';
 
-class Select extends StatefulWidget {
+/// Venera style Select component
+class Select extends StatelessWidget {
   const Select({
-    required this.initialValue,
-    this.width = 120,
-    required this.onChange,
-    Key? key,
+    super.key,
+    this.current,
     required this.values,
-    this.disabledValues = const [],
+    this.onTap,
+    this.minWidth,
+    // Legacy API support
+    this.initialValue,
+    this.width,
+    this.onChange,
     this.outline = false,
-  }) : super(key: key);
+    this.disabledValues = const [],
+  });
 
-  ///初始值, 提供values的下标
-  final int? initialValue;
+  final String? current;
 
-  ///可供选取的值
   final List<String> values;
 
-  ///宽度
-  final double width;
+  final void Function(int index)? onTap;
 
-  ///发生改变时的回调
-  final void Function(int) onChange;
+  final double? minWidth;
 
-  /// 禁用的值
+  // Legacy API
+  final int? initialValue;
+  final double? width;
+  final void Function(int)? onChange;
+  final bool outline;
   final List<int> disabledValues;
 
-  /// 是否为边框模式
-  final bool outline;
-
   @override
-  State<Select> createState() => _SelectState();
+  Widget build(BuildContext context) {
+    // If using legacy API (initialValue is provided), convert to new style
+    if (initialValue != null || onChange != null) {
+      return _SelectWrapper(
+        initialValue: initialValue,
+        width: width ?? 120,
+        onChange: onChange,
+        values: values,
+        disabledValues: disabledValues,
+      );
+    }
+
+    // Venera style Select
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: context.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: InkWell(
+        onTap: () {
+          var renderBox = context.findRenderObject() as RenderBox;
+          var offset = renderBox.localToGlobal(Offset.zero);
+          var size = renderBox.size;
+          showMenu(
+            elevation: 3,
+            color: context.brightness == Brightness.light
+                ? const Color(0xFFF6F6F6)
+                : const Color(0xFF1E1E1E),
+            context: context,
+            useRootNavigator: true,
+            constraints: BoxConstraints(
+              minWidth: size.width,
+              maxWidth: size.width,
+            ),
+            position: RelativeRect.fromLTRB(
+              offset.dx,
+              offset.dy + size.height + 2,
+              offset.dx + size.height + 2,
+              offset.dy,
+            ),
+            items: values
+                .map((e) => PopupMenuItem(
+                      height: App.isMobile ? 46 : 40,
+                      value: e,
+                      child: Text(e),
+                    ))
+                .toList(),
+          ).then((value) {
+            if (value != null) {
+              onTap?.call(values.indexOf(value));
+            }
+          });
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: minWidth != null ? (minWidth! - 32) : 0,
+              ),
+              child: Text(current ?? ' ', style: ts.s14),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.arrow_drop_down, color: context.colorScheme.primary),
+          ],
+        ).padding(const EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
+      ),
+    );
+  }
 }
 
-class _SelectState extends State<Select> {
-  late int? value = widget.initialValue;
-  bool isHover = false;
+/// Wrapper to adapt legacy API to new Venera style Select
+class _SelectWrapper extends StatefulWidget {
+  const _SelectWrapper({
+    this.initialValue,
+    this.width = 120,
+    this.onChange,
+    required this.values,
+    this.disabledValues = const [],
+  });
+
+  final int? initialValue;
+  final double width;
+  final void Function(int)? onChange;
+  final List<String> values;
+  final List<int> disabledValues;
 
   @override
-  void didUpdateWidget(covariant Select oldWidget) {
+  State<_SelectWrapper> createState() => _SelectWrapperState();
+}
+
+class _SelectWrapperState extends State<_SelectWrapper> {
+  late int? value = widget.initialValue;
+
+  @override
+  void didUpdateWidget(covariant _SelectWrapper oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialValue != oldWidget.initialValue) {
       value = widget.initialValue;
@@ -51,7 +140,84 @@ class _SelectState extends State<Select> {
       value = 0;
     }
     if (value != null && value! < 0) value = null;
-    
+
+    // Filter out disabled values for display
+    final enabledValues = <String>[];
+    final enabledIndices = <int>[];
+    for (int i = 0; i < widget.values.length; i++) {
+      if (!widget.disabledValues.contains(i)) {
+        enabledValues.add(widget.values[i]);
+        enabledIndices.add(i);
+      }
+    }
+
+    // Find current value index in enabled list
+    int? currentIndex;
+    if (value != null) {
+      final enabledIndex = enabledIndices.indexOf(value!);
+      if (enabledIndex >= 0) {
+        currentIndex = enabledIndex;
+      }
+    }
+
+    return SizedBox(
+      width: widget.width,
+      child: Select(
+        current: currentIndex != null ? enabledValues[currentIndex] : null,
+        values: enabledValues,
+        minWidth: widget.width - 32,
+        onTap: (index) {
+          setState(() {
+            value = enabledIndices[index];
+          });
+          widget.onChange?.call(enabledIndices[index]);
+        },
+      ),
+    );
+  }
+}
+
+/// Legacy Select implementation for backward compatibility
+class _LegacySelect extends StatefulWidget {
+  const _LegacySelect({
+    this.initialValue,
+    this.width = 120,
+    this.onChange,
+    required this.values,
+    this.disabledValues = const [],
+    this.outline = false,
+  });
+
+  final int? initialValue;
+  final double width;
+  final void Function(int)? onChange;
+  final List<String> values;
+  final List<int> disabledValues;
+  final bool outline;
+
+  @override
+  State<_LegacySelect> createState() => _LegacySelectState();
+}
+
+class _LegacySelectState extends State<_LegacySelect> {
+  late int? value = widget.initialValue;
+  bool isHover = false;
+
+  @override
+  void didUpdateWidget(covariant _LegacySelect oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != oldWidget.initialValue) {
+      value = widget.initialValue;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (value != null && value! >= widget.values.length) {
+      value = 0;
+    }
+    if (value != null && value! < 0) value = null;
+
     if (App.isFluent) {
       return SizedBox(
         width: widget.width,
@@ -69,7 +235,7 @@ class _SelectState extends State<Select> {
             if (i != null) {
               setState(() {
                 value = i;
-                widget.onChange(i);
+                widget.onChange?.call(i);
               });
             }
           },
@@ -109,7 +275,7 @@ class _SelectState extends State<Select> {
                       onTap: () {
                         setState(() {
                           value = i;
-                          widget.onChange(i);
+                          widget.onChange?.call(i);
                         });
                       },
                       child: Text(widget.values[i]),
@@ -119,7 +285,7 @@ class _SelectState extends State<Select> {
         child: AnimatedContainer(
           duration: _fastAnimationDuration,
           decoration: BoxDecoration(
-            color: color,
+            color: _getColor(),
             borderRadius: BorderRadius.circular(widget.outline ? 4 : 8),
             border: widget.outline
                 ? Border.all(
@@ -153,7 +319,7 @@ class _SelectState extends State<Select> {
     );
   }
 
-  Color get color {
+  Color _getColor() {
     if (widget.outline) {
       return isHover
           ? context.colorScheme.outline.withOpacity(0.1)
@@ -196,28 +362,16 @@ class _FilterChipFixedWidthState extends State<FilterChipFixedWidth> {
 
   @override
   void initState() {
+    Future.microtask(measureSize);
     super.initState();
-    // 使用addPostFrameCallback替代Future.microtask，确保在组件完全构建后再测量尺寸
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        measureSize();
-      }
-    });
   }
 
   void measureSize() {
-    // 添加空值检查，防止在iPad上出现空指针异常
-    if (key.currentContext != null) {
-      final RenderBox? renderBox =
-          key.currentContext!.findRenderObject() as RenderBox?;
-      if (renderBox != null && renderBox.hasSize) {
-        labelWidth = renderBox.size.width;
-        labelHeight = renderBox.size.height;
-        if (mounted) {
-          setState(() {});
-        }
-      }
-    }
+    final RenderBox renderBox =
+        key.currentContext!.findRenderObject() as RenderBox;
+    labelWidth = renderBox.size.width;
+    labelHeight = renderBox.size.height;
+    setState(() {});
   }
 
   @override
@@ -271,7 +425,7 @@ class _FilterChipFixedWidthState extends State<FilterChipFixedWidth> {
               top: 0,
               bottom: 0,
               right: labelWidth! + gap,
-              child: const AnimatedCheckIcon(size: iconSize).toCenter(),
+              child: AnimatedCheckIcon(size: iconSize).toCenter(),
             )
         ],
       ),
@@ -370,13 +524,14 @@ class OptionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: _fastAnimationDuration,
       decoration: BoxDecoration(
         color: isSelected
-            ? context.colorScheme.primaryContainer
+            ? context.colorScheme.secondaryContainer
             : context.colorScheme.surface,
         border: isSelected
-            ? Border.all(color: context.colorScheme.primaryContainer)
+            ? Border.all(color: context.colorScheme.secondaryContainer)
             : Border.all(color: context.colorScheme.outline),
         borderRadius: BorderRadius.circular(8),
       ),

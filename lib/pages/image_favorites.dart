@@ -442,30 +442,19 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
   }
 
   void deleteSelected() {
-    showDialog(
+    showConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text("确认删除".tl),
-        content: Text("确定要删除选中的 ${selectedImageFavorites.length} 个图片收藏吗？".tl),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("取消".tl),
-          ),
-          TextButton(
-            onPressed: () {
-              ImageFavoriteManager.deleteMultiple(selectedImageFavorites.keys);
-              setState(() {
-                multiSelectMode = false;
-                selectedImageFavorites.clear();
-                updateImageFavorites();
-              });
-              Navigator.pop(context);
-            },
-            child: Text("删除".tl),
-          ),
-        ],
-      ),
+      title: "确认删除".tl,
+      content: "确定要删除选中的 ${selectedImageFavorites.length} 个图片收藏吗？".tl,
+      btnColor: context.colorScheme.error,
+      onConfirm: () {
+        ImageFavoriteManager.deleteMultiple(selectedImageFavorites.keys);
+        setState(() {
+          multiSelectMode = false;
+          selectedImageFavorites.clear();
+          updateImageFavorites();
+        });
+      },
     );
   }
 
@@ -1015,69 +1004,51 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
   }
 
   void _showImageMenu(ImageFavorite image, Rect rect) {
-    showDialog(
-        context: App.globalContext!,
-        builder: (context) => Dialog(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: SelectableText(
-                        image.title.replaceAll("\n", ""),
-                        style: const TextStyle(fontSize: 22),
-                      ),
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.chrome_reader_mode_rounded),
-                      title: Text("查看漫画".tl),
-                      onTap: () {
-                        App.globalBack();
-                        var type = image.id.split("-")[0];
-                        _readWithKey(type, image.id.replaceFirst("$type-", ""),
-                            image.ep, image.page, image.title, image.otherInfo);
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.copy),
-                      title: Text("复制标题".tl),
-                      onTap: () {
-                        App.globalBack();
-                        Clipboard.setData(ClipboardData(text: image.title));
-                        showToast(message: "标题已复制".tl);
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.select_all),
-                      title: Text("全选本漫画".tl),
-                      onTap: () {
-                        App.globalBack();
-                        for (var ele in widget.comic.images) {
-                          widget.addSelected(ele);
-                        }
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.image),
-                      title: Text("图片视图".tl),
-                      onTap: () {
-                        App.globalBack();
-                        var type = image.id.split("-")[0];
-                        _readWithKey(type, image.id.replaceFirst("$type-", ""),
-                            image.ep, image.page, image.title, image.otherInfo);
-                      },
-                    ),
-                    const SizedBox(
-                      height: 16,
-                    ),
-                  ],
-                ),
-              ),
-            ));
+    showMenuX(
+      App.globalContext!,
+      Offset(rect.left + rect.width / 2 - 121, rect.top + rect.height / 2),
+      [
+        MenuEntry(
+          icon: Icons.chrome_reader_mode_rounded,
+          text: "查看漫画".tl,
+          onClick: () {
+            var type = image.id.split("-")[0];
+            _readWithKey(type, image.id.replaceFirst("$type-", ""),
+                image.ep, image.page, image.title, image.otherInfo);
+          },
+        ),
+        MenuEntry(
+          icon: Icons.copy,
+          text: "复制标题".tl,
+          onClick: () {
+            Clipboard.setData(ClipboardData(text: image.title));
+            showToast(message: "标题已复制".tl);
+          },
+        ),
+        MenuEntry(
+          icon: Icons.select_all,
+          text: "全选本漫画".tl,
+          onClick: () {
+            for (var ele in widget.comic.images) {
+              widget.addSelected(ele);
+            }
+          },
+        ),
+        MenuEntry(
+          icon: Icons.image,
+          text: "图片视图".tl,
+          onClick: () {
+            var type = image.id.split("-")[0];
+            _readWithKey(type, image.id.replaceFirst("$type-", ""),
+                image.ep, image.page, image.title, image.otherInfo);
+          },
+        ),
+      ],
+      title: SelectableText(
+        image.title.replaceAll("\n", ""),
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 
   void _readWithKey(String key, String target, int ep, int page, String title,
@@ -1352,7 +1323,12 @@ class FavoriteImageTile extends StatelessWidget {
   }
 
   void onLongTap() {
-    showConfirmDialog(App.globalContext!, "确认删除".tl, "要删除这个图片吗".tl, delete);
+    showConfirmDialog(
+      context: App.globalContext!,
+      title: "确认删除".tl,
+      content: "要删除这个图片吗".tl,
+      onConfirm: delete,
+    );
   }
 
   void delete() {
@@ -1461,145 +1437,99 @@ class _ImageFavoritesDialogState extends State<_ImageFavoritesDialog> {
   late ImageFavoriteSortType sortType;
   late TimeRange timeFilterSelect;
   late int numFilterSelect;
-  bool _allowPop = false;
+  List<String> optionTypes = ['排序', '筛选'];
 
   @override
   void initState() {
     sortType = widget.initSortType;
     timeFilterSelect = widget.initTimeFilterSelect;
     numFilterSelect = widget.initNumFilterSelect;
-    // iPad 小窗下，打开同一帧的点击可能被遮罩捕获导致立刻关闭，先阻止短时间的 pop
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 200), () {
-        if (mounted) setState(() => _allowPop = true);
-      });
-    });
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => _allowPop,
-      child: AlertDialog(
-        title: Text("排序和筛选".tl),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: DefaultTabController(
-            length: 3,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TabBar(
-                  tabs: [
-                    Tab(text: "排序".tl),
-                    Tab(text: "时间".tl),
-                    Tab(text: "数量".tl),
-                  ],
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: [
-                      // 排序方式选项卡
-                      SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(height: 16),
-                            ...ImageFavoriteSortType.values.map((e) {
-                              return RadioListTile<ImageFavoriteSortType>(
-                                value: e,
-                                groupValue: sortType,
-                                title: Text(e.displayName),
-                                onChanged: (value) {
-                                  setState(() {
-                                    sortType = value!;
-                                  });
-                                },
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-
-                      // 时间筛选选项卡
-                      SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(height: 16),
-                            ...TimeRangeType.values.map((e) {
-                              return RadioListTile<TimeRangeType>(
-                                value: e,
-                                groupValue: timeFilterSelect.type,
-                                title: Text(e.displayName),
-                                onChanged: (value) {
-                                  setState(() {
-                                    timeFilterSelect =
-                                        TimeRange.fromType(value!);
-                                  });
-                                },
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-
-                      // 收藏数量筛选选项卡
-                      SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(height: 16),
-                            ...numFilterList.map((e) {
-                              return RadioListTile<int>(
-                                value: e,
-                                groupValue: numFilterSelect,
-                                title: Text(
-                                    e == numFilterList[0] ? "不限" : "大于$e".tl),
-                                onChanged: (value) {
-                                  setState(() {
-                                    numFilterSelect = value!;
-                                  });
-                                },
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() => _allowPop = true);
-              Navigator.pop(context);
-            },
-            child: Text("取消".tl),
-          ),
-          TextButton(
-            onPressed: () {
-              appdata.implicitData[4] = sortType.value.toString();
-              appdata.implicitData[5] = timeFilterSelect.toString();
-              appdata.implicitData[6] = numFilterSelect.toString();
-              appdata.writeData();
-              widget.updateConfig(sortType, timeFilterSelect, numFilterSelect);
-              setState(() => _allowPop = true);
-              Navigator.pop(context);
-            },
-            child: Text("确定".tl),
-          ),
-        ],
+    Widget tabBar = Material(
+      borderRadius: BorderRadius.circular(8),
+      child: AppTabBar(
+        key: PageStorageKey(optionTypes),
+        tabs: optionTypes.map((e) => Tab(text: e.tl, key: Key(e))).toList(),
       ),
+    ).paddingTop(context.padding.top);
+    return ContentDialog(
+      content: DefaultTabController(
+        length: 2,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            tabBar,
+            TabViewBody(children: [
+              RadioGroup<ImageFavoriteSortType>(
+                groupValue: sortType,
+                onChanged: (v) {
+                  setState(() {
+                    sortType = v ?? sortType;
+                  });
+                },
+                child: Column(
+                  children: ImageFavoriteSortType.values
+                      .map(
+                        (e) => RadioListTile<ImageFavoriteSortType>(
+                          title: Text(e.displayName),
+                          value: e,
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+              Column(
+                children: [
+                  ListTile(
+                    title: Text("时间筛选".tl),
+                    trailing: Select(
+                      current: timeFilterSelect.type.displayName,
+                      values:
+                          TimeRangeType.values.map((e) => e.displayName).toList(),
+                      minWidth: 64,
+                      onTap: (index) {
+                        setState(() {
+                          timeFilterSelect = TimeRange.fromType(TimeRangeType.values[index]);
+                        });
+                      },
+                    ),
+                  ),
+                  ListTile(
+                    title: Text("图片收藏数量大于".tl),
+                    trailing: Select(
+                      current: numFilterSelect == numFilterList[0] ? "不限".tl : numFilterSelect.toString(),
+                      values: numFilterList.map((e) => e == numFilterList[0] ? "不限".tl : e.toString()).toList(),
+                      minWidth: 64,
+                      onTap: (index) {
+                        setState(() {
+                          numFilterSelect = numFilterList[index];
+                        });
+                      },
+                    ),
+                  )
+                ],
+              )
+            ]),
+          ],
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () {
+            appdata.implicitData[4] = sortType.value.toString();
+            appdata.implicitData[5] = timeFilterSelect.toString();
+            appdata.implicitData[6] = numFilterSelect.toString();
+            appdata.writeData();
+            widget.updateConfig(sortType, timeFilterSelect, numFilterSelect);
+            Navigator.pop(context);
+          },
+          child: Text("确认".tl),
+        ),
+      ],
     );
   }
 }

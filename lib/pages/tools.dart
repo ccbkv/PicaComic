@@ -126,7 +126,6 @@ void openTool(BuildContext context) {
                       ].contains(uri.host)) {
                         return "不支持的链接".tl;
                       }
-                      App.globalBack();
                       handleAppLinks(Uri.parse(text));
                       return null;
                     },
@@ -155,7 +154,8 @@ void openTool(BuildContext context) {
                       if (!value.isNum) {
                         return "输入的ID不是数字".tl;
                       }
-                      App.globalBack();
+                      // 不调用 App.globalBack()，让 showInputDialog 自己关闭
+                      // 也不关闭工具侧边栏，直接导航到新页面
                       App.mainNavigatorKey?.currentContext
                           ?.to(() => JmComicPage(value));
                       return null;

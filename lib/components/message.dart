@@ -247,7 +247,13 @@ Future<void> showInputDialog({
                           result = futureOr;
                         }
                         if (result == null) {
-                          context.pop();
+                          // 延迟关闭对话框，确保 onConfirm 中的导航操作先执行
+                          // 避免同时关闭对话框和导航导致的 StateController 问题
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            if (context.mounted) {
+                              context.pop();
+                            }
+                          });
                         } else {
                           setState(() => error = result.toString());
                         }

@@ -45,6 +45,7 @@ import 'package:pica_comic/network/picacg_network/methods.dart';
 import 'package:pica_comic/utils/translations.dart';
 
 import '../jm/jm_comments_page.dart';
+import 'package:pica_comic/network/cloudflare.dart';
 
 part 'eps_view.dart';
 
@@ -416,47 +417,100 @@ class ComicReadingPage extends StatelessWidget {
             child: SizedBox(
               width: 250,
               height: 40,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        logic.change();
-                      },
-                      child: Text("重试".tl),
-                    ),
-                  ),
-                  const SizedBox(
-                    width: 8,
-                  ),
-                  Expanded(
-                      child: FilledButton(
-                    onPressed: () {
-                      if (!readingData.hasEp) {
-                        showToast(message: "没有其它章节".tl);
-                        return;
-                      }
-                      if (MediaQuery.of(context).size.width > 600) {
-                        showSideBar(
-                          context,
-                          buildEpsView(),
-                          title: null,
-                          addTopPadding: true,
-                          width: 400,
-                        );
-                      } else {
-                        showModalBottomSheet(
-                          context: context,
-                          useSafeArea: false,
-                          builder: (context) {
-                            return buildEpsView();
-                          },
-                        );
-                      }
-                    },
-                    child: Text("切换章节".tl),
-                  )),
-                ],
+              child: Builder(
+                builder: (context) {
+                  // 检查是否是 Cloudflare 错误
+                  final cfe = CloudflareException.fromString(logic.errorMessage ?? "");
+                  if (cfe != null) {
+                    // Cloudflare 错误：显示验证按钮和切换章节按钮
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              passCloudflare(cfe, () {
+                                logic.change();
+                              });
+                            },
+                            child: Text("验证".tl),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              if (!readingData.hasEp) {
+                                showToast(message: "没有其它章节".tl);
+                                return;
+                              }
+                              if (MediaQuery.of(context).size.width > 600) {
+                                showSideBar(
+                                  context,
+                                  buildEpsView(),
+                                  title: null,
+                                  addTopPadding: true,
+                                  width: 400,
+                                );
+                              } else {
+                                showModalBottomSheet(
+                                  context: context,
+                                  useSafeArea: false,
+                                  builder: (context) {
+                                    return buildEpsView();
+                                  },
+                                );
+                              }
+                            },
+                            child: Text("切换章节".tl),
+                          ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    // 普通错误：显示重试和切换章节按钮
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              logic.change();
+                            },
+                            child: Text("重试".tl),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              if (!readingData.hasEp) {
+                                showToast(message: "没有其它章节".tl);
+                                return;
+                              }
+                              if (MediaQuery.of(context).size.width > 600) {
+                                showSideBar(
+                                  context,
+                                  buildEpsView(),
+                                  title: null,
+                                  addTopPadding: true,
+                                  width: 400,
+                                );
+                              } else {
+                                showModalBottomSheet(
+                                  context: context,
+                                  useSafeArea: false,
+                                  builder: (context) {
+                                    return buildEpsView();
+                                  },
+                                );
+                              }
+                            },
+                            child: Text("切换章节".tl),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                },
               ),
             ),
           ),

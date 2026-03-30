@@ -1,4 +1,4 @@
-part of pica_reader;
+part of 'comic_reading_page.dart';
 
 abstract class ReadingData {
   ReadingData();
@@ -100,7 +100,7 @@ class PicacgReadingData extends ReadingData {
 
   @override
   Future<Res<List<String>>> loadEpNetwork(int ep) {
-    return PicacgNetwork().getComicContent(id, ep);
+    return picacg.PicacgNetwork().getComicContent(id, ep);
   }
 
   @override
@@ -113,7 +113,7 @@ class PicacgReadingData extends ReadingData {
 }
 
 class EhReadingData extends ReadingData {
-  final Gallery gallery;
+  final eh.Gallery gallery;
 
   EhReadingData(this.gallery);
 

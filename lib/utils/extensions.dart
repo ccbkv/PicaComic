@@ -85,6 +85,11 @@ extension StringExtension on String{
   bool get isURL => _isURL();
 
   bool get isNum => double.tryParse(this) != null;
+
+  String capitalizeFirst() {
+    if (isEmpty) return this;
+    return this[0].toUpperCase() + substring(1);
+  }
 }
 
 extension MapExtension<S, T> on Map<S, List<T>>{

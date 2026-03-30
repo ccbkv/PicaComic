@@ -21,13 +21,14 @@ import 'package:pica_comic/components/window_frame.dart';
 import 'package:pica_comic/foundation/image_loader/base_image_provider.dart';
 import 'package:pica_comic/foundation/image_loader/file_image_loader.dart';
 import 'package:pica_comic/foundation/image_loader/stream_image_provider.dart';
+import 'package:pica_comic/foundation/image_loader/cached_image.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/network/download.dart';
-import 'package:pica_comic/network/eh_network/eh_models.dart';
+import 'package:pica_comic/network/eh_network/eh_models.dart' as eh;
 import 'package:pica_comic/network/eh_network/get_gallery_id.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/network/htmanga_network/htmanga_main_network.dart';
-import 'package:pica_comic/network/jm_network/jm_models.dart';
+import 'package:pica_comic/network/jm_network/jm_models.dart' as jm;
 import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
@@ -41,13 +42,16 @@ import '../../foundation/app.dart';
 import '../../foundation/ui_mode.dart';
 import '../../network/hitomi_network/hitomi_models.dart';
 import '../../utils/key_down_event.dart';
-import 'package:pica_comic/network/picacg_network/methods.dart';
+import 'package:pica_comic/network/picacg_network/methods.dart' as picacg;
 import 'package:pica_comic/utils/translations.dart';
 
 import '../jm/jm_comments_page.dart';
 import 'package:pica_comic/network/cloudflare.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 part 'eps_view.dart';
+
+part 'chapter_comments.dart';
 
 part 'image_view.dart';
 
@@ -101,7 +105,7 @@ class ComicReadingPage extends StatelessWidget {
             StateController.find<ComicReadingPageLogic>(), false)));
   }
 
-  ComicReadingPage.ehentai(Gallery gallery, {super.key, this.initialPage = 1})
+  ComicReadingPage.ehentai(eh.Gallery gallery, {super.key, this.initialPage = 1})
       : initialEp = 1,
         readingData = EhReadingData(gallery) {
     StateController.put(ComicReadingPageLogic(
@@ -112,7 +116,7 @@ class ComicReadingPage extends StatelessWidget {
             StateController.find<ComicReadingPageLogic>(), false)));
   }
 
-  ComicReadingPage.jmComic(JmComicInfo comic, this.initialEp,
+  ComicReadingPage.jmComic(jm.JmComicInfo comic, this.initialEp,
       {super.key, this.initialPage = 1})
       : readingData = JmReadingData(
           comic.name,

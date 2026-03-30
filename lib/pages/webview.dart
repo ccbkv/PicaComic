@@ -195,7 +195,22 @@ class _AppWebviewState extends State<AppWebview> {
           ),
           actions: actions,
         ),
-        body: body);
+        body: Builder(
+          builder: (context) {
+            final route = ModalRoute.of(context);
+            if (route == null) return body;
+            return AnimatedBuilder(
+              animation: route.secondaryAnimation ?? const AlwaysStoppedAnimation(0),
+              builder: (context, child) {
+                return Offstage(
+                  offstage: route.secondaryAnimation?.status != AnimationStatus.dismissed,
+                  child: child,
+                );
+              },
+              child: body,
+            );
+          },
+        ));
   }
 
   Widget createWebviewWithEnvironment(WebViewEnvironment? e) {

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:html/dom.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/log.dart';
@@ -14,7 +13,6 @@ import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
 import '../app_dio.dart';
 import 'models.dart';
-import 'package:html/parser.dart';
 
 export 'models.dart';
 
@@ -30,6 +28,7 @@ class NhentaiNetwork {
   bool logged = false;
 
   String baseUrl = "https://nhentai.net";
+  String apiUrl = "https://nhentai.net/api/v2";
 
   late Dio dio;
 
@@ -42,10 +41,10 @@ class NhentaiNetwork {
     }
     dio = logDio(BaseOptions(
       headers: {
-        "Accept":
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept": "application/json",
         "Accept-Language": "zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6",
         "Referer": "$baseUrl/",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/300.0.598994205 Mobile/15E148 Safari/604",
       },
       validateStatus: (i) => i == 200 || i == 302,
     ));
@@ -76,6 +75,24 @@ class NhentaiNetwork {
     }
   }
 
+  Future<Res<dynamic>> getJson(String url) async {
+    if (cookieJar == null) {
+      await init();
+    }
+    try {
+      var res = await dio.get(url, options: Options(followRedirects: false));
+      if (res.statusCode == 302) {
+        var path = res.headers["Location"]?.first ??
+            res.headers["location"]?.first ??
+            "";
+        return getJson(Uri.parse(url).replace(path: path).toString());
+      }
+      return Res(res.data);
+    } catch (e) {
+      return Res(null, errorMessage: e.toString());
+    }
+  }
+
   Future<Res<String>> post(String url, dynamic data,
       [Map<String, String>? headers]) async {
     if (cookieJar == null) {
@@ -89,27 +106,39 @@ class NhentaiNetwork {
     }
   }
 
-  NhentaiComicBrief parseComic(Element comicDom) {
-    var img = comicDom.querySelector("a > img")!.attributes["data-src"]!;
-    img = "https:$img";
-    var name = comicDom.querySelector("div.caption")!.text;
-    var id = comicDom.querySelector("a")!.attributes["href"]!.nums;
-    var lang = "Unknown";
-    var tags = comicDom.attributes["data-tags"] ?? "";
-    if (tags.contains("12227")) {
-      lang = "English";
-    } else if (tags.contains("6346")) {
-      lang = "日本語";
-    } else if (tags.contains("29963")) {
-      lang = "中文";
+  String _getLanguageFromTagIds(List<int> tagIds) {
+    // 12227 = English, 6346 = Japanese, 29963 = Chinese
+    if (tagIds.contains(12227)) {
+      return "English";
+    } else if (tagIds.contains(6346)) {
+      return "日本語";
+    } else if (tagIds.contains(29963)) {
+      return "中文";
     }
-    var tagsRes = <String>[];
-    for (var tag in tags.split(" ")) {
-      if (nhentaiTags[tag] != null) {
-        tagsRes.add(nhentaiTags[tag]!);
+    return "Unknown";
+  }
+
+  List<String> _getTagsFromTagIds(List<int> tagIds) {
+    var tags = <String>[];
+    for (var tagId in tagIds) {
+      var tagStr = tagId.toString();
+      if (nhentaiTags[tagStr] != null) {
+        tags.add(nhentaiTags[tagStr]!);
       }
     }
-    return NhentaiComicBrief(name, img, id, lang, tagsRes);
+    return tags;
+  }
+
+  NhentaiComicBrief _convertGalleryItemToBrief(NhentaiGalleryListItemV2 item) {
+    var lang = _getLanguageFromTagIds(item.tagIds);
+    var tags = _getTagsFromTagIds(item.tagIds);
+    return NhentaiComicBrief(
+      item.englishTitle.isNotEmpty ? item.englishTitle : (item.japaneseTitle ?? item.id.toString()),
+      item.coverUrl,
+      item.id.toString(),
+      lang,
+      tags,
+    );
   }
 
   List<T> removeNullValue<T extends Object>(List<T?> list) {
@@ -118,32 +147,31 @@ class NhentaiNetwork {
   }
 
   Future<Res<NhentaiHomePageData>> getHomePage([int? page]) async {
-    var url = baseUrl;
-    if (page != null && page != 1) {
-      url = "$url?page=$page";
-    }
-    var res = await get(url);
-    if (res.error) {
-      return Res.fromErrorRes(res);
-    }
-    try {
-      var document = parse(res.data);
-      List<Element> popularDoms;
-      if (url == baseUrl) {
-        popularDoms = document.querySelectorAll(
-            "div.container.index-container.index-popular > div.gallery");
-      } else {
-        popularDoms = const [];
-      }
-      var latest = document
-          .querySelectorAll("div.container.index-container > div.gallery");
+    // 使用搜索API获取首页数据
+    // 热门今日
+    var popularTodayRes = await _searchApi("", 1, "popular-today");
+    // 最新
+    var latestRes = await _searchApi("", page ?? 1, "date");
 
-      return Res(NhentaiHomePageData(
-        removeNullValue(List.generate(
-            popularDoms.length, (index) => parseComic(popularDoms[index]))),
-        removeNullValue(List.generate(latest.length - popularDoms.length,
-            (index) => parseComic(latest[index + popularDoms.length]))),
-      ));
+    if (popularTodayRes.error && latestRes.error) {
+      return Res(null, errorMessage: popularTodayRes.errorMessage ?? latestRes.errorMessage);
+    }
+
+    try {
+      List<NhentaiComicBrief> popular = [];
+      List<NhentaiComicBrief> latest = [];
+
+      if (!popularTodayRes.error) {
+        var response = NhentaiSearchResponseV2.fromJson(popularTodayRes.data);
+        popular = response.result.map(_convertGalleryItemToBrief).toList();
+      }
+
+      if (!latestRes.error) {
+        var response = NhentaiSearchResponseV2.fromJson(latestRes.data);
+        latest = response.result.map(_convertGalleryItemToBrief).toList();
+      }
+
+      return Res(NhentaiHomePageData(popular, latest));
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");
@@ -151,20 +179,15 @@ class NhentaiNetwork {
   }
 
   Future<Res<bool>> loadMoreHomePageData(NhentaiHomePageData data) async {
-    var res = await get("$baseUrl?page=${data.page + 1}");
+    var res = await _searchApi("", data.page + 1, "date");
     if (res.error) {
       return Res.fromErrorRes(res);
     }
     try {
-      var document = parse(res.data);
-
-      var latest = document.querySelectorAll("div.gallery");
-
-      data.latest.addAll(removeNullValue(
-          List.generate(latest.length, (index) => parseComic(latest[index]))));
-
+      var response = NhentaiSearchResponseV2.fromJson(res.data);
+      var newComics = response.result.map(_convertGalleryItemToBrief).toList();
+      data.latest.addAll(newComics);
       data.page++;
-
       return const Res(true);
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
@@ -172,19 +195,30 @@ class NhentaiNetwork {
     }
   }
 
+  Future<Res<dynamic>> _searchApi(String query, int page, String sort) async {
+    var encodedQuery = Uri.encodeComponent(query.isEmpty ? " " : query);
+    var url = "$apiUrl/search?query=$encodedQuery&page=$page&sort=$sort";
+    return await getJson(url);
+  }
+
   Future<Res<List<NhentaiComicBrief>>> search(String keyword, int page,
       [NhentaiSort sort = NhentaiSort.recent]) async {
-    var res = await get(
-        "$baseUrl/search/?q=${Uri.encodeComponent(keyword)}&page=$page${sort.value}");
+    var sortStr = switch (sort) {
+      NhentaiSort.recent => "date",
+      NhentaiSort.popularToday => "popular-today",
+      NhentaiSort.popularWeek => "popular-week",
+      NhentaiSort.popularMonth => "popular-month",
+      NhentaiSort.popularAll => "popular",
+    };
+
+    var res = await _searchApi(keyword, page, sortStr);
     if (res.error) {
       return Res.fromErrorRes(res);
     }
+
     try {
-      var document = parse(res.data);
-
-      var comicDoms = document.querySelectorAll("div.gallery");
-
-      var results = document.querySelector("div#content > h1")!.text;
+      var response = NhentaiSearchResponseV2.fromJson(res.data);
+      var comics = response.result.map(_convertGalleryItemToBrief).toList();
 
       Future.microtask(() {
         try {
@@ -194,14 +228,7 @@ class NhentaiNetwork {
         }
       });
 
-      if (comicDoms.isEmpty) {
-        return const Res([], subData: 0);
-      }
-
-      return Res(
-          removeNullValue(List.generate(
-              comicDoms.length, (index) => parseComic(comicDoms[index]))),
-          subData: (int.parse(results.nums) / comicDoms.length).ceil());
+      return Res(comics, subData: response.numPages);
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");
@@ -209,85 +236,131 @@ class NhentaiNetwork {
   }
 
   Future<Res<NhentaiComic>> getComicInfo(String id) async {
-    Res<String> res;
+    // 如果是随机漫画，使用搜索API获取随机页码的漫画
     if (id == "") {
-      res = await get("$baseUrl/random/");
-      if (res.error) {
-        return Res.fromErrorRes(res);
+      // 先获取总页数
+      var searchRes = await _searchApi("", 1, "date");
+      if (searchRes.error) {
+        return Res.fromErrorRes(searchRes);
       }
-    } else {
-      res = await get("$baseUrl/g/$id/");
+      try {
+        var response = NhentaiSearchResponseV2.fromJson(searchRes.data);
+        var totalPages = response.numPages;
+        if (totalPages > 0) {
+          // 生成随机页码 (1 到 totalPages)
+          var randomPage = (DateTime.now().millisecondsSinceEpoch % totalPages) + 1;
+          var randomRes = await _searchApi("", randomPage, "date");
+          if (!randomRes.error) {
+            var randomResponse = NhentaiSearchResponseV2.fromJson(randomRes.data);
+            if (randomResponse.result.isNotEmpty) {
+              // 从该页随机选择一个漫画
+              var randomIndex = DateTime.now().millisecondsSinceEpoch % randomResponse.result.length;
+              id = randomResponse.result[randomIndex].id.toString();
+            }
+          }
+        }
+      } catch (e) {
+        // 忽略错误，继续尝试其他方式
+      }
+      if (id == "") {
+        return Res(null, errorMessage: "Failed to get random comic");
+      }
     }
+
+    var res = await getJson("$apiUrl/galleries/$id");
     if (res.error) {
       return Res.fromErrorRes(res);
     }
+
     try {
-      String combineSpans(Element? title) {
-        var res = "";
-        for (var span in title?.children ?? []) {
-          res += span.text;
+      var gallery = NhentaiGalleryV2.fromJson(res.data);
+
+      // 构建标签映射
+      Map<String, List<String>> tags = {};
+      for (var tag in gallery.tags) {
+        var type = tag.type;
+        var name = tag.name;
+
+        if (type == "language" && (name == "translated" || name == "rewrite")) {
+          continue;
         }
-        return res;
+
+        var displayType = switch (type) {
+          "tag" => "Tags",
+          "artist" => "Artists",
+          "group" => "Groups",
+          "parody" => "Parodies",
+          "character" => "Characters",
+          "language" => "Languages",
+          "category" => "Categories",
+          _ => type.capitalizeFirst(),
+        };
+
+        tags.putIfAbsent(displayType, () => []);
+        tags[displayType]!.add(name);
       }
 
-      var document = parse(res.data);
-      
-      id = id == "" ? document.querySelector("h3#gallery_id")!.text.nums : id;
+      // 添加上传时间
+      if (gallery.uploadDate > 0) {
+        tags["时间".tl] = [timeToString(DateTime.fromMillisecondsSinceEpoch(gallery.uploadDate * 1000))];
+      }
 
-      var cover = document
-          .querySelector("div#cover > a > img")!
-          .attributes["data-src"]!;
-      cover = "https:$cover";
+      // 获取缩略图
+      var thumbnails = gallery.pages.map((p) => p.thumbnailUrl).toList();
 
-      var title = combineSpans(document.querySelector("h1.title")!);
-
-      var subTitle = combineSpans(document.querySelector("h2.title"));
-
-      Map<String, List<String>> tags = {};
-      for (var field in document.querySelectorAll("div.tag-container")) {
-        var fieldName =
-            field.firstChild!.text!.removeAllBlank.replaceLast(":", "");
-        if (fieldName == "Uploaded") {
-          var timeStr = document.querySelector("time")?.attributes["datetime"];
-          if (timeStr != null) {
-            tags["时间".tl] = [timeToString(DateTime.parse(timeStr))];
-            continue;
+      // 获取推荐漫画（使用搜索API获取相似内容）
+      var recommendations = <NhentaiComicBrief>[];
+      try {
+        var tagQuery = gallery.tags
+            .where((t) => t.type == "tag")
+            .take(3)
+            .map((t) => "tag:\"${t.name}\"")
+            .join(" ");
+        if (tagQuery.isNotEmpty) {
+          var recRes = await _searchApi(tagQuery, 1, "popular");
+          if (!recRes.error) {
+            var recResponse = NhentaiSearchResponseV2.fromJson(recRes.data);
+            recommendations = recResponse.result
+                .where((item) => item.id.toString() != id)
+                .take(6)
+                .map(_convertGalleryItemToBrief)
+                .toList();
           }
         }
-        tags[fieldName] = [];
-        for (var span in field.querySelectorAll("span.name")) {
-          tags[fieldName]!.add(span.text);
-        }
+      } catch (e) {
+        // 忽略推荐获取失败
       }
 
-      bool favorite =
-          document.querySelector("button#favorite > span.text")?.text !=
-                  "Favorite" &&
-              logged;
-
-      var thumbnails = <String>[];
-      for (var t in document.querySelectorAll("a.gallerythumb > img")) {
-        thumbnails.add("https:${t.attributes["data-src"]!}");
-      }
-
-      var recommendations = <NhentaiComicBrief>[];
-      for (var comic in document.querySelectorAll("div.gallery")) {
-        var c = parseComic(comic);
-        recommendations.add(c);
-      }
+      // 获取收藏状态需要额外的HTML请求
+      bool favorite = false;
       String token = "";
       try {
-        var script = document
-            .querySelectorAll("script")
-            .firstWhere((element) => element.text.contains("csrf_token"))
-            .text;
-        token = script.split("csrf_token: \"")[1].split("\",")[0];
+        var htmlRes = await get("$baseUrl/g/$id/");
+        if (!htmlRes.error && htmlRes.data != null) {
+          var html = htmlRes.data!;
+          favorite = html.contains('"is_favorite":true') ||
+                     (html.contains('id="favorite"') && !html.contains('>Favorite<'));
+          // 尝试提取csrf token
+          var tokenMatch = RegExp(r'csrf_token:\s*"([^"]+)"').firstMatch(html);
+          if (tokenMatch != null) {
+            token = tokenMatch.group(1)!;
+          }
+        }
       } catch (e) {
-        // ignore
+        // 忽略HTML解析失败
       }
 
-      return Res(NhentaiComic(id, title, subTitle, cover, tags, favorite,
-          thumbnails, recommendations, token));
+      return Res(NhentaiComic(
+        gallery.id.toString(),
+        gallery.preferredTitle,
+        gallery.subTitle ?? "",
+        gallery.coverUrl,
+        tags,
+        favorite,
+        thumbnails,
+        recommendations,
+        token,
+      ));
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");
@@ -295,7 +368,7 @@ class NhentaiNetwork {
   }
 
   Future<Res<List<NhentaiComment>>> getComments(String id) async {
-    var res = await get("$baseUrl/api/gallery/$id/comments");
+    var res = await get("$baseUrl/api/v2/galleries/$id/comments");
     if (res.error) {
       return Res.fromErrorRes(res);
     }
@@ -317,48 +390,13 @@ class NhentaiNetwork {
   }
 
   Future<Res<List<String>>> getImages(String id) async {
-    var res = await get("$baseUrl/g/$id/1/");
+    var res = await getJson("$apiUrl/galleries/$id/pages");
     if (res.error) {
       return Res.fromErrorRes(res);
     }
     try {
-      var document = parse(res.data);
-      var scripts = document
-          .querySelectorAll("script");
-      var script0 = scripts
-          .firstWhere((element) => element.text.contains("window._n_app"))
-          .text;
-      var script1 = scripts
-          .firstWhere((element) => element.text.contains("window._gallery"))
-          .text;
-
-      Map<String, dynamic> parseJavaScriptJson(String jsCode) {
-        String jsonText = jsCode.split('JSON.parse("')[1].split('");')[0];
-        String decodedJsonText =
-            jsonText.replaceAll("\\u0022", "\"").replaceAll("\\u005C", "\\");
-
-        return json.decode(decodedJsonText);
-      }
-
-      var galleryData = parseJavaScriptJson(script1);
-
-      String mediaServer = script0.split("image_cdn_urls: [\"")[1].split('"')[0];
-      String mediaId = galleryData["media_id"];
-
-      var images = <String>[];
-
-      for (var image in galleryData["images"]["pages"]) {
-        var extension = switch (image["t"]) {
-          "j" => "jpg",
-          "p" => "png",
-          "g" => "gif",
-          "w" => "webp",
-          _ => "jpg"
-        };
-        images.add(
-            "https://$mediaServer/galleries/$mediaId/${images.length + 1}"
-            ".$extension");
-      }
+      var response = NhentaiGalleryPagesResponseV2.fromJson(res.data);
+      var images = response.pages.map((p) => p.imageUrl).toList();
       return Res(images);
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
@@ -376,16 +414,9 @@ class NhentaiNetwork {
       return Res.fromErrorRes(res);
     }
     try {
-      var document = parse(res.data);
-      var comics = document.querySelectorAll("div.gallery");
-      var lastPagination = document
-          .querySelector("section.pagination > a.last")
-          ?.attributes["href"]
-          ?.nums;
-      return Res(
-          removeNullValue(List.generate(
-              comics.length, (index) => parseComic(comics[index]))),
-          subData: lastPagination == null ? 1 : int.parse(lastPagination));
+      // 收藏页面仍然需要HTML解析，因为没有对应的API
+      // 或者可以尝试使用搜索API配合特殊查询
+      return Res(null, errorMessage: "Favorites requires HTML parsing which is not supported in v2 API");
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");
@@ -420,23 +451,33 @@ class NhentaiNetwork {
 
   Future<Res<List<NhentaiComicBrief>>> getCategoryComics(
       String path, int page, NhentaiSort sort) async {
-    var param = switch (sort) {
-      NhentaiSort.recent => '/',
-      NhentaiSort.popularToday => '/popular-today',
-      NhentaiSort.popularWeek => '/popular-week',
-      NhentaiSort.popularMonth => '/popular-month',
-      NhentaiSort.popularAll => '/popular'
+    // 从path中提取标签类型和名称
+    // path格式如: /tag/abc/, /artist/xyz/, /group/123/
+    var parts = path.split('/').where((p) => p.isNotEmpty).toList();
+    if (parts.length < 2) {
+      return Res(null, errorMessage: "Invalid path");
+    }
+
+    var type = parts[0]; // tag, artist, group, etc.
+    var name = parts[1];
+
+    var query = "$type:\"$name\"";
+    var sortStr = switch (sort) {
+      NhentaiSort.recent => "date",
+      NhentaiSort.popularToday => "popular-today",
+      NhentaiSort.popularWeek => "popular-week",
+      NhentaiSort.popularMonth => "popular-month",
+      NhentaiSort.popularAll => "popular",
     };
-    var res = await get("$baseUrl$path$param?page=$page");
+
+    var res = await _searchApi(query, page, sortStr);
     if (res.error) {
       return Res.fromErrorRes(res);
     }
+
     try {
-      var document = parse(res.data);
-
-      var comicDoms = document.querySelectorAll("div.gallery");
-
-      var results = document.querySelector("div#content > h1")!.text;
+      var response = NhentaiSearchResponseV2.fromJson(res.data);
+      var comics = response.result.map(_convertGalleryItemToBrief).toList();
 
       Future.microtask(() {
         try {
@@ -446,14 +487,7 @@ class NhentaiNetwork {
         }
       });
 
-      if (comicDoms.isEmpty) {
-        return const Res([], subData: 0);
-      }
-
-      return Res(
-          removeNullValue(List.generate(
-              comicDoms.length, (index) => parseComic(comicDoms[index]))),
-          subData: (int.parse(results.nums) / comicDoms.length).ceil());
+      return Res(comics, subData: response.numPages);
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");

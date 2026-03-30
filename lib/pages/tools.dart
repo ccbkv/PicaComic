@@ -50,7 +50,7 @@ void openTool(BuildContext context) {
                     );
                     webview.open();
                   } else {
-                    await App.globalTo(
+                    await App.mainNavigatorKey?.currentContext?.to(
                       () => AppWebview(
                         initialUrl: "https://soutubot.moe/",
                         onNavigation: (uri, controller) {
@@ -82,7 +82,7 @@ void openTool(BuildContext context) {
                     );
                     webview.open();
                   } else {
-                    await App.globalTo(
+                    await App.mainNavigatorKey?.currentContext?.to(
                       () => AppWebview(
                         initialUrl: "https://saucenao.com/",
                         onNavigation: (uri, controller) {

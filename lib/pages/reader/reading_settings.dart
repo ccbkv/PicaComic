@@ -1,4 +1,4 @@
-part of pica_reader;
+part of 'comic_reading_page.dart';
 
 void showSettings(BuildContext context) {
   showSideBar(
@@ -114,6 +114,22 @@ class _ReadingSettingsState extends State<ReadingSettings> {
               },
             ),
           ),
+        // 显示章节评论
+        SliverToBoxAdapter(
+          child: SwitchListTile(
+            title: Text("显示章节评论".tl),
+            value: appdata.settings.length > 92 ? appdata.settings[92] == "1" : true,
+            onChanged: (b) {
+              setState(() {
+                while (appdata.settings.length <= 92) {
+                  appdata.settings.add("1");
+                }
+                appdata.settings[92] = b ? "1" : "0";
+              });
+              appdata.updateSettings();
+            },
+          ),
+        ),
         // 点按翻页
         SliverToBoxAdapter(
           child: SwitchListTile(

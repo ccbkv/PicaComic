@@ -180,7 +180,15 @@ class _NetworkFavoritesAppBarDelegate extends SliverPersistentHeaderDelegate {
         child: Row(
           children: [
             const SizedBox(width: 8),
-            leading ?? const SizedBox(),
+            leading ?? (Navigator.of(context).canPop()
+                ? Tooltip(
+                    message: "返回".tl,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  )
+                : const SizedBox()),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -612,8 +620,8 @@ class _FavoriteFolderState extends State<_FavoriteFolder> {
   }
 }
 
-class _FavoriteFolderComicsPage extends StatefulWidget {
-  const _FavoriteFolderComicsPage(
+class _FavoriteFolderComicsPage extends ComicsPage<BaseComic> {
+  _FavoriteFolderComicsPage(
       this.data, this.folderID, this.folderTitle, this.showFolders);
 
   final FavoriteData data;
@@ -622,189 +630,53 @@ class _FavoriteFolderComicsPage extends StatefulWidget {
   final VoidCallback showFolders;
 
   @override
-  State<_FavoriteFolderComicsPage> createState() => _FavoriteFolderComicsPageState();
-}
+  String? get title => null;
 
-class _FavoriteFolderComicsPageState extends State<_FavoriteFolderComicsPage> {
-  int _page = 1;
-  int? _maxPage;
-  bool _loading = false;
-  String? _errorMessage;
-  List<BaseComic> _comics = [];
+  @override
+  bool get centerTitle => false;
 
-  Future<void> _loadComics(int page) async {
-    if (_loading) return;
-    setState(() {
-      _loading = true;
-    });
-    var res = await widget.data.loadComic(page, widget.folderID);
-    if (mounted) {
-      setState(() {
-        _loading = false;
-        if (res.error) {
-          _errorMessage = res.errorMessage;
-        } else {
-          _maxPage = res.subData;
-          if (page == 1) {
-            _comics = res.data;
-          } else {
-            _comics.addAll(res.data);
-          }
-        }
-      });
-    }
-  }
-
-  void _refresh() {
-    _page = 1;
-    _comics = [];
-    _loadComics(1);
-  }
-
-  void _loadNextPage() {
-    if (_maxPage != null && _page >= _maxPage!) return;
-    _page++;
-    _loadComics(_page);
+  @override
+  Future<Res<List<BaseComic>>> getComics(int i) {
+    return data.loadComic(i, folderID);
   }
 
   @override
-  void initState() {
-    super.initState();
-    _loadComics(1);
-  }
+  String get sourceKey => data.key;
 
   @override
-  Widget build(BuildContext context) {
-    if (_loading && _comics.isEmpty) {
-      return Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _NetworkFavoritesAppBarDelegate(
-                title: widget.folderTitle,
-                topPadding: MediaQuery.of(context).size.width <= changePoint ? 0 : MediaQuery.of(context).padding.top,
-                leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-                    ? IconButton(
-                        icon: const Icon(Icons.menu),
-                        color: Theme.of(context).colorScheme.primary,
-                        onPressed: widget.showFolders,
-                      )
-                    : null,
-                actions: [
-                  MenuButton(entries: [
-                    MenuEntry(
-                      icon: Icons.sync,
-                      text: "转换为本地".tl,
-                      onClick: () {
-                        importNetworkFolder(widget.data.key, 9999999, widget.folderTitle, widget.folderID);
-                      },
-                    )
-                  ]),
-                ],
-              ),
-            ),
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+  String? get tag => "Favorites Folder $folderID";
 
-    if (_errorMessage != null && _comics.isEmpty) {
-      return Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _NetworkFavoritesAppBarDelegate(
-                title: widget.folderTitle,
-                topPadding: MediaQuery.of(context).size.width <= changePoint ? 0 : MediaQuery.of(context).padding.top,
-                leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-                    ? IconButton(
-                        icon: const Icon(Icons.menu),
-                        color: Theme.of(context).colorScheme.primary,
-                        onPressed: widget.showFolders,
-                      )
-                    : null,
-                actions: [
-                  MenuButton(entries: [
-                    MenuEntry(
-                      icon: Icons.sync,
-                      text: "转换为本地".tl,
-                      onClick: () {
-                        importNetworkFolder(widget.data.key, 9999999, widget.folderTitle, widget.folderID);
-                      },
-                    )
-                  ]),
-                ],
-              ),
-            ),
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: NetworkError(
-                message: _errorMessage!,
-                retry: _refresh,
-                withAppbar: false,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _NetworkFavoritesAppBarDelegate(
-              title: widget.folderTitle,
-              topPadding: MediaQuery.of(context).padding.top,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              actions: [
-                MenuButton(entries: [
-                  MenuEntry(
-                    icon: Icons.sync,
-                    text: "转换为本地".tl,
-                    onClick: () {
-                      importNetworkFolder(widget.data.key, 9999999, widget.folderTitle, widget.folderID);
-                    },
+  @override
+  Widget? get header {
+    final context = App.globalContext!;
+    final shouldShowMenuButton = MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth;
+    final isMobileView = MediaQuery.of(context).size.width <= changePoint;
+    return SliverPersistentHeader(
+      pinned: true,
+      delegate: _NetworkFavoritesAppBarDelegate(
+        title: folderTitle,
+        topPadding: isMobileView ? 0 : MediaQuery.of(context).padding.top,
+        leading: shouldShowMenuButton
+                ? Tooltip(
+                    message: "返回".tl,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => App.mainNavigatorKey?.currentState?.pop(),
+                    ),
                   )
-                ]),
-              ],
-            ),
-          ),
-          SliverGrid(
-            delegate: SliverChildBuilderDelegate(
-              childCount: _comics.length,
-              (context, i) {
-                if (i == _comics.length - 1 && !_loading) {
-                  _loadNextPage();
-                }
-                return buildComicTile(context, _comics[i], widget.data.key);
+            : null,
+        actions: [
+          MenuButton(entries: [
+            MenuEntry(
+              icon: Icons.sync,
+              text: "转换为本地".tl,
+              onClick: () {
+                importNetworkFolder(data.key, 9999999, folderTitle, folderID);
               },
-            ),
-            gridDelegate: SliverGridDelegateWithComics(),
-          ),
-          if (_loading)
-            const SliverToBoxAdapter(
-              child: ListLoadingIndicator(),
             )
-          else
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 80),
-            ),
+          ]),
         ],
       ),
     );
   }
-}
+} 

@@ -971,7 +971,22 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               },
             ),
           ),
-       
+          ListTile(
+            leading: const Icon(Icons.comment),
+            title: Text("显示章节评论".tl),
+            trailing: Switch(
+              value: appdata.settings.length > 92 ? appdata.settings[92] == "1" : true,
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 92) {
+                    appdata.settings.add("1");
+                  }
+                  appdata.settings[92] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
+          ),
           if (App.isIOS)
             ListTile(
               leading: const Icon(Icons.tab),

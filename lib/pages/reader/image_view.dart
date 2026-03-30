@@ -1,4 +1,4 @@
-part of pica_reader;
+part of 'comic_reading_page.dart';
 
 extension ScrollExtension on ScrollController {
   static double? futurePosition;

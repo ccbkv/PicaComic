@@ -46,6 +46,20 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
 
   late String readFilterSelect;
 
+  /// 分页相关
+  int currentPage = 1;
+  int pageSize = 20;
+  int maxPage = 1;
+
+  /// 获取当前显示模式（连续或分页）
+  bool get isPaginationMode => appdata.settings[25] == "1";
+
+  /// 重置分页
+  void resetPagination() {
+    currentPage = 1;
+    maxPage = 1;
+  }
+
   var searchResults = <FavoriteItem>[];
 
   void updateSearchResult() {
@@ -102,7 +116,30 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
         });
       }
     }
+    // 重置分页
+    resetPagination();
     setState(() {});
+  }
+
+  /// 获取分页后的漫画列表
+  List<FavoriteItem> getPaginatedComics(List<FavoriteItem> sourceComics) {
+    if (!isPaginationMode || searchMode) {
+      return sourceComics;
+    }
+    maxPage = (sourceComics.length / pageSize).ceil();
+    if (maxPage < 1) maxPage = 1;
+    if (currentPage > maxPage) currentPage = maxPage;
+    if (currentPage < 1) currentPage = 1;
+
+    int startIndex = (currentPage - 1) * pageSize;
+    int endIndex = startIndex + pageSize;
+    if (endIndex > sourceComics.length) {
+      endIndex = sourceComics.length;
+    }
+    if (startIndex >= sourceComics.length) {
+      return [];
+    }
+    return sourceComics.sublist(startIndex, endIndex);
   }
 
   List<FavoriteItem> filterComics(List<FavoriteItem> curComics) {
@@ -275,6 +312,9 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
 
     var displayComics = searchMode ? searchResults : comics;
     displayComics = filterComics(displayComics);
+
+    // 应用分页（仅在非搜索模式下）
+    var paginatedComics = getPaginatedComics(displayComics);
 
     Widget body = CustomScrollView(
       controller: scrollController,
@@ -580,6 +620,9 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
               },
             ),
           ),
+        // 顶部分页控件（在AppBar下方）
+        if (isPaginationMode && !searchMode && !multiSelectMode && displayComics.isNotEmpty)
+          _buildPaginationSliver(context),
         if (isLoading)
           const SliverFillRemaining(
             child: Center(child: CircularProgressIndicator()),
@@ -623,10 +666,11 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
           )
         else
           SliverGrid(
+            key: ValueKey('favorites_grid_$currentPage'),
             gridDelegate: SliverGridDelegateWithComics(),
             delegate: SliverChildBuilderDelegate(
               (context, index) {
-                var comic = displayComics[index];
+                var comic = paginatedComics[index];
                 var tile = LocalFavoriteTile(
                   comic,
                   widget.folder,
@@ -671,13 +715,117 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                   child: tile,
                 );
               },
-              childCount: displayComics.length,
+              childCount: paginatedComics.length,
             ),
           ),
+        // 底部分页控件
+        if (isPaginationMode && !searchMode && !multiSelectMode && displayComics.isNotEmpty)
+          _buildPaginationSliver(context),
       ],
     );
 
     return body;
+  }
+
+  /// 构建分页控件
+  Widget _buildPaginationSliver(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Row(
+        children: [
+          FilledButton(
+            onPressed: currentPage > 1
+                ? () {
+                    setState(() {
+                      currentPage--;
+                      scrollController.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    });
+                  }
+                : null,
+            child: Text("后退".tl),
+          ).fixWidth(84),
+          Expanded(
+            child: Center(
+              child: Material(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () async {
+                    int? page = await showDialog<int>(
+                      context: context,
+                      builder: (context) {
+                        TextEditingController controller =
+                            TextEditingController(text: currentPage.toString());
+                        return ContentDialog(
+                          title: "输入页码".tl,
+                          content: TextField(
+                            controller: controller,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: "页码".tl,
+                              hintText: "1-$maxPage",
+                            ),
+                            inputFormatters: <TextInputFormatter>[
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                          ).paddingHorizontal(16),
+                          actions: [
+                            Button.filled(
+                              onPressed: () {
+                                int? p = int.tryParse(controller.text);
+                                if (p != null && p >= 1 && p <= maxPage) {
+                                  Navigator.pop(context, p);
+                                } else {
+                                  showToast(message: "页码无效".tl);
+                                }
+                              },
+                              child: Text("确认".tl),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    if (page != null) {
+                      setState(() {
+                        currentPage = page;
+                        scrollController.animateTo(
+                          0,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                        );
+                      });
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Text("${"页面".tl} $currentPage / $maxPage"),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          FilledButton(
+            onPressed: currentPage < maxPage
+                ? () {
+                    setState(() {
+                      currentPage++;
+                      scrollController.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    });
+                  }
+                : null,
+            child: Text("前进".tl),
+          ).fixWidth(84),
+        ],
+      ).paddingVertical(8).paddingHorizontal(16),
+    );
   }
 
   void _deleteComicWithId() {

@@ -118,9 +118,11 @@ class Appdata {
     "www.cdntwice.org,www.cdnsha.org,www.cdnaspa.cc,www.cdnntr.cc", //85 jm api domains
     "https://cdn-msp.jmapiproxy3.cc", //86 jm image url
     "gold-usergeneratedcontent.net", //87 hitomi cdn url
-    "0",
+    "0", //88
     "2.0.11", //89 jm app version
-    "0",
+    "0", //90
+    "0", //91 Fluent UI
+    "1", //92 显示章节评论
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步
@@ -446,11 +448,62 @@ class Appdata {
     }
   }
 
+  void writeBlockedCommentWords() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/blockedCommentWords.txt");
+          if (!await file.exists()) {
+            await file.create();
+          }
+          await file.writeAsString(blockedCommentWords.join('\n'));
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.writeBlockedCommentWords",
+            "Failed to write blocked comment words: $e");
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      await s.setStringList("blockedCommentWords", blockedCommentWords);
+    }
+  }
+
+  void readBlockedCommentWords() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file = File("${externalDirectory.path}/blockedCommentWords.txt");
+          if (await file.exists()) {
+            var data = (await file.readAsString()).split('\n');
+            if(data.length == 1 && data[0].isEmpty){
+              data.clear();
+            }
+            blockedCommentWords = data;
+          } else {
+            writeBlockedCommentWords();
+          }
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readBlockedCommentWords",
+            "Failed to read blocked comment words: $e");
+        writeBlockedCommentWords();
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      blockedCommentWords = s.getStringList("blockedCommentWords") ?? [];
+    }
+  }
+
   ///屏蔽的关键词
   List<String> blockingKeyword = [];
 
   ///禁漫天堂专用屏蔽关键词
   List<String> jmBlockingKeyword = [];
+
+  ///评论屏蔽词
+  List<String> blockedCommentWords = [];
 
   ///是否第一次使用的判定, 用于显示提示
   List<String> firstUse = [
@@ -577,6 +630,8 @@ class Appdata {
       readBlockingKeyword();
 
       readJmBlockingKeyword();
+
+      readBlockedCommentWords();
 
       if (!App.isAndroid) {
         var s = await SharedPreferences.getInstance();

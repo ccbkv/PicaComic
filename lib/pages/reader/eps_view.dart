@@ -1,4 +1,4 @@
-part of pica_reader;
+part of 'comic_reading_page.dart';
 
 class EpsView extends StatefulWidget {
   const EpsView(this.data, {Key? key}) : super(key: key);
@@ -61,6 +61,13 @@ class _EpsViewState extends State<EpsView> {
                           (logic.data as JmReadingData).commentsLength ?? 9999);
                     },
                   ),
+                // 章节评论按钮
+                if (_shouldShowChapterComments())
+                  IconButton(
+                    icon: Icon(Icons.comment,
+                        color: Theme.of(context).colorScheme.secondary),
+                    onPressed: _openChapterComments,
+                  ),
                 // 排序按钮
                 Tooltip(
                   message: "点击切换排序".tl,
@@ -107,6 +114,44 @@ class _EpsViewState extends State<EpsView> {
           ),
         ],
       ),
+    );
+  }
+
+  bool _shouldShowChapterComments() {
+    var data = widget.data;
+    // 检查是否有章节
+    if (data.eps == null || data.eps!.isEmpty) return false;
+
+    // 检查设置是否启用
+    var showChapterComments = appdata.settings.length > 92 && appdata.settings[92] == "1";
+    if (!showChapterComments) return false;
+
+    // 检查漫画源是否支持章节评论
+    var source = ComicSource.find(data.sourceKey);
+    if (source == null || source.chapterCommentsLoader == null) return false;
+
+    return true;
+  }
+
+  void _openChapterComments() {
+    var data = widget.data;
+    var source = ComicSource.find(data.sourceKey);
+    if (source == null) return;
+
+    var logic = StateController.find<ComicReadingPageLogic>();
+    var epId = data.eps!.keys.elementAt(logic.order - 1);
+    var chapterTitle = data.eps!.values.elementAt(logic.order - 1);
+
+    showSideBar(
+      context,
+      ChapterCommentsPage(
+        comicId: data.id,
+        epId: epId,
+        source: source,
+        comicTitle: data.title,
+        chapterTitle: chapterTitle,
+      ),
+      title: "章节评论".tl,
     );
   }
 }

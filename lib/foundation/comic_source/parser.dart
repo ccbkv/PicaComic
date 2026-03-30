@@ -93,29 +93,31 @@ class ComicSourceParser {
     final favoriteData = _loadFavoriteData();
     final commentsLoader = _parseCommentsLoader();
     final sendCommentFunc = _parseSendCommentFunc();
+    final chapterCommentsLoader = _parseChapterCommentsLoader();
     final veneraSettings = _parseVeneraSettings();
 
-    var source =  ComicSource(
-        _name!,
-        key,
-        account,
-        categoryPageData,
-        categoryComicsData,
-        favoriteData,
-        explorePageData,
-        searchData,
-        [],
-        loadComicFunc,
-        loadComicPagesFunc,
-        getImageLoadingConfigFunc,
-        getThumbnailLoadingConfigFunc,
-        matchBriefIdRegex,
-        filePath,
-        url ?? "",
-        version ?? "1.0.0",
-        commentsLoader,
-        sendCommentFunc,
-        enableTagsTranslate,
+    var source = ComicSource.named(
+        name: _name!,
+        key: key,
+        account: account,
+        categoryData: categoryPageData,
+        categoryComicsData: categoryComicsData,
+        favoriteData: favoriteData,
+        explorePages: explorePageData,
+        searchPageData: searchData,
+        settings: [],
+        loadComicInfo: loadComicFunc,
+        loadComicPages: loadComicPagesFunc,
+        getImageLoadingConfig: getImageLoadingConfigFunc,
+        getThumbnailLoadingConfig: getThumbnailLoadingConfigFunc,
+        matchBriefIdReg: matchBriefIdRegex,
+        filePath: filePath,
+        url: url ?? "",
+        version: version ?? "1.0.0",
+        commentsLoader: commentsLoader,
+        sendCommentFunc: sendCommentFunc,
+        chapterCommentsLoader: chapterCommentsLoader,
+        enableTagsTranslate: enableTagsTranslate,
         veneraSettings: veneraSettings);
 
     await source.loadData();
@@ -199,6 +201,7 @@ class ComicSourceParser {
       final String type = _getValue("explore[$i].type");
       Future<Res<List<ExplorePagePart>>> Function()? loadMultiPart;
       Future<Res<List<BaseComic>>> Function(int page)? loadPage;
+      Future<Res<List<Object>>> Function(int index)? loadMixed;
       if (type == "singlePageWithMultiPart") {
         loadMultiPart = () async {
           try {
@@ -260,19 +263,55 @@ class ComicSourceParser {
             return Res.error(e.toString());
           }
         };
+      } else if (type == "mixed") {
+        loadMixed = (index) async {
+          try {
+            var res = await JsEngine()
+                .runCode("ComicSource.sources.$_key.explore[$i].load(${jsonEncode(index)})");
+            if (res == null || res is! Map) {
+              return Res.error("Invalid response from explore load");
+            }
+            var list = <Object>[];
+            var data = res['data'];
+            if (data == null || data is! List) {
+              return Res.error("Invalid data from explore load");
+            }
+            for (var item in data) {
+              if (item is List) {
+                list.add(item.map<CustomComic>((e) => CustomComic.fromJson(e, _key!)).toList());
+              } else if (item is Map) {
+                var comics = item['comics'];
+                if (comics == null || comics is! List) {
+                  list.add(ExplorePagePart(item['title'] ?? "", [], null));
+                } else {
+                  list.add(ExplorePagePart(
+                    item['title'] ?? "",
+                    comics.map<CustomComic>((e) => CustomComic.fromJson(e, _key!)).toList(),
+                    null));
+                }
+              }
+            }
+            return Res(list, subData: res['maxPage']);
+          } catch (e, s) {
+            log("$e\n$s", "Network", LogLevel.error);
+            return Res.error(e.toString());
+          }
+        };
       }
-      pages.add(ExplorePageData(
-          title,
-          switch (type) {
+      pages.add(ExplorePageData.named(
+          title: title,
+          type: switch (type) {
             "singlePageWithMultiPart" =>
               ExplorePageType.singlePageWithMultiPart,
             "multiPageComicList" => ExplorePageType.multiPageComicList,
             "multiPartPage" => ExplorePageType.singlePageWithMultiPart,
+            "mixed" => ExplorePageType.mixed,
             _ =>
               throw ComicSourceParseException("Unknown explore page type $type")
           },
-          loadPage,
-          loadMultiPart));
+          loadPage: loadPage,
+          loadMultiPart: loadMultiPart,
+          loadMixed: loadMixed));
     }
     return pages;
   }
@@ -775,6 +814,36 @@ class ComicSourceParser {
         }
       }
       return res;
+    };
+  }
+
+  ChapterCommentsLoader? _parseChapterCommentsLoader(){
+    if(!_checkExists("comic.loadChapterComments")) return null;
+    return (comicId, epId, page, replyTo) async {
+      try {
+        var res = await JsEngine().runCode("""
+          ComicSource.sources.$_key.comic.loadChapterComments(
+            ${jsonEncode(comicId)}, ${jsonEncode(epId)}, ${jsonEncode(page)}, ${jsonEncode(replyTo)})
+        """);
+        if (res == null || res is! Map) {
+          return Res.error("Invalid response from loadChapterComments");
+        }
+        var comments = res["comments"];
+        if (comments == null || comments is! List) {
+          return Res([]);
+        }
+        return Res(
+            comments.map((e) => Comment(
+                e["userName"] ?? "", e["avatar"] ?? "", e["content"] ?? "", e["time"] ?? "", e["replyCount"] ?? 0, e["id"]?.toString() ?? "",
+                score: e["score"],
+                isLiked: e["isLiked"],
+                voteStatus: e["voteStatus"]
+            )).toList(),
+            subData: res["maxPage"]);
+      } catch (e, s) {
+        log("$e\n$s", "Network", LogLevel.error);
+        return Res.error(e.toString());
+      }
     };
   }
 

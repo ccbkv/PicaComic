@@ -1,4 +1,4 @@
-part of pica_reader;
+part of 'comic_reading_page.dart';
 
 extension ToolBar on ComicReadingPage {
   bool get isReversed => appdata.settings[9] == "2" || appdata.settings[9] == "6";
@@ -421,6 +421,18 @@ extension ToolBar on ComicReadingPage {
                           ),
                         ),
                         //const Spacer(),
+                        if (_shouldShowChapterComments())
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
+                            child: Tooltip(
+                              message: "章节评论".tl,
+                              child: IconButton(
+                                iconSize: 25,
+                                icon: const Icon(Icons.comment),
+                                onPressed: () => _openChapterComments(context),
+                              ),
+                            ),
+                          ),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
                           child: Tooltip(
@@ -449,6 +461,43 @@ extension ToolBar on ComicReadingPage {
             );
           },
         ),
+      ),
+    );
+  }
+
+  bool _shouldShowChapterComments() {
+    // 检查是否有章节
+    if (!readingData.hasEp || readingData.eps == null || readingData.eps!.isEmpty) {
+      return false;
+    }
+
+    // 检查设置是否启用
+    var showChapterComments = appdata.settings.length > 92 && appdata.settings[92] == "1";
+    if (!showChapterComments) return false;
+
+    // 检查漫画源是否支持章节评论
+    var source = ComicSource.find(readingData.sourceKey);
+    if (source == null || source.chapterCommentsLoader == null) return false;
+
+    return true;
+  }
+
+  void _openChapterComments(BuildContext context) {
+    var source = ComicSource.find(readingData.sourceKey);
+    if (source == null) return;
+
+    var logic = StateController.find<ComicReadingPageLogic>();
+    var epId = readingData.eps!.keys.elementAt(logic.order - 1);
+    var chapterTitle = readingData.eps!.values.elementAt(logic.order - 1);
+
+    showSideBar(
+      context,
+      ChapterCommentsPage(
+        comicId: readingData.id,
+        epId: epId,
+        source: source,
+        comicTitle: readingData.title,
+        chapterTitle: chapterTitle,
       ),
     );
   }

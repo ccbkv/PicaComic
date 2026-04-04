@@ -138,6 +138,23 @@ class _ReadingSettingsState extends State<ReadingSettings> {
               appdata.updateSettings();
             },
           ),
+        if (App.isMobile)
+          ListTile(
+            leading: const Icon(Icons.signal_cellular_alt),
+            title: Text("始终显示状态栏".tl),
+            trailing: Switch(
+              value: appdata.settings.length > 95 && appdata.settings[95] == "1",
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 95) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[95] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
+          ),
         SelectSetting(
           leading: const Icon(Icons.image_outlined),
           title: "图片预加载".tl,

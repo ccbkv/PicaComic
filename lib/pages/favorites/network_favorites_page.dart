@@ -143,6 +143,23 @@ class _NormalFavoriteComicsPage extends ComicsPage<BaseComic> {
               },
             ),
           ),
+          if (data.key == 'nhentai')
+            Tooltip(
+              message: '随机'.tl,
+              child: IconButton(
+                icon: Icon(Icons.shuffle, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                onPressed: () async {
+                  final dialog = showLoadingDialog(context);
+                  final res = await NhentaiNetwork().getRandomFavoriteId();
+                  dialog.close();
+                  if (res.error || res.data == null || res.data!.isEmpty) {
+                    showToast(message: res.errorMessage ?? 'Error');
+                    return;
+                  }
+                  context.to(() => ComicPage(sourceKey: 'nhentai', id: res.data!));
+                },
+              ),
+            ),
           MenuButton(entries: [
             MenuEntry(
               icon: Icons.sync,

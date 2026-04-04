@@ -458,6 +458,26 @@ class NhentaiNetwork {
     }
   }
 
+  Future<Res<String>> getRandomFavoriteId() async {
+    if (!logged) {
+      return const Res(null, errorMessage: 'login required');
+    }
+    final res = await get('$apiUrl/favorites/random', withAuth: true);
+    if (res.error) {
+      return Res.fromErrorRes(res);
+    }
+    try {
+      final response = res.data as Map<String, dynamic>;
+      final idValue = response['id'];
+      if (idValue != null) {
+        return Res(idValue.toString());
+      }
+      return const Res(null, errorMessage: 'invalid random favorite response');
+    } catch (e) {
+      return Res(null, errorMessage: 'Failed to parse random favorite: $e');
+    }
+  }
+
   Future<Res<bool>> checkFavorite(String id) async {
     if (!logged) {
       return const Res(false);

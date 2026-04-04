@@ -420,6 +420,25 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                   },
                 ),
               ),
+                Tooltip(
+                  message: '随机'.tl,
+                  child: IconButton(
+                    icon: Icon(Icons.shuffle,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    onPressed: () {
+                      if (displayComics.isEmpty) {
+                        showToast(message: '当前收藏为空'.tl);
+                        return;
+                      }
+                      final c =displayComics[Random().nextInt(displayComics.length)];
+                      App.globalTo(() => ComicPage(
+                            id: c.target,
+                            sourceKey: c.type.comicSource.key,
+                            cover: c.coverPath,
+                          ));
+                    },
+                  ),
+                ),
               if (!isAllFolder)
                 MenuButton(
                   entries: [

@@ -87,9 +87,40 @@ class _NormalFavoritePageState extends State<_NormalFavoritePage> {
         .showFolderSelector();
   }
 
+  Future<void> openRandomFavorite() async {
+    final dialog = showLoadingDialog(context);
+    final res = await NhentaiNetwork().getRandomFavoriteId();
+    dialog.close();
+    if (!mounted) return;
+    if (res.error || res.data == null || res.data!.isEmpty) {
+      showToast(message: res.errorMessage ?? 'Error');
+      return;
+    }
+    context.to(() => ComicPage(sourceKey: 'nhentai', id: res.data!));
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _NormalFavoriteComicsPage(widget.data, showFolders);
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: _NormalFavoriteComicsPage(widget.data, showFolders),
+        ),
+        if (widget.data.key == 'nhentai')
+          Positioned(
+            right: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            child: Tooltip(
+              message: '随机'.tl,
+              child: FloatingActionButton(
+                heroTag: 'network_fav_random_${widget.data.key}',
+                onPressed: openRandomFavorite,
+                child: const Icon(Icons.shuffle),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
 
@@ -140,23 +171,6 @@ class _NormalFavoriteComicsPage extends ComicsPage<BaseComic> {
               icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurfaceVariant),
               onPressed: () {
                 refresh();
-              },
-            ),
-          ),
-          if (data.key == 'nhentai')
-            Tooltip(
-              message: '随机'.tl,
-              child: IconButton(
-                icon: Icon(Icons.shuffle, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                onPressed: () async {
-                  final dialog = showLoadingDialog(context);
-                  final res = await NhentaiNetwork().getRandomFavoriteId();
-                  dialog.close();
-                  if (res.error || res.data == null || res.data!.isEmpty) {
-                    showToast(message: res.errorMessage ?? 'Error');
-                    return;
-                  }
-                  context.to(() => ComicPage(sourceKey: 'nhentai', id: res.data!));
                 },
               ),
             ),

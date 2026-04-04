@@ -126,6 +126,7 @@ class Appdata {
     "0", //93 在搜索列表中隐藏已阅读项目
     "100", //94 已读项目隐藏阈值
     "0", //95 阅读器中始终显示状态栏
+    "0", //96 主页历史记录样式, 0-封面, 1-文本
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步
@@ -914,5 +915,19 @@ class _Settings {
       appdata.settings.add("0");
     }
     appdata.settings[94] = value.clamp(0, 100).toString();
+  }
+
+  int get homePageHistoryDisplayType {
+    while (appdata.settings.length <= 96) {
+      appdata.settings.add("0");
+    }
+    return int.tryParse(appdata.settings[96]) ?? 0;
+  }
+
+  set homePageHistoryDisplayType(int value) {
+    while (appdata.settings.length <= 96) {
+      appdata.settings.add("0");
+    }
+    appdata.settings[96] = value == 1 ? "1" : "0";
   }
 }

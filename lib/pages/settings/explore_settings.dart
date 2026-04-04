@@ -123,6 +123,17 @@ Widget buildExploreSettings(BuildContext context, bool popUp) {
           );
         },
       ),
+      SelectSetting(
+        leading: const Icon(Icons.history),
+        title: "主页历史记录样式".tl,
+        values: ["显示封面".tl, "不显示封面".tl],
+        initialValue: appdata.appSettings.homePageHistoryDisplayType,
+        onChanged: (i) {
+          appdata.appSettings.homePageHistoryDisplayType = i;
+          appdata.updateSettings();
+          StateController.findOrNull(tag: "me_page_history")?.update();
+        },
+      ),
       SettingsTitle("漫画块".tl),
       SelectSetting(
         leading: const Icon(Icons.web),

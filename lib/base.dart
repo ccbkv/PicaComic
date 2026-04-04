@@ -127,6 +127,7 @@ class Appdata {
     "100", //94 已读项目隐藏阈值
     "0", //95 阅读器中始终显示状态栏
     "0", //96 主页历史记录样式, 0-封面, 1-文本
+    "0", //97 多标签或门搜索(实验性)
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步
@@ -929,5 +930,19 @@ class _Settings {
       appdata.settings.add("0");
     }
     appdata.settings[96] = value == 1 ? "1" : "0";
+  }
+
+  bool get enableOrKeywordSearch {
+    while (appdata.settings.length <= 97) {
+      appdata.settings.add("0");
+    }
+    return appdata.settings[97] == "1";
+  }
+
+  set enableOrKeywordSearch(bool value) {
+    while (appdata.settings.length <= 97) {
+      appdata.settings.add("0");
+    }
+    appdata.settings[97] = value ? "1" : "0";
   }
 }

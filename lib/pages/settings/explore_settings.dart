@@ -75,6 +75,54 @@ Widget buildExploreSettings(BuildContext context, bool popUp) {
         options: ["无".tl, "chinese", "english", "japanese"],
         icon: const Icon(Icons.translate),
       ),
+      SwitchSetting(
+        title: "隐藏列表中的已读内容".tl,
+        settingsIndex: 93,
+        icon: const Icon(Icons.visibility_off),
+      ),
+      StatefulBuilder(
+        builder: (context, setState) {
+          final threshold = appdata.appSettings.hideReadThresholdInList;
+          if (App.isFluent) {
+            return fluent.ListTile(
+              leading: const Icon(Icons.tune),
+              title: Text("隐藏的阅读进度阈值".tl),
+              subtitle: fluent.Slider(
+                value: threshold.toDouble(),
+                min: 0,
+                max: 100,
+                divisions: 20,
+                onChanged: (v) {
+                  setState(() {
+                    appdata.appSettings.hideReadThresholdInList =
+                        v.round();
+                  });
+                  appdata.updateSettings();
+                },
+              ),
+              trailing: Text("$threshold%"),
+            );
+          }
+          return ListTile(
+            leading: const Icon(Icons.tune),
+            title: Text("隐藏的阅读进度阈值".tl),
+            subtitle: Slider(
+              value: threshold.toDouble(),
+              min: 0,
+              max: 100,
+              divisions: 20,
+              label: "$threshold%",
+              onChanged: (v) {
+                setState(() {
+                  appdata.appSettings.hideReadThresholdInList = v.round();
+                });
+                appdata.updateSettings();
+              },
+            ),
+            trailing: Text("$threshold%"),
+          );
+        },
+      ),
       SettingsTitle("漫画块".tl),
       SelectSetting(
         leading: const Icon(Icons.web),

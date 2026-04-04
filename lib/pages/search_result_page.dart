@@ -40,15 +40,40 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
   @override
   final Widget header;
 
+  int _getReadProgressPercent(History history) {
+    if (history.maxPage != null && history.maxPage! > 0) {
+      final progress = (history.page / history.maxPage! * 100).round();
+      return progress.clamp(0, 100);
+    }
+    return history.page > 0 ? 100 : 0;
+  }
+
+  bool _shouldHideComic(BaseComic comic) {
+    if (!appdata.appSettings.hideReadInList) return false;
+    final history = HistoryManager().findSync(comic.id);
+    if (history == null) return false;
+    final threshold = appdata.appSettings.hideReadThresholdInList;
+    return _getReadProgressPercent(history) >= threshold;
+  }
+
   @override
   Future<Res<List<BaseComic>>> getComics(int i) async {
     var loader = ComicSource.find(sourceKey)!.searchPageData!.loadPage!;
+    Res<List<BaseComic>> res;
     // 对于Picacg源，传递分类参数
     if (sourceKey == "picacg" && selectedCategories.isNotEmpty) {
-      return await PicacgNetwork().search(keyword, options[0], i,
+      res = await PicacgNetwork().search(keyword, options[0], i,
           categories: selectedCategories, addToHistory: true);
+    } else {
+      res = await loader(keyword, i, options);
     }
-    return await loader(keyword, i, options);
+
+    if (res.error || !appdata.appSettings.hideReadInList) {
+      return res;
+    }
+
+    final filtered = res.data.where((comic) => !_shouldHideComic(comic)).toList();
+    return Res<List<BaseComic>>(filtered, subData: res.subData);
   }
 
   @override

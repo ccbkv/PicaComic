@@ -39,6 +39,9 @@ class _NormalFavoritePage extends ComicsPage<BaseComic> {
   String get sourceKey => data.key;
 
   @override
+  bool get applyReadFilter => false;
+
+  @override
   List<ComicTileMenuOption>? get addonMenuOptions {
     return [
       if (data.addOrDelFavorite != null)
@@ -373,6 +376,9 @@ class _FavoriteFolder extends ComicsPage<BaseComic> {
 
   @override
   String? get tag => "Favorites Folder $folderID";
+
+  @override
+  bool get applyReadFilter => false;
 
   @override
   String get sourceKey => data.key;

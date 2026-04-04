@@ -1052,6 +1052,28 @@ Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
 }
 
 /// return the first blocked keyword, or null if not blocked
+bool shouldHideReadInList(BaseComic item) {
+  if (!appdata.appSettings.hideReadInList) {
+    return false;
+  }
+
+  final history = HistoryManager().findSync(item.id);
+  if (history == null) {
+    return false;
+  }
+
+  final threshold = appdata.appSettings.hideReadThresholdInList;
+
+  int progress;
+  if (history.maxPage != null && history.maxPage! > 0) {
+    progress = ((history.page / history.maxPage!) * 100).clamp(0, 100).round();
+  } else {
+    progress = history.page > 0 ? 100 : 0;
+  }
+
+  return progress >= threshold;
+}
+
 String? isBlocked(BaseComic item) {
   for (var keyword in appdata.blockingKeyword) {
     var mode = 0; // 0:all, 1:title, 2:uploader, 3:tag

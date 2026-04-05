@@ -12,6 +12,7 @@ import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/network/base_comic.dart';
+import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';

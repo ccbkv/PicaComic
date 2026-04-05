@@ -62,6 +62,19 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
 
   var searchResults = <FavoriteItem>[];
 
+  void openRandomComic(List<FavoriteItem> sourceComics) {
+    if (sourceComics.isEmpty) {
+      showToast(message: '当前收藏为空'.tl);
+      return;
+    }
+    final c = sourceComics[Random().nextInt(sourceComics.length)];
+    App.globalTo(() => ComicPage(
+          id: c.target,
+          sourceKey: c.type.comicSource.key,
+          cover: c.coverPath,
+        ));
+  }
+
   void updateSearchResult() {
     setState(() {
       if (keyword.trim().isEmpty) {
@@ -724,7 +737,23 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
       ],
     );
 
-    return body;
+    return Stack(
+      children: [
+        Positioned.fill(child: body),
+        Positioned(
+          right: 16,
+          bottom: MediaQuery.of(context).padding.bottom + 16,
+          child: Tooltip(
+            message: '随机'.tl,
+            child: FloatingActionButton(
+              heroTag: 'local_fav_random_${widget.folder}',
+              onPressed: () => openRandomComic(displayComics),
+              child: const Icon(Icons.shuffle),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /// 构建分页控件

@@ -34,11 +34,7 @@ class NhentaiNetwork {
 
   Future<void> init() async {
     cookieJar = SingleInstanceCookieJar.instance;
-    for (var cookie in cookieJar!.loadForRequest(Uri.parse(baseUrl))) {
-      if (cookie.name == "sessionid") {
-        logged = true;
-      }
-    }
+    refreshLoginState();
     dio = logDio(BaseOptions(
       headers: {
         "Accept": "application/json",
@@ -54,20 +50,84 @@ class NhentaiNetwork {
 
   void logout() async {
     logged = false;
-    cookieJar!.delete(Uri.parse(baseUrl), "sessionid");
+    cookieJar!.delete(Uri.parse(baseUrl), "access_token");
+    cookieJar!.delete(Uri.parse(baseUrl), "refresh_token");
   }
 
-  Future<Res<String>> get(String url) async {
+  void refreshLoginState() {
+    if (cookieJar == null) {
+      logged = false;
+      return;
+    }
+    final cookies = cookieJar!.loadForRequest(Uri.parse(baseUrl));
+    for (var cookie in cookies) {
+      if (cookie.name == 'access_token') {
+        logged = true;
+      }
+    }
+  }
+
+  String? _getAccessToken() {
+    if (cookieJar == null) {
+      return null;
+    }
+    for (final cookie in cookieJar!.loadForRequest(Uri.parse(baseUrl))) {
+      if (cookie.name == 'access_token' && cookie.value.isNotEmpty) {
+        return cookie.value;
+      }
+    }
+    return null;
+  }
+
+  Map<String, String>? _buildAuthHeaders() {
+    final token = _getAccessToken();
+    if (token == null) {
+      return null;
+    }
+    return {
+      'Accept': 'application/json',
+      'Accept-Language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6',
+      'Referer': '$baseUrl/',
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/300.0.598994205 Mobile/15E148 Safari/604',
+      'Authorization': 'User $token',
+    };
+  }
+
+  Future<Res<dynamic>> get(String url, {bool withAuth = false}) async {
     if (cookieJar == null) {
       await init();
     }
     try {
-      var res = await dio.get<String>(url, options: Options(followRedirects: false));
+      final headers = withAuth ? _buildAuthHeaders() : null;
+      var res = await dio.get<dynamic>(url, options: Options(followRedirects: false, headers: headers),
+      );
       if (res.statusCode == 302) {
         var path = res.headers["Location"]?.first ??
             res.headers["location"]?.first ??
             "";
-        return get(Uri.parse(url).replace(path: path).toString());
+        return get(Uri.parse(url).replace(path: path).toString(), withAuth:withAuth);
+      }
+      if (res.statusCode == 401) {
+        logged = false;
+        return const Res(null, errorMessage: 'login required');
+      }
+      return Res(res.data);
+    } catch (e) {
+      return Res(null, errorMessage: e.toString());
+    } 
+  }
+
+  Future<Res<dynamic>> post(String url, dynamic data,
+      {bool withAuth = false}) async {
+    if (cookieJar == null) {
+      await init();
+    }
+    try {
+      final headers = withAuth ? _buildAuthHeaders() : null;
+      var res = await dio.post<dynamic>(url, data: data, options: Options(headers: headers));
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        logged = false;
+        return const Res(null, errorMessage: 'login required');
       }
       return Res(res.data);
     } catch (e) {
@@ -75,31 +135,17 @@ class NhentaiNetwork {
     }
   }
 
-  Future<Res<dynamic>> getJson(String url) async {
+  Future<Res<dynamic>> delete(String url, {bool withAuth = false}) async {
     if (cookieJar == null) {
       await init();
     }
     try {
-      var res = await dio.get(url, options: Options(followRedirects: false));
-      if (res.statusCode == 302) {
-        var path = res.headers["Location"]?.first ??
-            res.headers["location"]?.first ??
-            "";
-        return getJson(Uri.parse(url).replace(path: path).toString());
+      final headers = withAuth ? _buildAuthHeaders() : null;
+      var res = await dio.delete<dynamic>(url, options: Options(headers: headers));
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        logged = false;
+        return const Res(null, errorMessage: 'login required');
       }
-      return Res(res.data);
-    } catch (e) {
-      return Res(null, errorMessage: e.toString());
-    }
-  }
-
-  Future<Res<String>> post(String url, dynamic data,
-      [Map<String, String>? headers]) async {
-    if (cookieJar == null) {
-      await init();
-    }
-    try {
-      var res = await dio.post<String>(url, data: data, options: Options(headers: headers));
       return Res(res.data);
     } catch (e) {
       return Res(null, errorMessage: e.toString());
@@ -198,7 +244,7 @@ class NhentaiNetwork {
   Future<Res<dynamic>> _searchApi(String query, int page, String sort) async {
     var encodedQuery = Uri.encodeComponent(query.isEmpty ? " " : query);
     var url = "$apiUrl/search?query=$encodedQuery&page=$page&sort=$sort";
-    return await getJson(url);
+    return await get(url);
   }
 
   Future<Res<List<NhentaiComicBrief>>> search(String keyword, int page,
@@ -267,7 +313,7 @@ class NhentaiNetwork {
       }
     }
 
-    var res = await getJson("$apiUrl/galleries/$id");
+    var res = await get("$apiUrl/galleries/$id");
     if (res.error) {
       return Res.fromErrorRes(res);
     }
@@ -331,23 +377,12 @@ class NhentaiNetwork {
         // 忽略推荐获取失败
       }
 
-      // 获取收藏状态需要额外的HTML请求
       bool favorite = false;
-      String token = "";
-      try {
-        var htmlRes = await get("$baseUrl/g/$id/");
-        if (!htmlRes.error && htmlRes.data != null) {
-          var html = htmlRes.data!;
-          favorite = html.contains('"is_favorite":true') ||
-                     (html.contains('id="favorite"') && !html.contains('>Favorite<'));
-          // 尝试提取csrf token
-          var tokenMatch = RegExp(r'csrf_token:\s*"([^"]+)"').firstMatch(html);
-          if (tokenMatch != null) {
-            token = tokenMatch.group(1)!;
-          }
+      if (logged) {
+        final favoriteRes = await checkFavorite(id);
+        if (!favoriteRes.error && favoriteRes.data != null) {
+          favorite = favoriteRes.data!;
         }
-      } catch (e) {
-        // 忽略HTML解析失败
       }
 
       return Res(NhentaiComic(
@@ -359,7 +394,7 @@ class NhentaiNetwork {
         favorite,
         thumbnails,
         recommendations,
-        token,
+        '',
       ));
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
@@ -390,7 +425,7 @@ class NhentaiNetwork {
   }
 
   Future<Res<List<String>>> getImages(String id) async {
-    var res = await getJson("$apiUrl/galleries/$id/pages");
+    var res = await get("$apiUrl/galleries/$id/pages");
     if (res.error) {
       return Res.fromErrorRes(res);
     }
@@ -409,42 +444,81 @@ class NhentaiNetwork {
     if (!logged) {
       return const Res(null, errorMessage: "login required");
     }
-    var res = await get("$baseUrl/favorites/?page=$page");
+    var res = await get('$apiUrl/favorites?page=$page', withAuth: true);  
     if (res.error) {
       return Res.fromErrorRes(res);
     }
     try {
-      // 收藏页面仍然需要HTML解析，因为没有对应的API
-      // 或者可以尝试使用搜索API配合特殊查询
-      return Res(null, errorMessage: "Favorites requires HTML parsing which is not supported in v2 API");
+      final response = NhentaiSearchResponseV2.fromJson(res.data);
+      final comics = response.result.map(_convertGalleryItemToBrief).toList();
+      return Res(comics, subData: response.numPages);
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");
     }
   }
 
-  Future<Res<bool>> favoriteComic(String id, String token) async {
-    var res = await post("$baseUrl/api/gallery/$id/favorite", null, {
-      "Referer": "$baseUrl/g/$id",
-      "X-Csrftoken": token,
-      "X-Requested-With": "XMLHttpRequest"
-    });
+  Future<Res<String>> getRandomFavoriteId() async {
+    if (!logged) {
+      return const Res(null, errorMessage: 'login required');
+    }
+    final res = await get('$apiUrl/favorites/random', withAuth: true);
     if (res.error) {
       return Res.fromErrorRes(res);
-    } else {
+    }
+    try {
+      final response = res.data as Map<String, dynamic>;
+      final idValue = response['id'];
+      if (idValue != null) {
+        return Res(idValue.toString());
+      }
+      return const Res(null, errorMessage: 'invalid random favorite response');
+    } catch (e) {
+      return Res(null, errorMessage: 'Failed to parse random favorite: $e');
+    }
+  }
+
+  Future<Res<bool>> checkFavorite(String id) async {
+    if (!logged) {
+      return const Res(false);
+    }
+    final res = await get('$apiUrl/galleries/$id/favorite', withAuth: true);
+    if (res.error) {
+      return Res.fromErrorRes(res);
+    }
+    try {
+      return Res((res.data['favorited'] ?? false) == true);
+    } catch (e) {
+      return Res(null, errorMessage: 'Failed to parse favorite state: $e');
+    }
+  }
+
+  Future<Res<bool>> favoriteComic(String id, [String? _]) async {
+    if (!logged) {
+      return const Res(null, errorMessage: 'login required');
+    }
+    var res = await post('$apiUrl/galleries/$id/favorite', null, withAuth: true);
+    if (res.error) {
+      return Res.fromErrorRes(res);
+    }
+    try {
+      return Res((res.data['favorited'] ?? true) == true);
+    } catch (_) {
       return const Res(true);
     }
   }
 
-  Future<Res<bool>> unfavoriteComic(String id, String token) async {
-    var res = await post("$baseUrl/api/gallery/$id/unfavorite", null, {
-      "Referer": "$baseUrl/g/$id",
-      "X-Csrftoken": token,
-      "X-Requested-With": "XMLHttpRequest"
-    });
+  Future<Res<bool>> unfavoriteComic(String id, [String? _]) async {
+    if (!logged) {
+      return const Res(null, errorMessage: 'login required');
+    }
+    var res = await delete('$apiUrl/galleries/$id/favorite', withAuth: true);
     if (res.error) {
       return Res.fromErrorRes(res);
-    } else {
+    }
+    try {
+      return Res((res.data['favorited'] ?? false) == false);
+    } catch (_) {
       return const Res(true);
     }
   }

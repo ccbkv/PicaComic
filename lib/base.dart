@@ -123,6 +123,11 @@ class Appdata {
     "0", //90
     "0", //91 Fluent UI
     "1", //92 显示章节评论
+    "0", //93 在搜索列表中隐藏已阅读项目
+    "100", //94 已读项目隐藏阈值
+    "0", //95 阅读器中始终显示状态栏
+    "0", //96 主页历史记录样式, 0-封面, 1-文本
+    "0", //97 多标签或门搜索(实验性)
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步
@@ -888,5 +893,56 @@ class _Settings {
 
   set networkFavorites(List<String> pages) {
     appdata.settings[68] = pages.join(',');
+  }
+
+  bool get hideReadInList =>
+      appdata.settings.length > 93 && appdata.settings[93] == "1";
+
+  set hideReadInList(bool value) {
+    while (appdata.settings.length <= 93) {
+      appdata.settings.add("0");
+    }
+    appdata.settings[93] = value ? "1" : "0";
+  }
+
+  int get hideReadThresholdInList {
+    if (appdata.settings.length <= 94) return 100;
+    final value = int.tryParse(appdata.settings[94]) ?? 100;
+    return value.clamp(0, 100);
+  }
+
+  set hideReadThresholdInList(int value) {
+    while (appdata.settings.length <= 94) {
+      appdata.settings.add("0");
+    }
+    appdata.settings[94] = value.clamp(0, 100).toString();
+  }
+
+  int get homePageHistoryDisplayType {
+    while (appdata.settings.length <= 96) {
+      appdata.settings.add("0");
+    }
+    return int.tryParse(appdata.settings[96]) ?? 0;
+  }
+
+  set homePageHistoryDisplayType(int value) {
+    while (appdata.settings.length <= 96) {
+      appdata.settings.add("0");
+    }
+    appdata.settings[96] = value == 1 ? "1" : "0";
+  }
+
+  bool get enableOrKeywordSearch {
+    while (appdata.settings.length <= 97) {
+      appdata.settings.add("0");
+    }
+    return appdata.settings[97] == "1";
+  }
+
+  set enableOrKeywordSearch(bool value) {
+    while (appdata.settings.length <= 97) {
+      appdata.settings.add("0");
+    }
+    appdata.settings[97] = value ? "1" : "0";
   }
 }

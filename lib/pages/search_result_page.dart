@@ -40,15 +40,76 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
   @override
   final Widget header;
 
-  @override
-  Future<Res<List<BaseComic>>> getComics(int i) async {
-    var loader = ComicSource.find(sourceKey)!.searchPageData!.loadPage!;
+  int _getReadProgressPercent(History history) {
+    if (history.maxPage != null && history.maxPage! > 0) {
+      final progress = (history.page / history.maxPage! * 100).round();
+      return progress.clamp(0, 100);
+    }
+    return history.page > 0 ? 100 : 0;
+  }
+
+  bool _shouldHideComic(BaseComic comic) {
+    if (!appdata.appSettings.hideReadInList) return false;
+    final history = HistoryManager().findSync(comic.id);
+    if (history == null) return false;
+    final threshold = appdata.appSettings.hideReadThresholdInList;
+    return _getReadProgressPercent(history) >= threshold;
+  }
+
+  Future<Res<List<BaseComic>>> _searchSingleKeyword(
+      String keyword, int page, ComicSource source) async {
+    final loader = source.searchPageData!.loadPage!;
+
     // 对于Picacg源，传递分类参数
     if (sourceKey == "picacg" && selectedCategories.isNotEmpty) {
-      return await PicacgNetwork().search(keyword, options[0], i,
+      return await PicacgNetwork().search(keyword, options[0], page,
           categories: selectedCategories, addToHistory: true);
     }
-    return await loader(keyword, i, options);
+    return await loader(keyword, page, options);
+  }
+
+  @override
+  Future<Res<List<BaseComic>>> getComics(int i) async {
+    final source = ComicSource.find(sourceKey)!;
+
+    final enableOrSearch = appdata.appSettings.enableOrKeywordSearch;
+    final splitKeywords = keyword
+        .split(RegExp(r'\s+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    Res<List<BaseComic>> res;
+    if (!enableOrSearch || splitKeywords.length <= 1) {
+      res = await _searchSingleKeyword(keyword, i, source);
+    } else {
+      final merged = <BaseComic>[];
+      final ids = <String>{};
+      String? firstSubData;
+
+      for (final k in splitKeywords) {
+        final current = await _searchSingleKeyword(k, i, source);
+        if (current.error) {
+          return current;
+        }
+        firstSubData ??= current.subData;
+        for (final comic in current.data) {
+          if (ids.add(comic.id)) {
+            merged.add(comic);
+          }
+        }
+      }
+
+      res = Res<List<BaseComic>>(merged, subData: firstSubData);
+    }
+
+    if (res.error || !appdata.appSettings.hideReadInList) {
+      return res;
+    }
+
+    final filtered =
+        res.data.where((comic) => !_shouldHideComic(comic)).toList();
+    return Res<List<BaseComic>>(filtered, subData: res.subData);
   }
 
   @override

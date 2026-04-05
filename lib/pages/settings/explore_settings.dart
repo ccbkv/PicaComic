@@ -75,6 +75,72 @@ Widget buildExploreSettings(BuildContext context, bool popUp) {
         options: ["无".tl, "chinese", "english", "japanese"],
         icon: const Icon(Icons.translate),
       ),
+      SwitchSetting(
+        title: "隐藏列表中的已读内容".tl,
+        settingsIndex: 93,
+        icon: const Icon(Icons.visibility_off),
+      ),
+      StatefulBuilder(
+        builder: (context, setState) {
+          final threshold = appdata.appSettings.hideReadThresholdInList;
+          if (App.isFluent) {
+            return fluent.ListTile(
+              leading: const Icon(Icons.tune),
+              title: Text("隐藏的阅读进度阈值".tl),
+              subtitle: fluent.Slider(
+                value: threshold.toDouble(),
+                min: 0,
+                max: 100,
+                divisions: 20,
+                onChanged: (v) {
+                  setState(() {
+                    appdata.appSettings.hideReadThresholdInList =
+                        v.round();
+                  });
+                  appdata.updateSettings();
+                },
+              ),
+              trailing: Text("$threshold%"),
+            );
+          }
+          return ListTile(
+            leading: const Icon(Icons.tune),
+            title: Text("隐藏的阅读进度阈值".tl),
+            subtitle: Slider(
+              value: threshold.toDouble(),
+              min: 0,
+              max: 100,
+              divisions: 20,
+              label: "$threshold%",
+              onChanged: (v) {
+                setState(() {
+                  appdata.appSettings.hideReadThresholdInList = v.round();
+                });
+                appdata.updateSettings();
+              },
+            ),
+            trailing: Text("$threshold%"),
+          );
+        },
+      ),
+      SelectSetting(
+        leading: const Icon(Icons.history),
+        title: "主页历史记录样式".tl,
+        values: ["显示封面".tl, "不显示封面".tl],
+        initialValue: appdata.appSettings.homePageHistoryDisplayType,
+        onChanged: (i) {
+          appdata.appSettings.homePageHistoryDisplayType = i;
+          appdata.updateSettings();
+          StateController.findOrNull(tag: "me_page_history")?.update();
+        },
+      ),
+      SettingsTitle("实验性".tl),
+      SwitchSetting(
+        title: "多标签或门搜索".tl,
+        subTitle: "将搜索关键词通过空格分割，将分割后的关键词分别搜索后合并搜索结果".tl,
+        settingsIndex: 97,
+        icon: const Icon(Icons.science_outlined),
+      ),
       SettingsTitle("漫画块".tl),
       SelectSetting(
         leading: const Icon(Icons.web),

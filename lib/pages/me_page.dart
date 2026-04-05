@@ -9,6 +9,7 @@ import 'accounts_page.dart';
 import 'package:pica_comic/pages/download_page.dart';
 import 'package:pica_comic/pages/tools.dart';
 import 'package:pica_comic/foundation/app.dart';
+import 'package:pica_comic/base.dart';
 import 'history_page.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'image_favorites.dart';
@@ -194,11 +195,49 @@ class MePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
-                    height: 128,
+                    height: appdata.appSettings.homePageHistoryDisplayType == 0 ? 128 : 88,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: history.length,
                       itemBuilder: (context, index) {
+                        if (appdata.appSettings.homePageHistoryDisplayType == 1) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: SizedBox(
+                              width: 220,
+                              child: fluent.HoverButton(
+                                onPressed: () => toComicPageWithHistory(context, history[index]),
+                                builder: (context, states) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: fluent.FluentTheme.of(context)
+                                          .resources
+                                          .cardBackgroundFillColorSecondary,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            history[index].title,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          history[index].type.name,
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        }
                         return Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: fluent.HoverButton(
@@ -252,11 +291,45 @@ class MePage extends StatelessWidget {
                       mouseCursor: SystemMouseCursors.click,
                     ),
                     SizedBox(
-                      height: 128,
+                      height: appdata.appSettings.homePageHistoryDisplayType == 0 ? 128 : 88,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         itemCount: history.length,
                         itemBuilder: (context, index) {
+                          if (appdata.appSettings.homePageHistoryDisplayType == 1) {
+                            return InkWell(
+                              onTap: () =>
+                                  toComicPageWithHistory(context, history[index]),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 220,
+                                margin: const EdgeInsets.symmetric(horizontal: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .secondaryContainer,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        history[index].title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      history[index].type.name,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
                           return InkWell(
                             onTap: () =>
                                 toComicPageWithHistory(context, history[index]),

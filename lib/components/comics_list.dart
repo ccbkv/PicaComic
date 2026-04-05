@@ -132,6 +132,8 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
 
   bool get showPageIndicator => true;
 
+  bool get applyReadFilter => true;
+
   List<ComicTileMenuOption>? get addonMenuOptions => null;
 
   /// 刷新页面
@@ -224,12 +226,17 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
               List<T> comics = [];
               if (appdata.appSettings.fullyHideBlockedWorks) {
                 for (var comic in logic.comics!) {
-                  if (isBlocked(comic) == null) {
+                  if (isBlocked(comic) == null &&
+                      (!applyReadFilter || !shouldHideReadInList(comic))) {
                     comics.add(comic);
                   }
                 }
               } else {
-                comics = logic.comics!;
+                for (var comic in logic.comics!) {
+                  if (!applyReadFilter || !shouldHideReadInList(comic)) {
+                    comics.add(comic);
+                  }
+                }
               }
               if (comics.isEmpty) {
                 return SmoothCustomScrollView(
@@ -282,12 +289,17 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
               List<T> comics = [];
               if (appdata.appSettings.fullyHideBlockedWorks) {
                 for (var comic in logic.dividedComics![logic.current]!) {
-                  if (isBlocked(comic) == null) {
+                  if (isBlocked(comic) == null &&
+                      (!applyReadFilter || !shouldHideReadInList(comic))) {
                     comics.add(comic);
                   }
                 }
               } else {
-                comics = logic.dividedComics![logic.current]!;
+                for (var comic in logic.dividedComics![logic.current]!) {
+                  if (!applyReadFilter || !shouldHideReadInList(comic)) {
+                    comics.add(comic);
+                  }
+                }
               }
               if (comics.isEmpty) {
                 return SmoothCustomScrollView(
@@ -624,12 +636,16 @@ class SliverGridComics extends StatelessWidget {
         List<BaseComic> comics = [];
         if (appdata.appSettings.fullyHideBlockedWorks) {
           for (var comic in this.comics) {
-            if (isBlocked(comic) == null) {
+            if (isBlocked(comic) == null && !shouldHideReadInList(comic)) {
               comics.add(comic);
             }
           }
         } else {
-          comics = this.comics;
+          for (var comic in this.comics) {
+            if (!shouldHideReadInList(comic)) {
+              comics.add(comic);
+            }
+          }
         }
         return _SliverGridComics(
           comics: comics,

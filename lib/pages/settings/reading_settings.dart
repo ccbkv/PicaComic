@@ -54,22 +54,22 @@ class _ReadingSettingsState extends State<ReadingSettings> {
             settingsIndex: 7,
             icon: const Icon(Icons.volume_mute),
           ),
-          ListTile(
-            leading: const Icon(Icons.comment),
-            title: Text("显示章节评论".tl),
-            trailing: Switch(
-              value: appdata.settings.length > 92 ? appdata.settings[92] == "1" : true,
-              onChanged: (b) {
-                setState(() {
-                  while (appdata.settings.length <= 92) {
-                    appdata.settings.add("1");
-                  }
-                  appdata.settings[92] = b ? "1" : "0";
-                });
-                appdata.updateSettings();
-              },
-            ),
+        ListTile(
+          leading: const Icon(Icons.comment),
+          title: Text("显示章节评论".tl),
+          trailing: Switch(
+            value: appdata.settings.length > 92 ? appdata.settings[92] == "1" : true,
+            onChanged: (b) {
+              setState(() {
+                while (appdata.settings.length <= 92) {
+                  appdata.settings.add("1");
+                }
+                appdata.settings[92] = b ? "1" : "0";
+              });
+              appdata.updateSettings();
+            },
           ),
+        ),
         ListTile(
           leading: const Icon(Icons.timer_sharp),
           subtitle: SizedBox(
@@ -137,6 +137,23 @@ class _ReadingSettingsState extends State<ReadingSettings> {
               appdata.settings[76] = i.toString();
               appdata.updateSettings();
             },
+          ),
+        if (App.isMobile)
+          ListTile(
+            leading: const Icon(Icons.signal_cellular_alt),
+            title: Text("始终显示状态栏".tl),
+            trailing: Switch(
+              value: appdata.settings.length > 95 && appdata.settings[95] == "1",
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 95) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[95] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
           ),
         SelectSetting(
           leading: const Icon(Icons.image_outlined),

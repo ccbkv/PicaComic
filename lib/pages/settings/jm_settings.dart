@@ -168,7 +168,7 @@ class _JmSettingsState extends State<JmSettings> {
         ),
         ListTile(
           leading: const Icon(Icons.today),
-          title: Text("每日签到".tl),
+          title: Text("每日自动签到".tl),
           subtitle: Text("勾选启用, 点击测试".tl),
           onTap: () => JmSettings.daily(true),
           trailing: Switch(

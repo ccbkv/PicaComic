@@ -77,11 +77,7 @@ final nhentai = ComicSource.named(
   ),
   account: AccountConfig.named(
     onLogin: (context) async {
-      var future = Completer<void>();
-      nhLogin(() {
-        future.complete();
-      });
-      await future.future;
+      await context.to(() => const NhentaiLoginPage());
       if (NhentaiNetwork().logged) {
         var source = ComicSource.find('nhentai')!;
         source.data["account"] = 'ok';

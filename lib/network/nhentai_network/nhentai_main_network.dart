@@ -408,9 +408,9 @@ class NhentaiNetwork {
       return Res.fromErrorRes(res);
     }
     try {
-      var json = const JsonDecoder().convert(res.data);
+      // res.data 已经是 List<dynamic> 类型，直接使用
       var comments = <NhentaiComment>[];
-      for (var c in json) {
+      for (var c in res.data) {
         comments.add(NhentaiComment(
             c["poster"]["username"],
             "https://i3.nhentai.net/${c["poster"]["avatar_url"]}",
@@ -425,13 +425,14 @@ class NhentaiNetwork {
   }
 
   Future<Res<List<String>>> getImages(String id) async {
-    var res = await get("$apiUrl/galleries/$id/pages");
+    // v2 API: 使用 galleries/{id} 端点获取漫画详情，从中提取页面图片 URL
+    var res = await get("$apiUrl/galleries/$id");
     if (res.error) {
       return Res.fromErrorRes(res);
     }
     try {
-      var response = NhentaiGalleryPagesResponseV2.fromJson(res.data);
-      var images = response.pages.map((p) => p.imageUrl).toList();
+      var gallery = NhentaiGalleryV2.fromJson(res.data);
+      var images = gallery.pages.map((p) => p.imageUrl).toList();
       return Res(images);
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");

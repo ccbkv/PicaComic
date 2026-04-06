@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/app.dart';
@@ -32,17 +33,22 @@ class NhentaiNetwork {
 
   late Dio dio;
 
+  Future<bool>? _refreshingFuture;
+
+  Map<String, String> get _defaultHeaders => {
+        'Accept': 'application/json',
+        'Accept-Language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6',
+        'Referer': '$baseUrl/',
+        'User-Agent':
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/300.0.598994205 Mobile/15E148 Safari/604',
+      };
+
   Future<void> init() async {
     cookieJar = SingleInstanceCookieJar.instance;
     refreshLoginState();
     dio = logDio(BaseOptions(
-      headers: {
-        "Accept": "application/json",
-        "Accept-Language": "zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6",
-        "Referer": "$baseUrl/",
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/300.0.598994205 Mobile/15E148 Safari/604",
-      },
-      validateStatus: (i) => i == 200 || i == 302,
+      headers: _defaultHeaders,
+      validateStatus: (i) => i == 200 || i == 302 || i == 401,
     ));
     dio.interceptors.add(CookieManagerSql(cookieJar!));
     dio.interceptors.add(CloudflareInterceptor());
@@ -79,21 +85,72 @@ class NhentaiNetwork {
     return null;
   }
 
+  String? _getRefreshToken() {
+    if (cookieJar == null) {
+      return null;
+    }
+    for (final cookie in cookieJar!.loadForRequest(Uri.parse(baseUrl))) {
+      if (cookie.name == 'refresh_token' && cookie.value.isNotEmpty) {
+        return cookie.value;
+      }
+    }
+    return null;
+  }
+
   Map<String, String>? _buildAuthHeaders() {
     final token = _getAccessToken();
     if (token == null) {
       return null;
     }
-    return {
-      'Accept': 'application/json',
-      'Accept-Language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6',
-      'Referer': '$baseUrl/',
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/300.0.598994205 Mobile/15E148 Safari/604',
-      'Authorization': 'User $token',
-    };
+    return {..._defaultHeaders, 'Authorization': 'User $token'};
   }
 
-  Future<Res<dynamic>> get(String url, {bool withAuth = false}) async {
+  void _saveTokens(String accessToken, String refreshToken) {
+    cookieJar?.saveFromResponse(Uri.parse(baseUrl), [
+      Cookie('access_token', accessToken)
+        ..domain = '.nhentai.net'
+        ..path = '/',
+      Cookie('refresh_token', refreshToken)
+        ..domain = '.nhentai.net'
+        ..path = '/',
+    ]);
+    refreshLoginState();
+  }
+
+
+  Future<bool> _refreshAccessToken() {
+    _refreshingFuture ??= _doRefreshAccessToken().whenComplete(() {
+      _refreshingFuture = null;
+    });
+    return _refreshingFuture!;
+  }
+
+  Future<bool> _doRefreshAccessToken() async {
+    final refreshToken = _getRefreshToken();
+    if (refreshToken == null) {
+      return false;
+    }
+    try {
+      final res = await dio.post<dynamic>('$apiUrl/auth/refresh', data: {'refresh_token': refreshToken},
+        options: Options(headers: _defaultHeaders),
+      );
+      final data = res.data;
+      if (data is! Map) {
+        return false;
+      }
+      final accessToken = data['access_token']?.toString();
+      final newRefreshToken = data['refresh_token']?.toString();
+      if (accessToken == null || accessToken.isEmpty || newRefreshToken == null || newRefreshToken.isEmpty) {
+        return false;
+      }
+      _saveTokens(accessToken, newRefreshToken);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Res<dynamic>> get(String url, {bool withAuth = false, bool retried = false}) async {
     if (cookieJar == null) {
       await init();
     }
@@ -105,20 +162,25 @@ class NhentaiNetwork {
         var path = res.headers["Location"]?.first ??
             res.headers["location"]?.first ??
             "";
-        return get(Uri.parse(url).replace(path: path).toString(), withAuth:withAuth);
+        return get(Uri.parse(url).replace(path: path).toString(), withAuth: withAuth, retried: retried);
       }
       if (res.statusCode == 401) {
+        if (withAuth && !retried) {
+          final refreshed = await _refreshAccessToken();
+          if (refreshed) {
+            return get(url, withAuth: withAuth, retried: true);
+          }
+        }
         logged = false;
         return const Res(null, errorMessage: 'login required');
       }
       return Res(res.data);
     } catch (e) {
       return Res(null, errorMessage: e.toString());
-    } 
+    }
   }
 
-  Future<Res<dynamic>> post(String url, dynamic data,
-      {bool withAuth = false}) async {
+  Future<Res<dynamic>> post(String url, dynamic data,{bool withAuth = false, bool retried = false}) async {
     if (cookieJar == null) {
       await init();
     }
@@ -126,6 +188,12 @@ class NhentaiNetwork {
       final headers = withAuth ? _buildAuthHeaders() : null;
       var res = await dio.post<dynamic>(url, data: data, options: Options(headers: headers));
       if (res.statusCode == 401 || res.statusCode == 403) {
+        if (withAuth && !retried) {
+          final refreshed = await _refreshAccessToken();
+          if (refreshed) {
+            return post(url, data, withAuth: withAuth, retried: true);
+          }
+        }
         logged = false;
         return const Res(null, errorMessage: 'login required');
       }
@@ -135,7 +203,7 @@ class NhentaiNetwork {
     }
   }
 
-  Future<Res<dynamic>> delete(String url, {bool withAuth = false}) async {
+  Future<Res<dynamic>> delete(String url, {bool withAuth = false, bool retried = false}) async {
     if (cookieJar == null) {
       await init();
     }
@@ -143,6 +211,12 @@ class NhentaiNetwork {
       final headers = withAuth ? _buildAuthHeaders() : null;
       var res = await dio.delete<dynamic>(url, options: Options(headers: headers));
       if (res.statusCode == 401 || res.statusCode == 403) {
+        if (withAuth && !retried) {
+          final refreshed = await _refreshAccessToken();
+          if (refreshed) {
+            return delete(url, withAuth: withAuth, retried: true);
+          }
+        }
         logged = false;
         return const Res(null, errorMessage: 'login required');
       }

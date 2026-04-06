@@ -13,8 +13,10 @@ class NhentaiComicBrief extends BaseComic{
   final String lang;
   @override
   final List<String> tags;
+  @override
+  final int? pages;
 
-  const NhentaiComicBrief(this.title, this.cover, this.id, this.lang, this.tags);
+  const NhentaiComicBrief(this.title, this.cover, this.id, this.lang, this.tags, {this.pages} );
 
   @override
   String get description => lang;
@@ -47,9 +49,10 @@ class NhentaiComic with HistoryMixin{
   List<String> thumbnails;
   List<NhentaiComicBrief> recommendations;
   String token;
+  int pages;
 
   NhentaiComic(this.id, this.title, this.subTitle, this.cover, this.tags, this.favorite,
-      this.thumbnails, this.recommendations, this.token);
+      this.thumbnails, this.recommendations, this.token, {this.pages = 0});
 
   Map<String, dynamic> toMap() => {
     "id": id,
@@ -67,7 +70,8 @@ class NhentaiComic with HistoryMixin{
       favorite = false,
       thumbnails = [],
       recommendations = [],
-      token = "";
+      token = "",
+      pages = 0;
 
   @override
   HistoryType get historyType => HistoryType.nhentai;
@@ -227,6 +231,7 @@ class NhentaiGalleryListItemV2 {
   final String englishTitle;
   final String? japaneseTitle;
   final List<int> tagIds;
+  final int? pages;
 
   NhentaiGalleryListItemV2({
     required this.id,
@@ -237,6 +242,7 @@ class NhentaiGalleryListItemV2 {
     required this.englishTitle,
     this.japaneseTitle,
     required this.tagIds,
+    this.pages,
   });
 
   factory NhentaiGalleryListItemV2.fromJson(Map<String, dynamic> json) {
@@ -249,6 +255,7 @@ class NhentaiGalleryListItemV2 {
       englishTitle: json['english_title'] ?? '',
       japaneseTitle: json['japanese_title'],
       tagIds: List<int>.from(json['tag_ids'] ?? []),
+      pages: json['num_pages'],
     );
   }
 
@@ -352,30 +359,5 @@ class NhentaiGalleryV2 {
       return title.japanese;
     }
     return null;
-  }
-}
-
-class NhentaiGalleryPagesResponseV2 {
-  final int galleryId;
-  final String mediaId;
-  final int numPages;
-  final List<NhentaiPageInfoV2> pages;
-
-  NhentaiGalleryPagesResponseV2({
-    required this.galleryId,
-    required this.mediaId,
-    required this.numPages,
-    required this.pages,
-  });
-
-  factory NhentaiGalleryPagesResponseV2.fromJson(Map<String, dynamic> json) {
-    return NhentaiGalleryPagesResponseV2(
-      galleryId: json['gallery_id'],
-      mediaId: json['media_id'].toString(),
-      numPages: json['num_pages'],
-      pages: (json['pages'] as List)
-          .map((e) => NhentaiPageInfoV2.fromJson(e))
-          .toList(),
-    );
   }
 }

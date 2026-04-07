@@ -30,9 +30,9 @@ class SearchPageComicList extends StatefulWidget {
 }
 
 class _SearchPageComicListState
-    extends LoadingState<SearchPageComicList, List<HitomiComicBrief>> {
+    extends LoadingState<SearchPageComicList, List<int>> {
   @override
-  Widget buildContent(BuildContext context, List<HitomiComicBrief> data) {
+  Widget buildContent(BuildContext context, List<int> data) {
     if (data.isEmpty) {
       return SmoothCustomScrollView(
         slivers: [
@@ -59,7 +59,7 @@ class _SearchPageComicListState
         SliverGrid(
           delegate: SliverChildBuilderDelegate(
             (context, index) {
-              return _HitomiSearchComicTile(data[index]);
+              return HitomiComicTileDynamicLoading(data[index]);
             },
             childCount: data.length,
           ),
@@ -70,31 +70,10 @@ class _SearchPageComicListState
   }
 
   @override
-  Future<Res<List<HitomiComicBrief>>> loadData() async {
+  Future<Res<List<int>>> loadData() async {
     var res = await HiNetwork().search(widget.keyword);
     if (res.error) return Res(null, errorMessage: res.errorMessage!);
-    var ids = res.data;
-    const int batchSize = 12;
-    const int targetCount = 60; // render ~60 items initially
-    const int maxPreload = 180; // cap preload to avoid long waiting
-    var briefs = <HitomiComicBrief>[];
-    for (var i = 0; i < ids.length && i < maxPreload; i += batchSize) {
-      var end = i + batchSize > ids.length ? ids.length : i + batchSize;
-      var batch = ids.sublist(i, end);
-      var futures = batch.map((id) => HiNetwork().getComicInfoBrief(id.toString())).toList();
-      var results = await Future.wait(futures);
-      for (var r in results) {
-        if (!r.error) {
-          var brief = r.data;
-          if (!appdata.appSettings.fullyHideBlockedWorks || isBlocked(brief) == null) {
-            briefs.add(brief);
-            if (briefs.length >= targetCount) break;
-          }
-        }
-      }
-      if (briefs.length >= targetCount) break;
-    }
-    return Res(briefs);
+    return Res(res.data);
   }
 }
 
@@ -173,12 +152,8 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 }
 
 class HitomiComicTileDynamicLoading extends StatefulWidget {
-  const HitomiComicTileDynamicLoading(this.id,
-      {Key? key, this.addonMenuOptions})
-      : super(key: key);
+  const HitomiComicTileDynamicLoading(this.id, {super.key});
   final int id;
-
-  final List<ComicTileMenuOption>? addonMenuOptions;
 
   @override
   State<HitomiComicTileDynamicLoading> createState() =>
@@ -189,8 +164,9 @@ class _HitomiComicTileDynamicLoadingState
     extends State<HitomiComicTileDynamicLoading> {
   HitomiComicBrief? comic;
   bool onScreen = true;
+  bool error = false;
 
-  static List<HitomiComicBrief> cache = [];
+  static final Map<int, HitomiComicBrief> _cache = {};
 
   @override
   void dispose() {
@@ -200,41 +176,37 @@ class _HitomiComicTileDynamicLoadingState
 
   @override
   Widget build(BuildContext context) {
-    for (var cachedComic in cache) {
-      var id = RegExp(r"\d+(?=\.html)").firstMatch(cachedComic.link)![0]!;
-      if (id == widget.id.toString()) {
-        comic = cachedComic;
-      }
+    if (_cache.containsKey(widget.id)) {
+      comic = _cache[widget.id];
     }
+
     if (comic == null) {
-      HiNetwork().getComicInfoBrief(widget.id.toString()).then((c) {
-        if (c.error) {
-          showToast(message: c.errorMessage!);
-          return;
-        }
-        cache.add(c.data);
-        if (onScreen) {
+      if (!error) {
+        HiNetwork().getComicInfoBrief(widget.id.toString()).then((c) {
+          if (!onScreen) return;
+          if (c.error) {
+            setState(() {
+              error = true;
+            });
+            return;
+          }
+          _cache[widget.id] = c.data;
           setState(() {
             comic = c.data;
           });
-        }
-      });
+        });
+      }
 
-      return buildLoadingWidget();
+      return Shimmer(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: const ComicTilePlaceholder(type: 'hitomi'),
+      );
     } else {
-      return buildComicTile(context, comic!, 'hitomi');
+      if (appdata.appSettings.fullyHideBlockedWorks && isBlocked(comic!) != null) {
+        return const SizedBox.shrink();
+      }
+      return _HitomiSearchComicTile(comic!);
     }
-  }
-
-  Widget buildPlaceHolder() {
-    return const ComicTilePlaceholder();
-  }
-
-  Widget buildLoadingWidget() {
-    return Shimmer(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: buildPlaceHolder(),
-    );
   }
 }
 

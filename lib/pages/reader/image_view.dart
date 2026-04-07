@@ -38,7 +38,7 @@ extension ImageExt on ComicReadingPage {
             .copyWith(scrollbars: false, dragDevices: _kTouchLikeDeviceTypes),
         physics: (logic.noScroll || logic.isCtrlPressed || logic.mouseScroll)
             ? const NeverScrollableScrollPhysics()
-            : const ClampingScrollPhysics(),
+            : const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         itemBuilder: (context, index) {
           double width = MediaQuery.of(context).size.width;
           double height = MediaQuery.of(context).size.height;

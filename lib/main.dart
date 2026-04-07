@@ -66,6 +66,15 @@ void main(List<String> args) {
   });
 }
 
+class _CustomScrollBehavior extends MaterialScrollBehavior {
+  const _CustomScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
+
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -351,6 +360,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               : appdata.appSettings.darkMode == 1
                   ? fluent.ThemeMode.light
                   : fluent.ThemeMode.system,
+          scrollBehavior: const _CustomScrollBehavior(),
           onGenerateRoute: (settings) => AppPageRoute(
             builder: (context) {
               // 使用FutureBuilder来异步检查firstUse[3]的值
@@ -452,6 +462,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         title: 'Pica Comic',
         debugShowCheckedModeBanner: false,
         navigatorKey: App.navigatorKey,
+        scrollBehavior: const _CustomScrollBehavior(),
         theme: ThemeData(
           colorScheme: lightColor,
           useMaterial3: true,

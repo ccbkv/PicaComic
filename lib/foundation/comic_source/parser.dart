@@ -94,6 +94,7 @@ class ComicSourceParser {
     final commentsLoader = _parseCommentsLoader();
     final sendCommentFunc = _parseSendCommentFunc();
     final chapterCommentsLoader = _parseChapterCommentsLoader();
+    final sendChapterCommentFunc = _parseSendChapterCommentFunc();
     final veneraSettings = _parseVeneraSettings();
 
     var source = ComicSource.named(
@@ -117,6 +118,7 @@ class ComicSourceParser {
         commentsLoader: commentsLoader,
         sendCommentFunc: sendCommentFunc,
         chapterCommentsLoader: chapterCommentsLoader,
+        sendChapterCommentFunc: sendChapterCommentFunc,
         enableTagsTranslate: enableTagsTranslate,
         veneraSettings: veneraSettings);
 
@@ -840,6 +842,25 @@ class ComicSourceParser {
                 voteStatus: e["voteStatus"]
             )).toList(),
             subData: res["maxPage"]);
+      } catch (e, s) {
+        log("$e\n$s", "Network", LogLevel.error);
+        return Res.error(e.toString());
+      }
+    };
+  }
+
+  SendChapterCommentFunc? _parseSendChapterCommentFunc(){
+    if(!_checkExists("comic.sendChapterComment")) return null;
+    return (comicId, epId, content, replyTo) async {
+      try {
+        var res = await JsEngine().runCode("""
+          ComicSource.sources.$_key.comic.sendChapterComment(
+            ${jsonEncode(comicId)}, ${jsonEncode(epId)}, ${jsonEncode(content)}, ${jsonEncode(replyTo)})
+        """);
+        if (res == null) {
+          return Res.error("Invalid response from sendChapterComment");
+        }
+        return const Res(true);
       } catch (e, s) {
         log("$e\n$s", "Network", LogLevel.error);
         return Res.error(e.toString());

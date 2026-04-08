@@ -386,7 +386,9 @@ extension ToolBar on ComicReadingPage {
                     right: MediaQuery.of(context).padding.right,
                   ),
                   child: SizedBox(
-                    width: MediaQuery.of(context).size.width,
+                    width: MediaQuery.of(context).size.width
+                        - MediaQuery.of(context).padding.left
+                        - MediaQuery.of(context).padding.right,
                     child: Row(
                       children: [
                         Padding(

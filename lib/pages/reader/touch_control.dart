@@ -272,6 +272,16 @@ class TapController {
 
   static void _handleClick(PointerUpEvent detail, ComicReadingPageLogic logic,
       BuildContext context) {
+    if (logic.isOnChapterCommentsPage) {
+      logic.tools = !logic.tools;
+      logic.update(["ToolBar"]);
+      if (logic.tools) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+      }
+      return;
+    }
     bool flag = false;
     bool flag2 = false;
     final range = int.parse(appdata.settings[40]) / 100;

@@ -60,6 +60,8 @@ class ComicReadingPageLogic extends StateController {
 
   bool haveUsedInitialPage = false;
 
+  bool isOnChapterCommentsPage = false;
+
   /// 双页模式下是否在第一页时显示单页
   bool get singlePageForFirstScreen => appdata.implicitData[1] == '1';
 
@@ -169,6 +171,7 @@ class ComicReadingPageLogic extends StateController {
 
   void reload() {
     index = 1;
+    isOnChapterCommentsPage = false;
     pageController = PageController(initialPage: 1);
     isLoading = true;
     requestedLoadingItems = [];
@@ -253,6 +256,7 @@ class ComicReadingPageLogic extends StateController {
     isLoading = true;
     tools = false;
     index = 1;
+    isOnChapterCommentsPage = false;
     pageController = PageController(initialPage: 1);
     requestedLoadingItems = [];
     clearPhotoViewControllers();
@@ -265,6 +269,7 @@ class ComicReadingPageLogic extends StateController {
     isLoading = true;
     tools = false;
     this.index = 1;
+    isOnChapterCommentsPage = false;
     pageController = PageController(initialPage: 1);
     requestedLoadingItems = [];
     clearPhotoViewControllers();
@@ -288,6 +293,7 @@ class ComicReadingPageLogic extends StateController {
     urls = [];
     isLoading = true;
     tools = false;
+    isOnChapterCommentsPage = false;
     pageController = PageController(initialPage: 1);
     index = 1;
     requestedLoadingItems = [];

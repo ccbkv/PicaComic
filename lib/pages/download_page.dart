@@ -2331,11 +2331,39 @@ class DownloadedComicInfoView extends StatefulWidget {
       _DownloadedComicInfoViewState();
 }
 
-class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView> {
+class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
+    with SingleTickerProviderStateMixin {
   String name = "";
   List<String> eps = [];
   List<int> downloadedEps = [];
   late final comic = widget.item;
+
+  ComicChapters? _chapters;
+  int _selectedGroupIndex = 0;
+  TabController? _tabController;
+
+  bool get _isGrouped => _chapters != null && _chapters!.isGrouped;
+
+  @override
+  void initState() {
+    super.initState();
+    if (comic is CustomDownloadedItem) {
+      _chapters = (comic as CustomDownloadedItem).chapters;
+    }
+    if (_isGrouped) {
+      _tabController = TabController(
+        length: _chapters!.groupCount,
+        initialIndex: 0,
+        vsync: this,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
+  }
 
   deleteEpisode(int i) {
     showConfirmDialog(
@@ -2433,60 +2461,93 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView> {
               style: const TextStyle(fontSize: 22),
             ),
           ),
-          Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 300,
-                childAspectRatio: 4,
+          if (_isGrouped) ...[
+            SizedBox(
+              height: 40,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                indicatorSize: TabBarIndicatorSize.label,
+                indicatorWeight: 2.5,
+                indicatorColor: Theme.of(context).colorScheme.primary,
+                labelColor: Theme.of(context).colorScheme.primary,
+                unselectedLabelColor: Theme.of(context).colorScheme.onSurface,
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                overlayColor: WidgetStateProperty.all(Colors.transparent),
+                onTap: (index) {
+                  if (index != _selectedGroupIndex) {
+                    setState(() {
+                      _selectedGroupIndex = index;
+                    });
+                  }
+                },
+                tabs: _chapters!.groups
+                    .map((g) => Tab(text: g))
+                    .toList(),
               ),
-              itemBuilder: (BuildContext context, int i) {
-                return Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: InkWell(
-                    borderRadius: const BorderRadius.all(Radius.circular(16)),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius:
-                            const BorderRadius.all(Radius.circular(16)),
-                        color: downloadedEps.contains(i)
-                            ? Theme.of(context).colorScheme.primaryContainer
-                            : Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(
-                            width: 16,
-                          ),
-                          Expanded(
-                            child: Text(
-                              eps[i],
-                            ),
-                          ),
-                          const SizedBox(
-                            width: 4,
-                          ),
-                          if (downloadedEps.contains(i))
-                            const Icon(Icons.download_done),
-                          const SizedBox(
-                            width: 16,
-                          ),
-                        ],
-                      ),
-                    ),
-                    onTap: () => readSpecifiedEps(i),
-                    onLongPress: () {
-                      deleteEpisode(i);
-                    },
-                    onSecondaryTapDown: (details) {
-                      deleteEpisode(i);
-                    },
-                  ),
-                );
-              },
-              itemCount: eps.length,
             ),
+            const SizedBox(height: 4),
+          ],
+          Expanded(
+            child: Builder(builder: (context) {
+              List<String> displayEps;
+              int Function(int) epOffset;
+              if (_isGrouped) {
+                var group = _chapters!.getGroupByIndex(_selectedGroupIndex);
+                displayEps = group.values.toList();
+                int offset = 0;
+                for (int j = 0; j < _selectedGroupIndex; j++) {
+                  offset += _chapters!.getGroupByIndex(j).length;
+                }
+                epOffset = (i) => offset + i;
+              } else {
+                displayEps = eps;
+                epOffset = (i) => i;
+              }
+              return GridView.builder(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 300,
+                  childAspectRatio: 4,
+                ),
+                itemBuilder: (BuildContext context, int i) {
+                  var globalIndex = epOffset(i);
+                  return Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: InkWell(
+                      borderRadius: const BorderRadius.all(Radius.circular(16)),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(16)),
+                          color: downloadedEps.contains(globalIndex)
+                              ? Theme.of(context).colorScheme.primaryContainer
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                        ),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 16),
+                            Expanded(child: Text(displayEps[i])),
+                            const SizedBox(width: 4),
+                            if (downloadedEps.contains(globalIndex))
+                              const Icon(Icons.download_done),
+                            const SizedBox(width: 16),
+                          ],
+                        ),
+                      ),
+                      onTap: () => readSpecifiedEps(globalIndex),
+                      onLongPress: () => deleteEpisode(globalIndex),
+                      onSecondaryTapDown: (details) => deleteEpisode(globalIndex),
+                    ),
+                  );
+                },
+                itemCount: displayEps.length,
+              );
+            }),
           ),
           SizedBox(
               height: 50,

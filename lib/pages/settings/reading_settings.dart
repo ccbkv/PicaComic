@@ -65,11 +65,36 @@ class _ReadingSettingsState extends State<ReadingSettings> {
                   appdata.settings.add("1");
                 }
                 appdata.settings[92] = b ? "1" : "0";
+                if (!b) {
+                  while (appdata.settings.length <= 99) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[99] = "0";
+                }
               });
               appdata.updateSettings();
             },
           ),
         ),
+        if (appdata.settings.length > 92 ? appdata.settings[92] == "1" : true)
+          ListTile(
+            leading: const Icon(Icons.comment_bank),
+            title: Text("章节末尾显示评论".tl),
+            trailing: Switch(
+              value: appdata.settings.length > 99 ? appdata.settings[99] == "1" : false,
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 99) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[99] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
+          ),
+
+        
         ListTile(
           leading: const Icon(Icons.timer_sharp),
           subtitle: SizedBox(
@@ -138,6 +163,8 @@ class _ReadingSettingsState extends State<ReadingSettings> {
               appdata.updateSettings();
             },
           ),
+
+
         if (App.isMobile)
           ListTile(
             leading: const Icon(Icons.signal_cellular_alt),
@@ -154,6 +181,12 @@ class _ReadingSettingsState extends State<ReadingSettings> {
                 appdata.updateSettings();
               },
             ),
+          ),
+        if (App.isMobile)
+          SwitchSetting(
+            title: "在阅读器中显示时间和电量信息".tl,
+            settingsIndex: 98,
+            icon: const Icon(Icons.battery_std),
           ),
         SelectSetting(
           leading: const Icon(Icons.image_outlined),

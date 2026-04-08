@@ -125,12 +125,70 @@ class _ReadingSettingsState extends State<ReadingSettings> {
                   appdata.settings.add("1");
                 }
                 appdata.settings[92] = b ? "1" : "0";
+                if (!b) {
+                  while (appdata.settings.length <= 99) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[99] = "0";
+                }
               });
               appdata.updateSettings();
             },
           ),
         ),
+        if (appdata.settings.length > 92 ? appdata.settings[92] == "1" : true)
+          SliverToBoxAdapter(
+            child: SwitchListTile(
+              title: Text("章节末尾显示评论".tl),
+              value: appdata.settings.length > 99 ? appdata.settings[99] == "1" : false,
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 99) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[99] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+                try {
+                  StateController.find<ComicReadingPageLogic>().update();
+                } catch (_) {}
+              },
+            ),
+          ),
         // 点按翻页
+
+        if (App.isMobile)
+          SliverToBoxAdapter(
+            child: SwitchListTile(
+              title: Text("在阅读器中显示时间和电量信息".tl),
+              value: appdata.settings.length > 98 ? appdata.settings[98] == "1" : false,
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 98) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[98] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
+          ),
+        SliverToBoxAdapter(
+          child: SwitchListTile(
+            title: Text("宽屏时显示控制按钮".tl),
+            value: appdata.settings[4] == "1",
+            onChanged: (b) {
+              setState(() {
+                appdata.settings[4] = b ? "1" : "0";
+              });
+              appdata.updateSettings();
+              try {
+                StateController.find<ComicReadingPageLogic>().update();
+              } catch (_) {}
+            },
+          ),
+        ),
+
         SliverToBoxAdapter(
           child: SwitchListTile(
             title: Text("点按翻页".tl),

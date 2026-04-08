@@ -68,16 +68,33 @@ extension ImageExt on ComicReadingPage {
     );
 
     Widget buildType123() {
+      final showCommentsAtEnd = _shouldShowChapterCommentsAtEnd();
+      final extraPage = showCommentsAtEnd ? 1 : 0;
       return PhotoViewGallery.builder(
         backgroundDecoration: decoration,
-        key: Key(logic.readingMethod.index.toString()),
+        key: Key('${logic.readingMethod.index}_$showCommentsAtEnd'),
         reverse: appdata.settings[9] == "2",
         scrollDirection:
             appdata.settings[9] != "3" ? Axis.horizontal : Axis.vertical,
-        itemCount: logic.urls.length + 2,
+        itemCount: logic.urls.length + 2 + extraPage,
         builder: (BuildContext context, int index) {
           ImageProvider? imageProvider;
-          if (index != 0 && index != logic.urls.length + 1) {
+          if (index != 0 && index != logic.urls.length + 1 + extraPage) {
+            if (showCommentsAtEnd && index == logic.urls.length + 1) {
+              var source = ComicSource.find(readingData.sourceKey);
+              var epId = readingData.eps!.keys.elementAt(logic.order - 1);
+              var chapterTitle = readingData.eps!.values.elementAt(logic.order - 1);
+              return PhotoViewGalleryPageOptions.customChild(
+                scaleStateController: PhotoViewScaleStateController(),
+                child: _EmbeddedChapterCommentsPage(
+                  comicId: readingData.id,
+                  epId: epId,
+                  source: source!,
+                  comicTitle: readingData.title,
+                  chapterTitle: chapterTitle,
+                ),
+              );
+            }
             imageProvider = createImageProvider(type, logic, index - 1, target);
           } else {
             return PhotoViewGalleryPageOptions.customChild(
@@ -175,7 +192,7 @@ extension ImageExt on ComicReadingPage {
               return;
             }
             logic.jumpToLastChapter();
-          } else if (i == logic.urls.length + 1) {
+          } else if (i == logic.urls.length + 1 + extraPage) {
             if (!logic.data.hasEp) {
               logic.jumpByDeviceType(i - 1);
               return;
@@ -183,6 +200,7 @@ extension ImageExt on ComicReadingPage {
             logic.jumpToNextChapter();
           } else {
             logic.index = i;
+            logic.isOnChapterCommentsPage = showCommentsAtEnd && i == logic.urls.length + 1;
             logic.update();
           }
         },
@@ -464,5 +482,24 @@ extension ImageExt on ComicReadingPage {
         logic.requestedLoadingItems[index] = true;
       }
     }
+  }
+
+  bool _shouldShowChapterCommentsAtEnd() {
+    if (!readingData.hasEp || readingData.eps == null || readingData.eps!.isEmpty) {
+      return false;
+    }
+    var showChapterComments = appdata.settings.length > 92 && appdata.settings[92] == "1";
+    if (!showChapterComments) return false;
+    var showAtEnd = appdata.settings.length > 99 && appdata.settings[99] == "1";
+    if (!showAtEnd) return false;
+    var source = ComicSource.find(readingData.sourceKey);
+    if (source == null || source.chapterCommentsLoader == null) return false;
+    var readingMethod = ReadingMethod.values[int.parse(appdata.settings[9]) - 1];
+    if (readingMethod != ReadingMethod.leftToRight &&
+        readingMethod != ReadingMethod.rightToLeft &&
+        readingMethod != ReadingMethod.topToBottom) {
+      return false;
+    }
+    return true;
   }
 }

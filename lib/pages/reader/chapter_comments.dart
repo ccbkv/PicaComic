@@ -229,7 +229,7 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   isCollapsed: true,
-                  hintText: "Comment".tl,
+                  hintText: "评论".tl,
                 ),
                 minLines: 1,
                 maxLines: 5,
@@ -988,7 +988,7 @@ class _EmbeddedChapterCommentsPageState
             onPressed: () {
               Navigator.of(context).pop();
             },
-            tooltip: "Exit".tl,
+            tooltip: "返回".tl,
           ),
           const SizedBox(width: 4),
           Icon(Icons.comment, size: 24),
@@ -998,7 +998,7 @@ class _EmbeddedChapterCommentsPageState
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Chapter Comments".tl, style: const TextStyle(fontSize: 18)),
+                Text("章节评论".tl, style: const TextStyle(fontSize: 18)),
                 Text(widget.chapterTitle, style: const TextStyle(fontSize: 12)),
               ],
             ),
@@ -1096,7 +1096,7 @@ class _EmbeddedChapterCommentsPageState
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   isCollapsed: true,
-                  hintText: "Comment".tl,
+                  hintText: "评论".tl,
                 ),
                 minLines: 1,
                 maxLines: 5,

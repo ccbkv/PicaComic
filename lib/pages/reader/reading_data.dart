@@ -344,18 +344,22 @@ class NhentaiReadingData extends ReadingData {
 }
 
 class CustomReadingData extends ReadingData{
-  CustomReadingData(this.id, this.title, this.source, this.eps);
+  CustomReadingData(this.id, this.title, this.source, this._chapters);
 
   final ComicSource? source;
 
   @override
   String get downloadId => DownloadManager().generateId(sourceKey, id);
 
-  @override
-  final Map<String, String>? eps;
+  final ComicChapters? _chapters;
 
   @override
-  bool get hasEp => eps != null;
+  Map<String, String>? get eps => _chapters?.allChapters;
+
+  ComicChapters? get comicChapters => _chapters;
+
+  @override
+  bool get hasEp => _chapters != null;
 
   @override
   String id;

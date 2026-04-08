@@ -48,169 +48,180 @@ extension ToolBar on ComicReadingPage {
                     ),
                   ],
                 ),
-                Row(
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                    ),
-                    Container(
-                      height: 24,
-                      padding: const EdgeInsets.fromLTRB(6, 2, 6, 0),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.tertiaryContainer,
-                      ),
-                      child: Text(text),
-                    ),
-                    const Spacer(),
-                    Tooltip(
-                      message: "收藏图片".tl,
-                      child: IconButton(
-                        icon: const Icon(Icons.favorite_outline),
-                        onPressed: () async {
-                          try {
-                            final id =
-                                "${logic.data.sourceKey}-${logic.data.id}";
-                            var image = await _persistentCurrentImage();
-                            if (image != null) {
-                              image = image.split("/").last;
-                              var otherInfo = <String, dynamic>{};
-                              if (logic.data.type == ReadingType.ehentai) {
-                                otherInfo["gallery"] =
-                                    (logic.data as EhReadingData)
-                                        .gallery
-                                        .toJson();
-                              } else if (logic.data.type ==
-                                  ReadingType.hitomi) {
-                                otherInfo["hitomi"] =
-                                    (readingData as HitomiReadingData)
-                                        .images
-                                        .map((e) => e.toMap())
-                                        .toList();
-                                otherInfo["galleryId"] = readingData.id;
-                              } else if (logic.data.type == ReadingType.jm) {
-                                otherInfo["jmEpNames"] =
-                                    readingData.eps!.values.toList();
-                                otherInfo["epsId"] = readingData.eps!.keys
-                                    .elementAt(logic.index - 1);
-                                otherInfo["bookId"] = readingData.id;
-                              }
-                              if (logic.data.type != ComicType.other) {
-                                otherInfo["eps"] =
-                                    readingData.eps?.keys.toList() ?? [];
-                              } else {
-                                otherInfo["eps"] = readingData.eps;
-                              }
-                              otherInfo["url"] = logic.urls[logic.index - 1];
-                              // 添加章节总页数信息
-                              otherInfo["epTotalPages"] = logic.urls.length;
-                              var favorite = ImageFavorite(
-                                  id,
-                                  image,
-                                  readingData.title,
-                                  logic.order,
-                                  logic.index,
-                                  otherInfo);
-                              if (!ImageFavoriteManager.exist(id, logic.order, logic.index)) {
-                                ImageFavoriteManager.add(favorite);
-                                showToast(message: "已添加至图片收藏".tl);
-                              } else {
-                                ImageFavoriteManager.delete(favorite);
-                                showToast(message: "已取消图片收藏".tl);
-                              }
-                            }
-                          } catch (e) {
-                            showToast(message: e.toString());
-                          }
-                        },
-                      ),
-                    ),
-                    if (App.isWindows)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final buttons = <Widget>[
                       Tooltip(
-                        message: "${"全屏".tl}(F12)",
+                        message: "收藏图片".tl,
                         child: IconButton(
-                          icon: const Icon(Icons.fullscreen),
-                          onPressed: () {
-                            logic.fullscreen();
-                          },
-                        ),
-                      ),
-                    if (App.isAndroid && appdata.settings[76] == "0")
-                      Tooltip(
-                        message: "屏幕方向".tl,
-                        child: IconButton(
-                          icon: () {
-                            if (logic.rotation == null) {
-                              return const Icon(Icons.screen_rotation_alt);
-                            } else if (logic.rotation == false) {
-                              return const Icon(Icons.screen_lock_portrait);
-                            } else {
-                              return const Icon(Icons.screen_lock_landscape);
-                            }
-                          }.call(),
-                          onPressed: () {
-                            if (logic.rotation == null) {
-                              logic.rotation = false;
-                              logic.update();
-                              SystemChrome.setPreferredOrientations([
-                                DeviceOrientation.portraitUp,
-                                DeviceOrientation.portraitDown,
-                              ]);
-                            } else if (logic.rotation == false) {
-                              logic.rotation = true;
-                              logic.update();
-                              SystemChrome.setPreferredOrientations([
-                                DeviceOrientation.landscapeLeft,
-                                DeviceOrientation.landscapeRight
-                              ]);
-                            } else {
-                              logic.rotation = null;
-                              logic.update();
-                              SystemChrome.setPreferredOrientations(
-                                  DeviceOrientation.values);
+                          icon: const Icon(Icons.favorite_outline),
+                          onPressed: () async {
+                            try {
+                              final id =
+                                  "${logic.data.sourceKey}-${logic.data.id}";
+                              var image = await _persistentCurrentImage();
+                              if (image != null) {
+                                image = image.split("/").last;
+                                var otherInfo = <String, dynamic>{};
+                                if (logic.data.type == ReadingType.ehentai) {
+                                  otherInfo["gallery"] =
+                                      (logic.data as EhReadingData)
+                                          .gallery
+                                          .toJson();
+                                } else if (logic.data.type ==
+                                    ReadingType.hitomi) {
+                                  otherInfo["hitomi"] =
+                                      (readingData as HitomiReadingData)
+                                          .images
+                                          .map((e) => e.toMap())
+                                          .toList();
+                                  otherInfo["galleryId"] = readingData.id;
+                                } else if (logic.data.type == ReadingType.jm) {
+                                  otherInfo["jmEpNames"] =
+                                      readingData.eps!.values.toList();
+                                  otherInfo["epsId"] = readingData.eps!.keys
+                                      .elementAt(logic.index - 1);
+                                  otherInfo["bookId"] = readingData.id;
+                                }
+                                if (logic.data.type != ComicType.other) {
+                                  otherInfo["eps"] =
+                                      readingData.eps?.keys.toList() ?? [];
+                                } else {
+                                  otherInfo["eps"] = readingData.eps;
+                                }
+                                otherInfo["url"] = logic.urls[logic.index - 1];
+                                otherInfo["epTotalPages"] = logic.urls.length;
+                                var favorite = ImageFavorite(
+                                    id,
+                                    image,
+                                    readingData.title,
+                                    logic.order,
+                                    logic.index,
+                                    otherInfo);
+                                if (!ImageFavoriteManager.exist(id, logic.order, logic.index)) {
+                                  ImageFavoriteManager.add(favorite);
+                                  showToast(message: "已添加至图片收藏".tl);
+                                } else {
+                                  ImageFavoriteManager.delete(favorite);
+                                  showToast(message: "已取消图片收藏".tl);
+                                }
+                              }
+                            } catch (e) {
+                              showToast(message: e.toString());
                             }
                           },
                         ),
                       ),
-                    Tooltip(
-                      message: "自动翻页".tl,
-                      child: IconButton(
-                        icon: logic.runningAutoPageTurning
-                            ? const Icon(Icons.timer)
-                            : const Icon(Icons.timer_sharp),
-                        onPressed: () {
-                          logic.runningAutoPageTurning =
-                              !logic.runningAutoPageTurning;
-                          logic.update();
-                          logic.autoPageTurning();
-                        },
-                      ),
-                    ),
-                    if (showEps)
+                      if (App.isWindows)
+                        Tooltip(
+                          message: "${"全屏".tl}(F12)",
+                          child: IconButton(
+                            icon: const Icon(Icons.fullscreen),
+                            onPressed: () {
+                              logic.fullscreen();
+                            },
+                          ),
+                        ),
+                      if (App.isAndroid && appdata.settings[76] == "0")
+                        Tooltip(
+                          message: "屏幕方向".tl,
+                          child: IconButton(
+                            icon: () {
+                              if (logic.rotation == null) {
+                                return const Icon(Icons.screen_rotation_alt);
+                              } else if (logic.rotation == false) {
+                                return const Icon(Icons.screen_lock_portrait);
+                              } else {
+                                return const Icon(Icons.screen_lock_landscape);
+                              }
+                            }.call(),
+                            onPressed: () {
+                              if (logic.rotation == null) {
+                                logic.rotation = false;
+                                logic.update();
+                                SystemChrome.setPreferredOrientations([
+                                  DeviceOrientation.portraitUp,
+                                  DeviceOrientation.portraitDown,
+                                ]);
+                              } else if (logic.rotation == false) {
+                                logic.rotation = true;
+                                logic.update();
+                                SystemChrome.setPreferredOrientations([
+                                  DeviceOrientation.landscapeLeft,
+                                  DeviceOrientation.landscapeRight
+                                ]);
+                              } else {
+                                logic.rotation = null;
+                                logic.update();
+                                SystemChrome.setPreferredOrientations(
+                                    DeviceOrientation.values);
+                              }
+                            },
+                          ),
+                        ),
                       Tooltip(
-                        message: "章节".tl,
+                        message: "自动翻页".tl,
                         child: IconButton(
-                          icon: const Icon(Icons.library_books),
-                          onPressed: openEpsDrawer,
+                          icon: logic.runningAutoPageTurning
+                              ? const Icon(Icons.timer)
+                              : const Icon(Icons.timer_sharp),
+                          onPressed: () {
+                            logic.runningAutoPageTurning =
+                                !logic.runningAutoPageTurning;
+                            logic.update();
+                            logic.autoPageTurning();
+                          },
                         ),
                       ),
-                    Tooltip(
-                      message: "保存图片".tl,
-                      child: IconButton(
-                        icon: const Icon(Icons.download),
-                        onPressed: saveCurrentImage,
+                      if (showEps)
+                        Tooltip(
+                          message: "章节".tl,
+                          child: IconButton(
+                            icon: const Icon(Icons.library_books),
+                            onPressed: openEpsDrawer,
+                          ),
+                        ),
+                      Tooltip(
+                        message: "保存图片".tl,
+                        child: IconButton(
+                          icon: const Icon(Icons.download),
+                          onPressed: saveCurrentImage,
+                        ),
                       ),
-                    ),
-                    Tooltip(
-                      message: "分享".tl,
-                      child: IconButton(
-                        icon: const Icon(Icons.share),
-                        onPressed: share,
+                      Tooltip(
+                        message: "分享".tl,
+                        child: IconButton(
+                          icon: const Icon(Icons.share),
+                          onPressed: share,
+                        ),
                       ),
-                    ),
-                    const SizedBox(
-                      width: 5,
-                    )
-                  ],
+                    ];
+
+                    final small = (constraints.maxWidth - buttons.length * 50) < 120;
+
+                    return Row(
+                      children: [
+                        if (!small)
+                          Container(
+                            height: 24,
+                            padding: const EdgeInsets.fromLTRB(6, 2, 6, 0),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.tertiaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(child: Text(text)),
+                          ).paddingLeft(16),
+                        const Spacer(),
+                        for (var button in buttons)
+                          if (!small)
+                            button.paddingHorizontal(4)
+                          else
+                            ...[button, const Spacer()],
+                        if (!small)
+                          const SizedBox(width: 4),
+                      ],
+                    );
+                  },
                 )
               ],
             ),
@@ -225,6 +236,10 @@ extension ToolBar on ComicReadingPage {
                   width: 0.6,
                 ),
               ),
+            ),
+            padding: EdgeInsets.only(
+              left: MediaQuery.of(context).padding.left,
+              right: MediaQuery.of(context).padding.right,
             ),
             child: child,
           );
@@ -360,11 +375,15 @@ extension ToolBar on ComicReadingPage {
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
                     border: Border(
-                      bottom: BorderSide(
-                        color: Theme.of(context).colorScheme.outlineVariant,
-                        width: 0.6,
-                      ),
+                    bottom: BorderSide(
+                     color: Colors.grey.toOpacity(0.5),
+                     width: 0.5,
+            ),
                     ),
+                  ),
+                  padding: EdgeInsets.only(
+                    left: MediaQuery.of(context).padding.left,
+                    right: MediaQuery.of(context).padding.right,
                   ),
                   child: SizedBox(
                     width: MediaQuery.of(context).size.width,
@@ -466,20 +485,28 @@ extension ToolBar on ComicReadingPage {
   }
 
   bool _shouldShowChapterComments() {
-    // 检查是否有章节
     if (!readingData.hasEp || readingData.eps == null || readingData.eps!.isEmpty) {
       return false;
     }
 
-    // 检查设置是否启用
     var showChapterComments = appdata.settings.length > 92 && appdata.settings[92] == "1";
     if (!showChapterComments) return false;
 
-    // 检查漫画源是否支持章节评论
     var source = ComicSource.find(readingData.sourceKey);
     if (source == null || source.chapterCommentsLoader == null) return false;
 
     return true;
+  }
+
+  bool _shouldShowChapterCommentsAtEnd() {
+    if (!_shouldShowChapterComments()) return false;
+    var readingMethod = ReadingMethod.values[int.parse(appdata.settings[9]) - 1];
+    if (readingMethod != ReadingMethod.leftToRight &&
+        readingMethod != ReadingMethod.rightToLeft &&
+        readingMethod != ReadingMethod.topToBottom) {
+      return false;
+    }
+    return appdata.settings.length > 99 && appdata.settings[99] == "1";
   }
 
   void _openChapterComments(BuildContext context) {
@@ -546,6 +573,200 @@ extension ToolBar on ComicReadingPage {
           );
         },
       ),
+    );
+  }
+
+  Widget buildStatusInfo(
+      ComicReadingPageLogic logic, BuildContext context) {
+    return Positioned(
+      bottom: 13,
+      right: 25,
+      child: Row(
+        children: [
+          _ClockWidget(),
+          const SizedBox(width: 10),
+          _BatteryWidget(),
+        ],
+      ),
+    );
+  }
+}
+
+class _BatteryWidget extends StatefulWidget {
+  @override
+  _BatteryWidgetState createState() => _BatteryWidgetState();
+}
+
+class _BatteryWidgetState extends State<_BatteryWidget> {
+  late Battery _battery;
+  late int _batteryLevel = 100;
+  Timer? _timer;
+  bool _hasBattery = false;
+  BatteryState state = BatteryState.unknown;
+
+  @override
+  void initState() {
+    super.initState();
+    _battery = Battery();
+    _checkBatteryAvailability();
+  }
+
+  void _checkBatteryAvailability() async {
+    try {
+      _batteryLevel = await _battery.batteryLevel;
+      state = await _battery.batteryState;
+      if (_batteryLevel > 0 && state != BatteryState.unknown) {
+        setState(() {
+          _hasBattery = true;
+        });
+        _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          _battery.batteryLevel.then((level) {
+            if (_batteryLevel != level) {
+              setState(() {
+                _batteryLevel = level;
+              });
+            }
+          });
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_hasBattery) {
+      return const SizedBox.shrink();
+    }
+    return _batteryInfo(_batteryLevel);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Widget _batteryInfo(int batteryLevel) {
+    IconData batteryIcon;
+    Color batteryColor = Theme.of(context).colorScheme.onSurface;
+
+    if (state == BatteryState.charging) {
+      batteryIcon = Icons.battery_charging_full;
+    } else if (batteryLevel >= 96) {
+      batteryIcon = Icons.battery_full_sharp;
+    } else if (batteryLevel >= 84) {
+      batteryIcon = Icons.battery_6_bar_sharp;
+    } else if (batteryLevel >= 72) {
+      batteryIcon = Icons.battery_5_bar_sharp;
+    } else if (batteryLevel >= 60) {
+      batteryIcon = Icons.battery_4_bar_sharp;
+    } else if (batteryLevel >= 48) {
+      batteryIcon = Icons.battery_3_bar_sharp;
+    } else if (batteryLevel >= 36) {
+      batteryIcon = Icons.battery_2_bar_sharp;
+    } else if (batteryLevel >= 24) {
+      batteryIcon = Icons.battery_1_bar_sharp;
+    } else if (batteryLevel >= 12) {
+      batteryIcon = Icons.battery_0_bar_sharp;
+    } else {
+      batteryIcon = Icons.battery_alert_sharp;
+      batteryColor = Colors.red;
+    }
+
+    return Row(
+      children: [
+        Icon(
+          batteryIcon,
+          size: 16,
+          color: batteryColor,
+          shadows: List.generate(9, (index) {
+            if (index == 4) {
+              return null;
+            }
+            double offsetX = (index % 3 - 1) * 0.8;
+            double offsetY = ((index / 3).floor() - 1) * 0.8;
+            return Shadow(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
+              offset: Offset(offsetX, offsetY),
+            );
+          }).whereType<Shadow>().toList(),
+        ),
+        Stack(
+          children: [
+            Text(
+              '$batteryLevel%',
+              style: TextStyle(
+                fontSize: 14,
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 1.4
+                  ..color = Theme.of(context).brightness == Brightness.dark
+                      ? Colors.black
+                      : Colors.white,
+              ),
+            ),
+            Text('$batteryLevel%'),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ClockWidget extends StatefulWidget {
+  @override
+  _ClockWidgetState createState() => _ClockWidgetState();
+}
+
+class _ClockWidgetState extends State<_ClockWidget> {
+  late String _currentTime;
+  late Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTime = _getCurrentTime();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final time = _getCurrentTime();
+      if (_currentTime != time) {
+        setState(() {
+          _currentTime = time;
+        });
+      }
+    });
+  }
+
+  String _getCurrentTime() {
+    final now = DateTime.now();
+    return "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Text(
+          _currentTime,
+          style: TextStyle(
+            fontSize: 14,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.4
+              ..color = Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
+          ),
+        ),
+        Text(_currentTime),
+      ],
     );
   }
 }

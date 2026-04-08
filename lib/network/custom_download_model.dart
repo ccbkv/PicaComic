@@ -17,10 +17,10 @@ class CustomDownloadedItem extends DownloadedItem {
   @override
   final List<int> downloadedEps;
 
-  final Map<String, String>? chapters;
+  final ComicChapters? chapters;
 
   @override
-  List<String> get eps => chapters?.values.toList() ?? ["EP 1"];
+  List<String> get eps => chapters?.titles.toList() ?? ["EP 1"];
 
   final String comicId;
 
@@ -62,7 +62,7 @@ class CustomDownloadedItem extends DownloadedItem {
   Map<String, dynamic> toJson() => {
         "comicSize": comicSize,
         "downloadedEps": downloadedEps,
-        "chapters": chapters,
+        "chapters": chapters?.toJson(),
         "id": id,
         "name": name,
         "subTitle": subTitle,
@@ -76,7 +76,7 @@ class CustomDownloadedItem extends DownloadedItem {
   CustomDownloadedItem.fromJson(Map<String, dynamic> json)
       : comicSize = json["comicSize"],
         downloadedEps = List<int>.from(json["downloadedEps"]),
-        chapters = Map<String, String>.from(json["chapters"]),
+        chapters = ComicChapters.fromJsonOrNull(json["chapters"]),
         id = json["id"],
         name = json["name"],
         subTitle = json["subTitle"],
@@ -109,7 +109,7 @@ class CustomDownloadingItem extends DownloadingItem {
     if (source.getImageLoadingConfig != null) {
       int ep = links!.keys.elementAt(downloadingEp);
       var config = await source.getImageLoadingConfig!(url, comic.comicId,
-          comic.chapters?.keys.elementAtOrNull(ep - 1) ?? comic.comicId);
+          comic.chapters?.ids.elementAtOrNull(ep - 1) ?? comic.comicId);
       return ImageManager()
           .getImage(config["url"] ?? url, Map.from(config['headers'] ?? {}));
     }
@@ -129,7 +129,7 @@ class CustomDownloadingItem extends DownloadingItem {
     while (retry < 3) {
       try {
         links[i + 1] = (await source.loadComicPages!(
-                comic.comicId, comic.chapters!.keys.elementAt(i)))
+                comic.comicId, comic.chapters!.ids.elementAt(i)))
             .data;
         return;
       } catch (e) {

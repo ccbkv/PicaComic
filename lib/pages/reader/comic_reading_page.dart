@@ -3,6 +3,7 @@ library pica_reader;
 import 'package:pica_comic/utils/show_delayed_dialog.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:battery_plus/battery_plus.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +42,7 @@ import 'package:pica_comic/network/jm_network/jm_network.dart';
 import '../../foundation/app.dart';
 import '../../foundation/ui_mode.dart';
 import '../../network/hitomi_network/hitomi_models.dart';
+import '../../utils/extensions.dart';
 import '../../utils/key_down_event.dart';
 import 'package:pica_comic/network/picacg_network/methods.dart' as picacg;
 import 'package:pica_comic/utils/translations.dart';
@@ -349,16 +351,20 @@ class ComicReadingPage extends StatelessWidget {
                         ),
                       ),
 
-                    if (appdata.appSettings.showPageInfoInReader)
+                    if (appdata.appSettings.showPageInfoInReader && !logic.isOnChapterCommentsPage)
                       buildPageInfoText(logic, context),
 
-                    //底部工具栏
-                    buildBottomToolBar(logic, context, readingData.hasEp),
+                    if (appdata.appSettings.enableClockAndBatteryInfoInReader && !logic.isOnChapterCommentsPage)
+                      buildStatusInfo(logic, context),
 
-                    ...buildButtons(logic, context),
+                    if (!logic.isOnChapterCommentsPage)
+                      buildBottomToolBar(logic, context, readingData.hasEp),
 
-                    //顶部工具栏
-                    buildTopToolBar(logic, context),
+                    if (!logic.isOnChapterCommentsPage)
+                      ...buildButtons(logic, context),
+
+                    if (!logic.isOnChapterCommentsPage)
+                      buildTopToolBar(logic, context),
                   ],
                 ),
               );

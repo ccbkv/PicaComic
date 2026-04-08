@@ -78,7 +78,7 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
   @override
   void download() async {
     final downloadId = DownloadManager().generateId(sourceKey, id);
-    final eps = data!.chapters?.values.toList();
+    final eps = data!.chapters?.titles.toList();
     for (var i in DownloadManager().downloading) {
       if (i.id == downloadId) {
         showToast(message: "下载中".tl);
@@ -109,7 +109,7 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
               DownloadManager().addCustomDownload(data!, selectedEps);
               App.globalBack();
               showToast(message: "已加入下载队列".tl);
-            }, downloaded);
+            }, downloaded, chapters: data!.chapters);
           });
     } else {
       showSideBar(
@@ -118,15 +118,60 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
             DownloadManager().addCustomDownload(data!, selectedEps);
             App.globalBack();
             showToast(message: "已加入下载队列".tl);
-          }, downloaded));
+          }, downloaded, chapters: data!.chapters));
     }
   }
 
   @override
   EpsData? get eps {
-    if (data!.chapters != null && data!.chapters!.isNotEmpty) {
+    if (data!.chapters != null && data!.chapters!.length > 0) {
+      if (data!.chapters!.isGrouped) {
+        var groupedEps = <String, List<String>>{};
+        for (var group in data!.chapters!.groups) {
+          groupedEps[group] = data!.chapters!.getGroup(group).values.toList();
+        }
+        return EpsData(
+          data!.chapters!.titles.toList(),
+          (ep) async {
+            await History.findOrCreate(data!);
+            App.globalTo(
+              () => ComicReadingPage(
+                CustomReadingData(
+                  data!.target,
+                  data!.title,
+                  ComicSource.find(sourceKey)!,
+                  data!.chapters,
+                ),
+                0,
+                ep + 1,
+              ),
+            );
+          },
+          groupedEps: groupedEps,
+          onGroupedTap: (groupIndex, epIndexInGroup) async {
+            await History.findOrCreate(data!);
+            int chapterIndex = 0;
+            for (int i = 0; i < groupIndex; i++) {
+              chapterIndex += data!.chapters!.getGroupByIndex(i).length;
+            }
+            chapterIndex += epIndexInGroup;
+            App.globalTo(
+              () => ComicReadingPage(
+                CustomReadingData(
+                  data!.target,
+                  data!.title,
+                  ComicSource.find(sourceKey)!,
+                  data!.chapters,
+                ),
+                0,
+                chapterIndex + 1,
+              ),
+            );
+          },
+        );
+      }
       return EpsData(
-        data!.chapters!.values.toList(),
+        data!.chapters!.titles.toList(),
             (ep) async {
           await History.findOrCreate(data!);
           App.globalTo(
@@ -575,8 +620,16 @@ class EpsData {
   /// callback when a episode button is tapped
   final void Function(int) onTap;
 
+  /// grouped episodes: groupName -> episode titles
+  final Map<String, List<String>>? groupedEps;
+
+  /// callback when a grouped episode button is tapped, (groupIndex, epIndexInGroup)
+  final void Function(int, int)? onGroupedTap;
+
   /// comic episode data
-  const EpsData(this.eps, this.onTap);
+  const EpsData(this.eps, this.onTap, {this.groupedEps, this.onGroupedTap});
+
+  bool get isGrouped => groupedEps != null && groupedEps!.isNotEmpty;
 }
 
 class ThumbnailsData {
@@ -618,6 +671,7 @@ class ComicPageLogic<T extends Object> extends StateController {
   History? history;
   bool reverseEpsOrder = false;
   bool showFullEps = false;
+  int selectedGroupIndex = 0;
   int colorIndex = 0;
   bool? favoriteOnPlatform;
 
@@ -1658,6 +1712,14 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
       child: Divider(),
     );
 
+    if (eps!.isGrouped) {
+      yield* _buildGroupedEpisodeInfo(context, colorScheme);
+    } else {
+      yield* _buildNormalEpisodeInfo(context, colorScheme);
+    }
+  }
+
+  Iterable<Widget> _buildNormalEpisodeInfo(BuildContext context, ColorScheme colorScheme) sync* {
     yield SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1746,6 +1808,104 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
               _logic.update();
             },
             child: Text("${"显示全部".tl} (${eps!.eps.length})"),
+          ).paddingTop(12),
+        ),
+      );
+    }
+  }
+
+  Iterable<Widget> _buildGroupedEpisodeInfo(BuildContext context, ColorScheme colorScheme) sync* {
+    var groupNames = eps!.groupedEps!.keys.toList();
+    var currentGroupIndex = _logic.selectedGroupIndex.clamp(0, groupNames.length - 1);
+    var groupEps = eps!.groupedEps![groupNames[currentGroupIndex]]!;
+
+    yield SliverToBoxAdapter(
+      child: _GroupedChapterTabs(
+        groupNames: groupNames,
+        currentIndex: currentGroupIndex,
+        onGroupChanged: (index) {
+          _logic.selectedGroupIndex = index;
+          _logic.showFullEps = false;
+          _logic.update();
+        },
+        onReverseOrder: () {
+          _logic.reverseEpsOrder = !_logic.reverseEpsOrder;
+          _logic.update();
+        },
+      ),
+    );
+
+    yield const SliverPadding(padding: EdgeInsets.all(4));
+
+    int length = groupEps.length;
+
+    if (!_logic.showFullEps) {
+      length = math.min(length, 20);
+    }
+
+    yield SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      sliver: SliverGrid(
+        delegate: SliverChildBuilderDelegate(childCount: length, (context, i) {
+          var epIndexInGroup = i;
+          if (_logic.reverseEpsOrder) {
+            epIndexInGroup = groupEps.length - i - 1;
+          }
+          int chapterIndex = 0;
+          for (int j = 0; j < currentGroupIndex; j++) {
+            chapterIndex += eps!.groupedEps![groupNames[j]]!.length;
+          }
+          chapterIndex += epIndexInGroup;
+          bool visited =
+          (_logic.history?.readEpisode ?? const {}).contains(chapterIndex + 1);
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+            child: InkWell(
+              borderRadius: const BorderRadius.all(Radius.circular(16)),
+              child: Material(
+                elevation: 5,
+                color: colorScheme.surface,
+                surfaceTintColor: colorScheme.surfaceTint,
+                borderRadius: const BorderRadius.all(Radius.circular(12)),
+                shadowColor: Colors.transparent,
+                child: Padding(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Center(
+                    child: Text(
+                      groupEps[epIndexInGroup],
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: visited ? colorScheme.outline : null),
+                    ),
+                  ),
+                ),
+              ),
+              onTap: () => eps!.onGroupedTap!(currentGroupIndex, epIndexInGroup),
+            ),
+          );
+        }),
+        gridDelegate: const SliverGridDelegateWithFixedHeight(
+            maxCrossAxisExtent: 200, itemHeight: 48),
+      ),
+    );
+
+    if (groupEps.length > 20 && !_logic.showFullEps) {
+      yield SliverToBoxAdapter(
+        child: Align(
+          alignment: Alignment.center,
+          child: FilledButton.tonal(
+            style: ButtonStyle(
+              shape: WidgetStateProperty.all(const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(8)))),
+            ),
+            onPressed: () {
+              _logic.showFullEps = true;
+              _logic.update();
+            },
+            child: Text("${"显示全部".tl} (${groupEps.length})"),
           ).paddingTop(12),
         ),
       );
@@ -2353,5 +2513,108 @@ class _FavoriteComicWidgetState extends State<FavoriteComicWidget> {
             )
           ],
         ));
+  }
+}
+
+class _GroupedChapterTabs extends StatefulWidget {
+  final List<String> groupNames;
+  final int currentIndex;
+  final ValueChanged<int> onGroupChanged;
+  final VoidCallback onReverseOrder;
+
+  const _GroupedChapterTabs({
+    required this.groupNames,
+    required this.currentIndex,
+    required this.onGroupChanged,
+    required this.onReverseOrder,
+  });
+
+  @override
+  State<_GroupedChapterTabs> createState() => _GroupedChapterTabsState();
+}
+
+class _GroupedChapterTabsState extends State<_GroupedChapterTabs>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: widget.groupNames.length,
+      initialIndex: widget.currentIndex,
+      vsync: this,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _GroupedChapterTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.groupNames.length != widget.groupNames.length) {
+      _tabController.dispose();
+      _tabController = TabController(
+        length: widget.groupNames.length,
+        initialIndex: widget.currentIndex,
+        vsync: this,
+      );
+    } else if (oldWidget.currentIndex != widget.currentIndex &&
+        _tabController.index != widget.currentIndex) {
+      _tabController.animateTo(widget.currentIndex);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(mainAxisAlignment: MainAxisAlignment.start, children: [
+            Text(
+              "章节".tl,
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18),
+            ),
+            const Spacer(),
+            Tooltip(
+              message: "排序".tl,
+              child: IconButton(
+                icon: const Icon(Icons.swap_vert),
+                onPressed: widget.onReverseOrder,
+              ),
+            )
+          ]),
+        ),
+        SizedBox(
+          height: 40,
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+            indicatorSize: TabBarIndicatorSize.label,
+            indicatorWeight: 2.5,
+            indicatorColor: colorScheme.primary,
+            labelColor: colorScheme.primary,
+            unselectedLabelColor: colorScheme.onSurface,
+            labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            overlayColor: WidgetStateProperty.all(Colors.transparent),
+            onTap: (index) {
+              if (index != widget.currentIndex) {
+                widget.onGroupChanged(index);
+              }
+            },
+            tabs: widget.groupNames.map((name) => Tab(text: name)).toList(),
+          ),
+        ),
+      ],
+    );
   }
 }

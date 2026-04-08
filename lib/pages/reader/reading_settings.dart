@@ -133,6 +133,9 @@ class _ReadingSettingsState extends State<ReadingSettings> {
                 }
               });
               appdata.updateSettings();
+              try {
+                StateController.find<ComicReadingPageLogic>().update();
+              } catch (_) {}
             },
           ),
         ),

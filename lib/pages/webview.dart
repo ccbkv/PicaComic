@@ -62,6 +62,7 @@ class AppWebview extends StatefulWidget {
       this.singlePage = false,
       this.onStarted,
       this.onLoadStop,
+      this.userAgent,
       super.key});
 
   final String initialUrl;
@@ -77,6 +78,8 @@ class AppWebview extends StatefulWidget {
   final void Function(InAppWebViewController controller)? onLoadStop;
 
   final bool singlePage;
+
+  final String? userAgent;
 
   static WebViewEnvironment? webViewEnvironment;
 
@@ -218,6 +221,7 @@ class _AppWebviewState extends State<AppWebview> {
       webViewEnvironment: e,
       initialSettings: InAppWebViewSettings(
         isInspectable: true,
+        userAgent: widget.userAgent,
       ),
       initialUrlRequest: URLRequest(url: WebUri(widget.initialUrl)),
       onTitleChanged: (c, t) {

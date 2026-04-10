@@ -256,6 +256,50 @@ class FavoriteItem {
   }
 }
 
+class FavoriteItemWithUpdateInfo extends FavoriteItem {
+  String? updateTime;
+
+  DateTime? lastCheckTime;
+
+  bool hasNewUpdate;
+
+  FavoriteItemWithUpdateInfo(
+    FavoriteItem item,
+    this.updateTime,
+    this.hasNewUpdate,
+    int? lastCheckTime,
+  )   : lastCheckTime = lastCheckTime == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(lastCheckTime),
+        super(
+          target: item.target,
+          name: item.name,
+          coverPath: item.coverPath,
+          author: item.author,
+          type: item.type,
+          tags: item.tags,
+        );
+
+  @override
+  String get description {
+    var updateTime = this.updateTime ?? "Unknown";
+    var sourceName = type.name;
+    return "$updateTime | $sourceName";
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FavoriteItemWithUpdateInfo &&
+        other.updateTime == updateTime &&
+        other.hasNewUpdate == hasNewUpdate &&
+        super == other;
+  }
+
+  @override
+  int get hashCode =>
+      super.hashCode ^ updateTime.hashCode ^ hasNewUpdate.hashCode;
+}
+
 class FavoriteItemWithFolderInfo {
   FavoriteItem comic;
   String folder;
@@ -362,6 +406,26 @@ class LocalFavoritesManager {
           INSERT INTO "$table" SELECT * FROM "$tempName";
           DROP TABLE "$tempName";
         """);
+      }
+    }
+    _migrateFollowUpdatesFields(tables);
+  }
+
+  void _migrateFollowUpdatesFields(List<String> tables) {
+    for (var table in tables) {
+      var columns = _db.select('PRAGMA table_info("$table");');
+      var columnNames = columns.map((e) => e["name"] as String).toList();
+      if (!columnNames.contains("last_update_time")) {
+        _db.execute(
+            'ALTER TABLE "$table" ADD COLUMN last_update_time TEXT DEFAULT NULL;');
+      }
+      if (!columnNames.contains("has_new_update")) {
+        _db.execute(
+            'ALTER TABLE "$table" ADD COLUMN has_new_update INTEGER DEFAULT 0;');
+      }
+      if (!columnNames.contains("last_check_time")) {
+        _db.execute(
+            'ALTER TABLE "$table" ADD COLUMN last_check_time INTEGER DEFAULT NULL;');
       }
     }
   }
@@ -1098,7 +1162,7 @@ class LocalFavoritesManager {
     }
   }
 
-  void updateInfo(String folder, FavoriteItem comic) {
+  void updateInfo(String folder, FavoriteItem comic, [bool notify = true]) {
     _db.execute("""
       update "$folder"
       set name = ?, author = ?, cover_path = ?, tags = ?
@@ -1111,5 +1175,87 @@ class LocalFavoritesManager {
       comic.target,
       comic.type.key
     ]);
+    if (notify) {
+      updateUI();
+    }
+  }
+
+  void prepareTableForFollowUpdates(String folder) {
+    if (!folderNames.contains(folder)) return;
+    _migrateFollowUpdatesFields([folder]);
+  }
+
+  int countUpdates(String folder) {
+    final tables = _getTablesWithDB();
+    if (!tables.contains(folder)) return 0;
+    return _db.select("""
+      select count(*) as c from "$folder"
+      where has_new_update == 1;
+    """).first['c'];
+  }
+
+  List<FavoriteItemWithUpdateInfo> getComicsWithUpdatesInfo(String folder) {
+    if (!folderNames.contains(folder)) return [];
+    var res = _db.select("""
+      select * from "$folder";
+    """);
+    return res
+        .map(
+          (e) => FavoriteItemWithUpdateInfo(
+            FavoriteItem.fromRow(e),
+            e['last_update_time'],
+            e['has_new_update'] == 1,
+            e['last_check_time'],
+          ),
+        )
+        .toList();
+  }
+
+  void markAsRead(String id, FavoriteType type) {
+    var folder = appdata.appSettings.followUpdatesFolder.isEmpty
+        ? null
+        : appdata.appSettings.followUpdatesFolder;
+    if (folder == null || !folderNames.contains(folder)) return;
+    _db.execute("""
+      update "$folder"
+      set has_new_update = 0
+      where target == ? and type == ?;
+    """, [id, type.key]);
+  }
+
+  void updateUpdateTime(
+    String folder,
+    String target,
+    FavoriteType type,
+    String updateTime,
+  ) {
+    var oldTime = _db.select("""
+      select last_update_time from "$folder"
+      where target == ? and type == ?;
+    """, [target, type.key]).first['last_update_time'];
+    var hasNewUpdate = oldTime != updateTime;
+    _db.execute("""
+      update "$folder"
+      set last_update_time = ?, has_new_update = ?, last_check_time = ?
+      where target == ? and type == ?;
+    """, [
+      updateTime,
+      hasNewUpdate ? 1 : 0,
+      DateTime.now().millisecondsSinceEpoch,
+      target,
+      type.key,
+    ]);
+  }
+
+  void updateCheckTime(
+    String folder,
+    String target,
+    FavoriteType type,
+  ) {
+    _db.execute("""
+      update "$folder"
+      set last_check_time = ?
+      where target == ? and type == ?;
+    """, [DateTime.now().millisecondsSinceEpoch, target, type.key]);
   }
 }

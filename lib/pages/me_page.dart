@@ -14,6 +14,8 @@ import 'history_page.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'image_favorites.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
+import 'package:pica_comic/pages/follow_updates_page.dart';
+import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class _SearchBar extends StatelessWidget {
@@ -75,15 +77,11 @@ class MePage extends StatelessWidget {
         children: [
           const _SearchBar(),
           buildHistory(context),
-          const SizedBox(height: 12),
+          buildFollowUpdates(context),
           buildAccount(1000), // width not critical for Fluent layout here
-          const SizedBox(height: 12),
           buildDownload(context, 1000),
-          const SizedBox(height: 12),
           buildImageFavorite(context, 1000),
-          const SizedBox(height: 12),
           buildComicSource(context, 1000),
-          const SizedBox(height: 12),
           buildTools(context, 1000),
           const SizedBox(height: 24),
         ],
@@ -103,6 +101,7 @@ class MePage extends StatelessWidget {
                 ),
                 const _SearchBar(),
                 buildHistory(context),
+                buildFollowUpdates(context),
                 if (shouldShowTwoPanel)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,17 +109,8 @@ class MePage extends StatelessWidget {
                       Expanded(
                         child: Column(
                           children: [
-                            const SizedBox(
-                              height: 12,
-                            ),
                             buildAccount(width),
-                            const SizedBox(
-                              height: 12,
-                            ),
                             buildDownload(context, width),
-                            const SizedBox(
-                              height: 12,
-                            ),
                             buildComicSource(context, width),
                           ],
                         ),
@@ -131,13 +121,7 @@ class MePage extends StatelessWidget {
                       Expanded(
                         child: Column(
                           children: [
-                            const SizedBox(
-                              height: 12,
-                            ),
                             buildImageFavorite(context, width),
-                            const SizedBox(
-                              height: 12,
-                            ),
                             buildTools(context, width),
                           ],
                         ),
@@ -145,25 +129,10 @@ class MePage extends StatelessWidget {
                     ],
                   )
                 else ...[
-                  const SizedBox(
-                    height: 12,
-                  ),
                   buildAccount(width),
-                  const SizedBox(
-                    height: 12,
-                  ),
                   buildDownload(context, width),
-                  const SizedBox(
-                    height: 12,
-                  ),
                   buildImageFavorite(context, width),
-                  const SizedBox(
-                    height: 12,
-                  ),
                   buildComicSource(context, width),
-                  const SizedBox(
-                    height: 12,
-                  ),
                   buildTools(context, width),
                 ],
               ],
@@ -272,104 +241,189 @@ class MePage extends StatelessWidget {
               ),
             );
           }
-          return InkWell(
-            onTap: () => context.to(() => const HistoryPage()),
-            mouseCursor: SystemMouseCursors.click,
-            borderRadius: BorderRadius.circular(12),
-            child: Card.outlined(
-              margin: EdgeInsets.zero,
-              color: Colors.transparent,
-              child: Container(
-                margin: EdgeInsets.zero,
-                width: double.infinity,
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.history),
-                      title: Text("${"历史记录".tl}(${HistoryManager().count()})"),
-                      trailing: const Icon(Icons.chevron_right),
-                      mouseCursor: SystemMouseCursors.click,
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                width: 0.6,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => context.to(() => const HistoryPage()),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 48,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.history).paddingLeft(16),
+                        const SizedBox(width: 12),
+                        Center(
+                          child: Text("${"历史记录".tl}(${HistoryManager().count()})", style: ts.s16),
+                        ),
+                        const Spacer(),
+                        const Icon(Icons.arrow_right).paddingRight(16),
+                      ],
                     ),
-                    SizedBox(
-                      height: appdata.appSettings.homePageHistoryDisplayType == 0 ? 128 : 88,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: history.length,
-                        itemBuilder: (context, index) {
-                          if (appdata.appSettings.homePageHistoryDisplayType == 1) {
-                            return InkWell(
-                              onTap: () =>
-                                  toComicPageWithHistory(context, history[index]),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                width: 220,
-                                margin: const EdgeInsets.symmetric(horizontal: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondaryContainer,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        history[index].title,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      history[index].type.name,
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }
+                  ),
+                  SizedBox(
+                    height: appdata.appSettings.homePageHistoryDisplayType == 0 ? 128 : 88,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: history.length,
+                      itemBuilder: (context, index) {
+                        if (appdata.appSettings.homePageHistoryDisplayType == 1) {
                           return InkWell(
                             onTap: () =>
                                 toComicPageWithHistory(context, history[index]),
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
-                              width: 96,
-                              height: 128,
+                              width: 220,
                               margin: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                                 color: Theme.of(context)
                                     .colorScheme
                                     .secondaryContainer,
                               ),
-                              clipBehavior: Clip.antiAlias,
-                              child: AnimatedImage(
-                                image: CachedImageProvider(
-                                  history[index].cover,
-                                  sourceKey:
-                                      history[index].type.comicSource?.key,
-                                ),
-                                width: 96,
-                                height: 128,
-                                fit: BoxFit.cover,
-                                filterQuality: FilterQuality.medium,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      history[index].title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    history[index].type.name,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ],
                               ),
                             ),
                           );
-                        },
-                      ),
-                    ).paddingHorizontal(8),
-                    const SizedBox(
-                      height: 12,
-                    )
-                  ],
-                ),
+                        }
+                        return InkWell(
+                          onTap: () =>
+                              toComicPageWithHistory(context, history[index]),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 96,
+                            height: 128,
+                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .secondaryContainer,
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: AnimatedImage(
+                              image: CachedImageProvider(
+                                history[index].cover,
+                                sourceKey:
+                                    history[index].type.comicSource?.key,
+                              ),
+                              width: 96,
+                              height: 128,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ).paddingHorizontal(8).paddingBottom(12),
+                ],
               ),
             ),
           );
         });
+  }
+
+  Widget buildFollowUpdates(BuildContext context) {
+    return StateBuilder<SimpleController>(
+      tag: "me_page_follow_updates",
+      init: SimpleController(),
+      builder: (controller) {
+        String? folder = appdata.appSettings.followUpdatesFolder.isEmpty
+            ? null
+            : appdata.appSettings.followUpdatesFolder;
+        int count = 0;
+        if (folder != null && LocalFavoritesManager().folderNames.contains(folder)) {
+          count = LocalFavoritesManager().countUpdates(folder);
+        }
+
+        if (App.isFluent) {
+          return fluent.Card(
+            margin: const EdgeInsets.symmetric(horizontal: 12),
+            child: fluent.ListTile(
+              leading: const Icon(fluent.FluentIcons.sync),
+              title: Text('追更'.tl),
+              subtitle: count > 0 ? Text('@c 个更新'.tlParams({'c': count.toString()})) : null,
+              trailing: const Icon(fluent.FluentIcons.chevron_right),
+              onPressed: () => context.to(() => const FollowUpdatesPage()),
+            ),
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+              width: 0.6,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () {
+              context.to(() => const FollowUpdatesPage());
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 56,
+                  child: Row(
+                    children: [
+                      Center(
+                        child: Text('追更'.tl, style: ts.s18),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.arrow_right),
+                    ],
+                  ),
+                ).paddingHorizontal(16),
+                if (count > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                    margin: const EdgeInsets.only(bottom: 16, left: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                    ),
+                    child: Text(
+                      '@c 个更新'.tlParams({'c': count.toString()}),
+                      style: ts.s16,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget buildAccount(double width) {
@@ -602,25 +656,40 @@ class _MePageCard extends StatelessWidget {
         ),
       );
     }
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Card.outlined(
-        margin: EdgeInsets.zero,
-        color: Colors.transparent,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+          width: 0.6,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ListTile(
-              leading: icon,
-              title: Text(title),
-              trailing: const Icon(Icons.chevron_right),
-              mouseCursor: SystemMouseCursors.click,
+            SizedBox(
+              height: 56,
+              child: Row(
+                children: [
+                  icon.paddingLeft(16),
+                  const SizedBox(width: 16),
+                  Center(
+                    child: Text(title, style: ts.s18),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.arrow_right).paddingRight(16),
+                ],
+              ),
             ),
-            Text(description)
-                .paddingHorizontal(16)
-                .paddingBottom(16)
-                .paddingTop(8),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, bottom: 16),
+              child: Text(description, style: ts.s14),
+            ),
             if (child != null) child!
           ],
         ),

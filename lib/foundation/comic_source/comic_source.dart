@@ -710,6 +710,37 @@ class ComicInfoData with HistoryMixin {
 
   @override
   String get target => comicId;
+
+  String? findUpdateTime() {
+    const acceptedNamespaces = [
+      "更新",
+      "最後更新",
+      "最后更新",
+      "update",
+      "last update",
+    ];
+    for (var entry in tags.entries) {
+      if (acceptedNamespaces.contains(entry.key.toLowerCase()) &&
+          entry.value.isNotEmpty) {
+        var value = entry.value.first;
+        var parts = value.split(RegExp(r'[-/年月日]'));
+        if (parts.length >= 3) {
+          try {
+            var year = int.parse(parts[0]);
+            var month = int.parse(parts[1]);
+            var day = int.parse(parts[2].split(RegExp(r'[^\d]')).first);
+            if (year < 2000 || year > 3000) return null;
+            if (month < 1 || month > 12) return null;
+            if (day < 1 || day > 31) return null;
+            return "$year-$month-$day";
+          } catch (_) {
+            continue;
+          }
+        }
+      }
+    }
+    return null;
+  }
 }
 
 typedef CategoryComicsLoader = Future<Res<List<BaseComic>>> Function(

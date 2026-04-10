@@ -9,6 +9,7 @@ import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/foundation/log.dart';
+import 'package:pica_comic/pages/follow_updates_page.dart';
 import 'package:pica_comic/network/cookie_jar.dart';
 import 'package:pica_comic/network/http_proxy.dart';
 import 'package:pica_comic/network/jm_network/jm_network.dart';
@@ -115,6 +116,8 @@ Future<void> init() async {
       AppTranslation.init(),
     ]);
     CacheManager().setLimitSize(appdata.appSettings.cacheLimit);
+
+    FollowUpdatesService.initChecker();
   } catch (e, s) {
     LogManager.addLog(
         LogLevel.error, "Init", "App initialization failed!\n$e$s");

@@ -878,132 +878,223 @@ void syncDataSettings(BuildContext context) {
   String username = configs[1];
   String pwd = configs[2];
   String path = configs[3];
-  int value = 0;
-  
+  String disableSync = appdata.settings[100];
+  bool autoSync = appdata.implicitData[15] == '1';
+  bool upload = true;
+  bool isTesting = false;
+
+  void saveConfig() {
+    appdata.settings[45] = "$url;$username;$pwd;$path";
+    appdata.settings[100] = disableSync;
+    appdata.updateSettings();
+  }
+
   if (App.isFluent) {
     fluent.showDialog(
       context: context,
-      builder: (context) => fluent.ContentDialog(
-        title: const Text("Webdav"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            fluent.TextBox(
-                onChanged: (s) => url = s,
-                controller: TextEditingController(text: url),
-                placeholder: "https://example.com:4433/webdav",
-                prefix: const Padding(
-                  padding: EdgeInsets.only(left: 8.0),
-                  child: Text("URL"),
-                )),
-            const SizedBox(
-              height: 8,
-            ),
-            fluent.TextBox(
-                onChanged: (s) => username = s,
-                controller: TextEditingController(text: username),
-                prefix: Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Text("用户名".tl),
-                )),
-            const SizedBox(
-              height: 8,
-            ),
-            fluent.TextBox(
-                onChanged: (s) => pwd = s,
-                controller: TextEditingController(text: pwd),
-                obscureText: true,
-                prefix: Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Text("密码".tl),
-                )),
-            const SizedBox(
-              height: 8,
-            ),
-            fluent.TextBox(
-                onChanged: (s) => path = s,
-                controller: TextEditingController(text: path),
-                prefix: Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Text("储存路径".tl),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => fluent.ContentDialog(
+          title: const Text("Webdav"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                fluent.TextBox(
+                    onChanged: (s) { url = s; saveConfig(); },
+                    controller: TextEditingController(text: url),
+                    placeholder: "A valid WebDav directory URL",
+                    prefix: const Padding(
+                      padding: EdgeInsets.only(left: 8.0),
+                      child: Text("URL"),
+                    )),
+                const SizedBox(height: 8),
+                fluent.TextBox(
+                    onChanged: (s) { username = s; saveConfig(); },
+                    controller: TextEditingController(text: username),
+                    prefix: Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Text("用户名".tl),
+                    )),
+                const SizedBox(height: 8),
+                fluent.TextBox(
+                    onChanged: (s) { pwd = s; saveConfig(); },
+                    controller: TextEditingController(text: pwd),
+                    obscureText: true,
+                    prefix: Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Text("密码".tl),
+                    )),
+                const SizedBox(height: 8),
+                fluent.TextBox(
+                    onChanged: (s) { path = s; saveConfig(); },
+                    controller: TextEditingController(text: path),
+                    prefix: Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Text("储存路径".tl),
+                    ),
+                    placeholder: "请确保路径存在".tl),
+                const SizedBox(height: 8),
+                fluent.TextBox(
+                    onChanged: (s) { disableSync = s; saveConfig(); },
+                    controller: TextEditingController(text: disableSync),
+                    prefix: Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Text("跳过同步字段(可选)".tl),
+                    ),
+                    placeholder: "field0, field1, field2, ...",
+                    suffix: IconButton(
+                      icon: const Icon(Icons.help_outline, size: 16),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: Text("跳过同步字段".tl),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("同步数据时跳过某些设置字段，这意味着这些字段不会被上传/覆盖。".tl),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    )),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.sync, size: 20),
+                    const SizedBox(width: 8),
+                    Text("自动同步数据".tl),
+                    const Spacer(),
+                    fluent.ToggleSwitch(
+                      checked: autoSync,
+                      onChanged: (v) {
+                        setState(() {
+                          autoSync = v;
+                        });
+                        appdata.implicitData[15] = v ? '1' : '0';
+                        appdata.writeImplicitData();
+                      },
+                    ),
+                  ],
                 ),
-                placeholder: "请确保路径存在".tl),
-            const SizedBox(
-              height: 8,
-            ),
-            StatefulBuilder(builder: (context, stateSetter) {
-              return Row(
-                children: [
-                  Text("立即执行:".tl),
-                  const SizedBox(width: 8),
-                  fluent.RadioButton(
-                      checked: value == 0,
-                      content: Text("上传数据".tl),
-                      onChanged: (i) => stateSetter(() => value = 0)),
-                  const SizedBox(width: 16),
-                  fluent.RadioButton(
-                      checked: value == 1,
-                      content: Text("下载数据".tl),
-                      onChanged: (i) => stateSetter(() => value = 1)),
-                ],
-              );
-            }),
-            const SizedBox(
-              height: 8,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.info_outline,
-                    size: 20,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text("操作:".tl),
+                    const SizedBox(width: 8),
+                    fluent.RadioButton(
+                        checked: upload,
+                        content: Text("上传数据".tl),
+                        onChanged: (i) => setState(() => upload = true)),
+                    const SizedBox(width: 16),
+                    fluent.RadioButton(
+                        checked: !upload,
+                        content: Text("下载数据".tl),
+                        onChanged: (i) => setState(() => upload = false)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  child: autoSync
+                      ? Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: fluent.FluentTheme.of(context)
+                                .accentColor
+                                .lightest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text("操作成功后，应用将自动与服务器同步数据。".tl),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.info_outline, size: 20),
+                      const SizedBox(width: 4),
+                      if (configs.length == 4)
+                        Text("将URL留空以禁用同步".tl)
+                      else
+                        Text("已禁用".tl)
+                    ],
                   ),
-                  const SizedBox(
-                    width: 4,
-                  ),
-                  if (configs.length == 4)
-                    Text("将URL留空以禁用同步".tl)
-                  else
-                    Text("已禁用".tl)
-                ],
-              ),
+                )
+              ],
+            ),
+          ),
+          actions: [
+            fluent.FilledButton(
+              child: isTesting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ))
+                  : Text("继续".tl),
+              onPressed: isTesting
+                  ? null
+                  : () async {
+                      if (url.trim().isEmpty &&
+                          username.trim().isEmpty &&
+                          pwd.trim().isEmpty) {
+                        appdata.settings[45] = ";;;";
+                        appdata.implicitData[15] = '0';
+                        appdata.writeImplicitData();
+                        appdata.updateSettings();
+                        App.globalBack();
+                        return;
+                      }
+
+                      saveConfig();
+                      appdata.implicitData[15] = autoSync ? '1' : '0';
+                      appdata.writeImplicitData();
+
+                      if (!autoSync) {
+                        App.globalBack();
+                        return;
+                      }
+
+                      setState(() {
+                        isTesting = true;
+                      });
+                      var configStr = "$url;$username;$pwd;$path";
+                      var res = upload
+                          ? await Webdav.uploadData(configStr)
+                          : await Webdav.downloadData(configStr);
+                      if (!res) {
+                        setState(() {
+                          isTesting = false;
+                        });
+                        showToast(message: "Failed to sync data");
+                      } else {
+                        App.globalBack();
+                      }
+                    },
+            ),
+            fluent.Button(
+              onPressed: () => App.globalBack(),
+              child: Text("取消".tl),
             )
           ],
-        ),
-        actions: [
-          fluent.FilledButton(
-            child: Text("提交".tl),
-            onPressed: () async {
-              if (url.isEmpty) {
-                appdata.settings[45] = "$url;$username;$pwd;$path";
-                appdata.updateSettings();
-                App.globalBack();
-                return;
-              }
-              var dialog = showLoadingDialog(context,
-                  allowCancel: false, barrierDismissible: false);
-              var res = value == 0
-                  ? await Webdav.uploadData("$url;$username;$pwd;$path")
-                  : await Webdav.downloadData("$url;$username;$pwd;$path");
-              if (!res) {
-                dialog.close();
-                showToast(message: "Failed to sync data");
-              } else {
-                appdata.settings[45] = "$url;$username;$pwd;$path";
-                appdata.updateSettings();
-                dialog.close();
-                App.globalBack();
-              }
-            },
-          ),
-          fluent.Button(
-            onPressed: () => App.globalBack(),
-            child: Text("取消".tl),
-          )
-        ],
-      ).paddingHorizontal(12),
+        ).paddingHorizontal(12),
+      ),
     );
     return;
   }
@@ -1011,119 +1102,198 @@ void syncDataSettings(BuildContext context) {
   showDialog(
     context: context,
     useSafeArea: false,
-    builder: (context) => ContentDialog(
-      title: "Webdav",
-      content: Column(
-        children: [
-          TextField(
-              onChanged: (s) => url = s,
-              controller: TextEditingController(text: url),
-              decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  label: Text("URL"),
-                  hintText: "https://example.com:4433/webdav")),
-          const SizedBox(
-            height: 8,
-          ),
-          TextField(
-              onChanged: (s) => username = s,
-              controller: TextEditingController(text: username),
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                label: Text("用户名".tl),
-              )),
-          const SizedBox(
-            height: 8,
-          ),
-          TextField(
-              onChanged: (s) => pwd = s,
-              controller: TextEditingController(text: pwd),
-              obscureText: true,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                label: Text("密码".tl),
-              )),
-          const SizedBox(
-            height: 8,
-          ),
-          TextField(
-              onChanged: (s) => path = s,
-              controller: TextEditingController(text: path),
-              decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  label: Text("储存路径".tl),
-                  hintText: "请确保路径存在".tl)),
-          const SizedBox(
-            height: 8,
-          ),
-          StatefulBuilder(builder: (context, stateSetter) {
-            return Row(
-              children: [
-                Text("立即执行:".tl),
-                Radio<int>(
-                    value: 0,
-                    groupValue: value,
-                    onChanged: (i) => stateSetter(() => value = 0)),
-                Text("上传数据".tl),
-                Radio<int>(
-                    value: 1,
-                    groupValue: value,
-                    onChanged: (i) => stateSetter(() => value = 1)),
-                Text("下载数据".tl),
-              ],
-            );
-          }),
-          const SizedBox(
-            height: 8,
-          ),
-          Center(
-            child: FilledButton(
-              child: Text("提交".tl),
-              onPressed: () async {
-                if (url.isEmpty) {
-                  appdata.settings[45] = "$url;$username;$pwd;$path";
-                  appdata.updateSettings();
-                  App.globalBack();
-                  return;
-                }
-                var dialog = showLoadingDialog(context,
-                    allowCancel: false, barrierDismissible: false);
-                var res = value == 0
-                    ? await Webdav.uploadData("$url;$username;$pwd;$path")
-                    : await Webdav.downloadData("$url;$username;$pwd;$path");
-                if (!res) {
-                  dialog.close();
-                  showToast(message: "Failed to sync data");
-                } else {
-                  appdata.settings[45] = "$url;$username;$pwd;$path";
-                  appdata.updateSettings();
-                  dialog.close();
-                  App.globalBack();
-                }
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.info_outline,
-                  size: 20,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => ContentDialog(
+        title: "Webdav",
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(
+                  onChanged: (s) { url = s; saveConfig(); },
+                  controller: TextEditingController(text: url),
+                  decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      label: Text("URL"),
+                      hintText: "A valid WebDav directory URL".tl)),
+              const SizedBox(height: 8),
+              TextField(
+                  onChanged: (s) { username = s; saveConfig(); },
+                  controller: TextEditingController(text: username),
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    label: Text("用户名".tl),
+                  )),
+              const SizedBox(height: 8),
+              TextField(
+                  onChanged: (s) { pwd = s; saveConfig(); },
+                  controller: TextEditingController(text: pwd),
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    label: Text("密码".tl),
+                  )),
+              const SizedBox(height: 8),
+              TextField(
+                  onChanged: (s) { path = s; saveConfig(); },
+                  controller: TextEditingController(text: path),
+                  decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      label: Text("储存路径".tl),
+                      hintText: "请确保路径存在".tl)),
+              const SizedBox(height: 8),
+              TextField(
+                  onChanged: (s) { disableSync = s; saveConfig(); },
+                  controller: TextEditingController(text: disableSync),
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    label: Text("跳过同步字段(可选)".tl),
+                    hintText: "field0, field1, field2, ...",
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.help_outline),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: Text("跳过同步字段".tl),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("同步数据时跳过某些设置字段，这意味着这些字段不会被上传/覆盖。".tl),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(Icons.sync),
+                title: Text("自动同步数据".tl),
+                contentPadding: EdgeInsets.zero,
+                trailing: Switch(
+                  value: autoSync,
+                  onChanged: (v) {
+                    setState(() {
+                      autoSync = v;
+                    });
+                    appdata.implicitData[15] = v ? '1' : '0';
+                    appdata.writeImplicitData();
+                  },
                 ),
-                const SizedBox(
-                  width: 4,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text("操作:".tl),
+                  Radio<bool>(
+                      value: true,
+                      groupValue: upload,
+                      onChanged: (v) => setState(() => upload = true)),
+                  Text("上传数据".tl),
+                  Radio<bool>(
+                      value: false,
+                      groupValue: upload,
+                      onChanged: (v) => setState(() => upload = false)),
+                  Text("下载数据".tl),
+                ],
+              ),
+              const SizedBox(height: 8),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                child: autoSync
+                    ? Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text("操作成功后，应用将自动与服务器同步数据。".tl),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: FilledButton(
+                  child: isTesting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ))
+                      : Text("继续".tl),
+                  onPressed: isTesting
+                      ? null
+                      : () async {
+                          if (url.trim().isEmpty &&
+                              username.trim().isEmpty &&
+                              pwd.trim().isEmpty) {
+                            appdata.settings[45] = ";;;";
+                            appdata.implicitData[15] = '0';
+                            appdata.writeImplicitData();
+                            appdata.updateSettings();
+                            App.globalBack();
+                            return;
+                          }
+
+                          saveConfig();
+                          appdata.implicitData[15] = autoSync ? '1' : '0';
+                          appdata.writeImplicitData();
+
+                          if (!autoSync) {
+                            App.globalBack();
+                            return;
+                          }
+
+                          setState(() {
+                            isTesting = true;
+                          });
+                          var configStr = "$url;$username;$pwd;$path";
+                          var res = upload
+                              ? await Webdav.uploadData(configStr)
+                              : await Webdav.downloadData(configStr);
+                          if (!res) {
+                            setState(() {
+                              isTesting = false;
+                            });
+                            showToast(message: "Failed to sync data");
+                          } else {
+                            App.globalBack();
+                          }
+                        },
                 ),
-                if (configs.length == 4)
-                  Text("将URL留空以禁用同步".tl)
-                else
-                  Text("已禁用".tl)
-              ],
-            ),
-          )
-        ],
-      ).paddingHorizontal(12),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.info_outline, size: 20),
+                    const SizedBox(width: 4),
+                    if (configs.length == 4)
+                      Text("将URL留空以禁用同步".tl)
+                    else
+                      Text("已禁用".tl)
+                  ],
+                ),
+              )
+            ],
+          ).paddingHorizontal(12),
+        ),
+      ),
     ),
   );
 }

@@ -275,7 +275,15 @@ Future<void> showInputDialog({
 }
 
 class LoadingDialogController {
+  double? _progress;
+
+  String? _message;
+
   void Function()? closeDialog;
+
+  void Function(double? value)? _setProgress;
+
+  void Function(String message)? _setMessage;
 
   bool closed = false;
 
@@ -290,100 +298,80 @@ class LoadingDialogController {
       closeDialog!();
     }
   }
+
+  void setProgress(double? value) {
+    if (closed) {
+      return;
+    }
+    _setProgress?.call(value);
+  }
+
+  void setMessage(String message) {
+    if (closed) {
+      return;
+    }
+    _setMessage?.call(message);
+  }
 }
 
-LoadingDialogController showLoadingDialog(BuildContext context,
-    {void Function()? onCancel,
-    bool barrierDismissible = true,
-    bool allowCancel = true,
-    String? message,
-    String cancelButtonText = "Cancel"}) {
+LoadingDialogController showLoadingDialog(
+  BuildContext context, {
+  void Function()? onCancel,
+  bool barrierDismissible = true,
+  bool allowCancel = true,
+  String? message,
+  String cancelButtonText = "Cancel",
+  bool withProgress = false,
+}) {
   var controller = LoadingDialogController();
+  controller._message = message;
 
-  if (App.isFluent) {
-    fluent.showDialog(
-      context: context,
-      barrierDismissible: barrierDismissible,
-      builder: (context) {
-        return fluent.ContentDialog(
-          content: Container(
-            width: 100,
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: fluent.ProgressRing(),
-                ),
-                const SizedBox(
-                  width: 16,
-                ),
-                Text(
-                  message ?? 'Loading',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const Spacer(),
-                if (allowCancel)
-                  fluent.Button(
-                      onPressed: () {
-                        controller.close();
-                        onCancel?.call();
-                      },
-                      child: Text(cancelButtonText.tl))
-              ],
-            ),
-          ),
-        );
-      },
-    ).then((value) => controller.closed = true);
-    
-    controller.closeDialog = () {
-      if(Navigator.of(context, rootNavigator: true).canPop()){
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-    };
-    
-    return controller;
+  if (withProgress) {
+    controller._progress = 0;
   }
 
   var loadingDialogRoute = DialogRoute(
-      context: context,
-      barrierDismissible: barrierDismissible,
-      builder: (BuildContext context) {
-        return Dialog(
-          child: Container(
-            width: 100,
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 30,
-                  height: 30,
+    context: context,
+    barrierDismissible: barrierDismissible,
+    builder: (BuildContext context) {
+      return StatefulBuilder(builder: (context, setState) {
+        controller._setProgress = (value) {
+          setState(() {
+            controller._progress = value;
+          });
+        };
+        controller._setMessage = (msg) {
+          setState(() {
+            controller._message = msg;
+          });
+        };
+        return ContentDialog(
+          title: controller._message ?? 'Loading',
+          content: withProgress
+              ? LinearProgressIndicator(
+                  value: controller._progress,
+                  backgroundColor: context.colorScheme.surfaceContainer,
+                ).paddingHorizontal(16).paddingVertical(16)
+              : const Center(
                   child: CircularProgressIndicator(),
-                ),
-                const SizedBox(
-                  width: 16,
-                ),
-                Text(
-                  message ?? 'Loading',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const Spacer(),
-                if (allowCancel)
-                  TextButton(
-                      onPressed: () {
-                        controller.close();
-                        onCancel?.call();
-                      },
-                      child: Text(cancelButtonText.tl))
-              ],
-            ),
-          ),
+                ).paddingVertical(32),
+          actions: [
+            FilledButton(
+              onPressed: allowCancel
+                  ? () {
+                      controller.close();
+                      onCancel?.call();
+                    }
+                  : null,
+              child: Text(cancelButtonText.tl),
+            )
+          ],
         );
       });
+    },
+  );
 
-  var navigator = Navigator.of(context);
+  var navigator = Navigator.of(context, rootNavigator: true);
 
   navigator.push(loadingDialogRoute).then((value) => controller.closed = true);
 

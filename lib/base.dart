@@ -130,6 +130,7 @@ class Appdata {
     "0", //97 多标签或门搜索(实验性)
     "0", //98 在阅读器中显示时间和电量信息
     "0", //99 章节末尾显示评论
+    "", //100 webdav disableSyncFields
 
   ];
 
@@ -150,6 +151,7 @@ class Appdata {
     "lastHalfYear", // 最近半年
     "lastYear", // 最近一年
     "0", // 图片收藏数量筛选
+    "1", //15 webdav autoSync
   ];
 
   void writeFavoriteTags() async {
@@ -975,5 +977,19 @@ class _Settings {
       appdata.settings.add("0");
     }
     appdata.settings[99] = value ? "1" : "0";
+  }
+
+  String get followUpdatesFolder {
+    while (appdata.settings.length <= 101) {
+      appdata.settings.add("");
+    }
+    return appdata.settings[101];
+  }
+
+  set followUpdatesFolder(String value) {
+    while (appdata.settings.length <= 101) {
+      appdata.settings.add("");
+    }
+    appdata.settings[101] = value;
   }
 }

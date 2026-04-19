@@ -12,6 +12,7 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/base.dart';
 import 'history_page.dart';
 import 'package:pica_comic/utils/translations.dart';
+import 'package:pica_comic/utils/data_sync.dart';
 import 'image_favorites.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
 import 'package:pica_comic/pages/follow_updates_page.dart';
@@ -83,6 +84,7 @@ class MePage extends StatelessWidget {
           buildImageFavorite(context, 1000),
           buildComicSource(context, 1000),
           buildTools(context, 1000),
+          buildSyncData(context, 1000),
           const SizedBox(height: 24),
         ],
       );
@@ -128,13 +130,15 @@ class MePage extends StatelessWidget {
                       ),
                     ],
                   )
-                else ...[
-                  buildAccount(width),
-                  buildDownload(context, width),
-                  buildImageFavorite(context, width),
-                  buildComicSource(context, width),
-                  buildTools(context, width),
-                ],
+                else
+                  ...[
+                    buildAccount(width),
+                    buildDownload(context, width),
+                    buildImageFavorite(context, width),
+                    buildComicSource(context, width),
+                    buildTools(context, width),
+                  ],
+                buildSyncData(context, width),
               ],
             ),
           );
@@ -606,6 +610,79 @@ class MePage extends StatelessWidget {
           buildItem("打开链接".tl),
         ],
       ).paddingHorizontal(12).paddingBottom(12),
+    );
+  }
+
+  Widget buildSyncData(BuildContext context, double width) {
+    if (!DataSync().isEnabled) {
+      return const SizedBox.shrink();
+    }
+    return StateBuilder<DataSync>(
+      init: DataSync(),
+      builder: (controller) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ListTile(
+            leading: const Icon(Icons.sync),
+            title: Text('Sync Data'.tl),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (DataSync().lastError != null)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      showDialogMessage(
+                        App.globalContext!,
+                        "Error".tl,
+                        DataSync().lastError!,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 4),
+                          Text('Error'.tl, style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ).paddingRight(4),
+                IconButton(
+                  icon: const Icon(Icons.cloud_upload_outlined),
+                  onPressed: () async {
+                    DataSync().uploadData();
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.cloud_download_outlined),
+                  onPressed: () async {
+                    DataSync().downloadData();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

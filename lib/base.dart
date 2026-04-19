@@ -661,6 +661,13 @@ class Appdata {
         writeImplicitData();
       }
 
+      try {
+        readComicSpecificSettings();
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readData",
+            "Failed to read comic specific settings: $e");
+      }
+
       while (settings.length < 91) {
         settings.add("0");
       }
@@ -748,6 +755,75 @@ class Appdata {
   }
 
   final appSettings = _Settings();
+
+  /// 漫画特定阅读设置
+  Map<String, Map<String, dynamic>> _comicSpecificSettings = {};
+
+  bool isComicSpecificSettingsEnabled(String comicId, String sourceKey) {
+    return _comicSpecificSettings["$comicId@$sourceKey"]?.containsKey("enabled") == true &&
+        _comicSpecificSettings["$comicId@$sourceKey"]!["enabled"] == true;
+  }
+
+  void setEnabledComicSpecificSettings(
+    String comicId,
+    String sourceKey,
+    bool enabled,
+  ) {
+    var key = "$comicId@$sourceKey";
+    _comicSpecificSettings.putIfAbsent(key, () => {});
+    _comicSpecificSettings[key]!["enabled"] = enabled;
+    _saveComicSpecificSettings();
+  }
+
+  /// 获取阅读设置，如果 comicId 不为 null 且启用了漫画特定设置，则返回漫画特定值，否则返回全局设置
+  String getReaderSetting(String? comicId, String? sourceKey, int settingIndex) {
+    if (comicId == null || sourceKey == null) {
+      return settings[settingIndex];
+    }
+    if (!isComicSpecificSettingsEnabled(comicId, sourceKey)) {
+      return settings[settingIndex];
+    }
+    var key = "$comicId@$sourceKey";
+    var value = _comicSpecificSettings[key]?[settingIndex.toString()];
+    if (value == null) {
+      return settings[settingIndex];
+    }
+    return value.toString();
+  }
+
+  /// 设置阅读设置，如果 comicId 不为 null 且启用了漫画特定设置，则保存到漫画特定设置，否则保存到全局设置
+  void setReaderSetting(String? comicId, String? sourceKey, int settingIndex, String value) {
+    if (comicId != null && sourceKey != null && isComicSpecificSettingsEnabled(comicId, sourceKey)) {
+      var key = "$comicId@$sourceKey";
+      _comicSpecificSettings.putIfAbsent(key, () => {});
+      _comicSpecificSettings[key]![settingIndex.toString()] = value;
+      _saveComicSpecificSettings();
+    } else {
+      settings[settingIndex] = value;
+    }
+  }
+
+  void _saveComicSpecificSettings() async {
+    var file = File("${App.dataPath}/comic_specific_settings.json");
+    await file.writeAsString(jsonEncode(_comicSpecificSettings));
+  }
+
+  Future<void> readComicSpecificSettings() async {
+    try {
+      var file = File("${App.dataPath}/comic_specific_settings.json");
+      if (file.existsSync()) {
+        var json = jsonDecode(await file.readAsString());
+        if (json is Map) {
+          _comicSpecificSettings = Map<String, Map<String, dynamic>>.from(
+            json.map((k, v) => MapEntry(k, Map<String, dynamic>.from(v))),
+          );
+        }
+      }
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, "Appdata.readComicSpecificSettings",
+          "Failed to read comic specific settings: $e");
+    }
+  }
 }
 
 var appdata = Appdata();
@@ -991,5 +1067,326 @@ class _Settings {
       appdata.settings.add("");
     }
     appdata.settings[101] = value;
+  }
+
+  bool get saveChapterCommentsOnDownload {
+    while (appdata.settings.length <= 102) {
+      appdata.settings.add("0");
+    }
+    return appdata.settings[102] == "1";
+  }
+
+  set saveChapterCommentsOnDownload(bool value) {
+    while (appdata.settings.length <= 102) {
+      appdata.settings.add("0");
+    }
+    appdata.settings[102] = value ? "1" : "0";
+  }
+}
+
+class ChapterCommentsStorage {
+  static String get _basePath => "${App.dataPath}/chapter_comments";
+
+  static String _sanitize(String s) =>
+      s.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+
+  /// 保存评论，包含漫画名和章节名，只在内容变化时保存
+  static Future<bool> saveComments({
+    required String sourceKey,
+    required String comicId,
+    required String epId,
+    required List<Map<String, dynamic>> comments,
+    String? comicName,
+    String? chapterTitle,
+  }) async {
+    var dir = Directory(
+        "$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}");
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    var file = File("${dir.path}/${_sanitize(epId)}.json");
+    
+    // 检查现有文件内容
+    if (await file.exists()) {
+      try {
+        var existingContent = await file.readAsString();
+        var existingData = jsonDecode(existingContent) as Map<String, dynamic>;
+        var existingComments = existingData['comments'] as List<dynamic>?;
+        
+        // 比较评论内容是否相同
+        if (_commentsEqual(existingComments, comments)) {
+          return false; // 内容相同，不需要保存
+        }
+      } catch (e) {
+        // 读取失败时继续保存
+      }
+    }
+    
+    // 保留原有的锁定状态（如果存在）
+    bool isLocked = false;
+    if (await file.exists()) {
+      try {
+        var existingContent = await file.readAsString();
+        var existingData = jsonDecode(existingContent) as Map<String, dynamic>;
+        isLocked = existingData['isLocked'] == true;
+      } catch (e) {
+        // 忽略错误
+      }
+    }
+    
+    var data = {
+      'sourceKey': sourceKey,
+      'comicId': comicId,
+      'epId': epId,
+      'comicName': comicName,
+      'chapterTitle': chapterTitle,
+      'savedAt': DateTime.now().toIso8601String(),
+      'isLocked': isLocked,
+      'comments': comments,
+    };
+    
+    await file.writeAsString(jsonEncode(data));
+    return true; // 保存成功
+  }
+
+  /// 比较两个评论列表是否相等
+  static bool _commentsEqual(List<dynamic>? a, List<Map<String, dynamic>> b) {
+    if (a == null) return false;
+    if (a.length != b.length) return false;
+    
+    for (var i = 0; i < a.length; i++) {
+      var commentA = a[i] as Map<String, dynamic>;
+      var commentB = b[i];
+      
+      // 比较关键字段
+      if (commentA['id'] != commentB['id']) return false;
+      if (commentA['content'] != commentB['content']) return false;
+      if (commentA['userName'] != commentB['userName']) return false;
+      if (commentA['time'] != commentB['time']) return false;
+    }
+    
+    return true;
+  }
+
+  /// 加载评论，返回包含元数据的完整结构
+  static Future<Map<String, dynamic>?> loadCommentsWithMeta(
+      String sourceKey, String comicId, String epId) async {
+    var file = File(
+        "$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}/${_sanitize(epId)}.json");
+    if (!await file.exists()) return null;
+    try {
+      var data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 加载评论列表（仅用于兼容）
+  static Future<List<Map<String, dynamic>>?> loadComments(
+      String sourceKey, String comicId, String epId) async {
+    var meta = await loadCommentsWithMeta(sourceKey, comicId, epId);
+    if (meta == null) return null;
+    var comments = meta['comments'];
+    if (comments is List) {
+      return comments.map((c) => Map<String, dynamic>.from(c as Map)).toList();
+    }
+    return null;
+  }
+
+  /// 获取所有保存的评论文件信息
+  static Future<List<Map<String, dynamic>>> getAllSavedComments() async {
+    var result = <Map<String, dynamic>>[];
+    var baseDir = Directory(_basePath);
+    if (!await baseDir.exists()) return result;
+
+    await for (var entity in baseDir.list()) {
+      if (entity is Directory) {
+        await for (var file in entity.list()) {
+          if (file is File && file.path.endsWith('.json')) {
+            try {
+              var content = await file.readAsString();
+              var data = jsonDecode(content) as Map<String, dynamic>;
+              
+              // 计算文件大小
+              var stat = await file.stat();
+              data['fileSize'] = stat.size;
+              data['filePath'] = file.path;
+              
+              result.add(data);
+            } catch (e) {
+              // 忽略无法解析的文件
+            }
+          }
+        }
+      }
+    }
+    
+    // 按保存时间排序，最新的在前
+    result.sort((a, b) {
+      var aTime = a['savedAt'] ?? '';
+      var bTime = b['savedAt'] ?? '';
+      return bTime.toString().compareTo(aTime.toString());
+    });
+    
+    return result;
+  }
+
+  /// 删除指定的评论文件
+  static Future<bool> deleteComments(String sourceKey, String comicId, String epId) async {
+    try {
+      var file = File(
+          "$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}/${_sanitize(epId)}.json");
+      if (await file.exists()) {
+        await file.delete();
+        // 如果文件夹为空，删除文件夹
+        var dir = Directory("$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}");
+        var isEmpty = true;
+        await for (var _ in dir.list()) {
+          isEmpty = false;
+          break;
+        }
+        if (isEmpty) {
+          await dir.delete();
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 删除整个漫画的所有评论
+  static Future<bool> deleteComicComments(String sourceKey, String comicId) async {
+    try {
+      var dir = Directory("$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}");
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 切换章节的锁定状态
+  static Future<bool> toggleLock(String sourceKey, String comicId, String epId) async {
+    try {
+      var file = File(
+          "$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}/${_sanitize(epId)}.json");
+      if (!await file.exists()) return false;
+      
+      var content = await file.readAsString();
+      var data = jsonDecode(content) as Map<String, dynamic>;
+      var currentLock = data['isLocked'] == true;
+      data['isLocked'] = !currentLock;
+      data['savedAt'] = DateTime.now().toIso8601String();
+      
+      await file.writeAsString(jsonEncode(data));
+      return !currentLock; // 返回新的锁定状态
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 获取章节的锁定状态
+  static Future<bool> isLocked(String sourceKey, String comicId, String epId) async {
+    try {
+      var file = File(
+          "$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}/${_sanitize(epId)}.json");
+      if (!await file.exists()) return false;
+      
+      var content = await file.readAsString();
+      var data = jsonDecode(content) as Map<String, dynamic>;
+      return data['isLocked'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 更新单条评论
+  static Future<bool> updateComment(String sourceKey, String comicId, String epId, 
+      String commentId, Map<String, dynamic> updatedComment) async {
+    try {
+      var file = File(
+          "$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}/${_sanitize(epId)}.json");
+      if (!await file.exists()) return false;
+      
+      var content = await file.readAsString();
+      var data = jsonDecode(content) as Map<String, dynamic>;
+      var comments = data['comments'] as List<dynamic>;
+      
+      var index = comments.indexWhere((c) => (c as Map<String, dynamic>)['id'] == commentId);
+      if (index == -1) return false;
+      
+      comments[index] = updatedComment;
+      data['savedAt'] = DateTime.now().toIso8601String();
+      
+      await file.writeAsString(jsonEncode(data));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 删除单条评论
+  static Future<bool> deleteSingleComment(String sourceKey, String comicId, String epId, 
+      String commentId) async {
+    try {
+      var file = File(
+          "$_basePath/${_sanitize(sourceKey)}_${_sanitize(comicId)}/${_sanitize(epId)}.json");
+      if (!await file.exists()) return false;
+      
+      var content = await file.readAsString();
+      var data = jsonDecode(content) as Map<String, dynamic>;
+      var comments = data['comments'] as List<dynamic>;
+      
+      var index = comments.indexWhere((c) => (c as Map<String, dynamic>)['id'] == commentId);
+      if (index == -1) return false;
+      
+      comments.removeAt(index);
+      data['savedAt'] = DateTime.now().toIso8601String();
+      
+      await file.writeAsString(jsonEncode(data));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 获取统计信息
+  static Future<Map<String, dynamic>> getStats() async {
+    var totalComics = 0;
+    var totalChapters = 0;
+    var totalSize = 0;
+    
+    var baseDir = Directory(_basePath);
+    if (!await baseDir.exists()) {
+      return {
+        'totalComics': 0,
+        'totalChapters': 0,
+        'totalSize': 0,
+      };
+    }
+
+    await for (var entity in baseDir.list()) {
+      if (entity is Directory) {
+        totalComics++;
+        await for (var file in entity.list()) {
+          if (file is File) {
+            totalChapters++;
+            totalSize += await file.length();
+          }
+        }
+      }
+    }
+
+    return {
+      'totalComics': totalComics,
+      'totalChapters': totalChapters,
+      'totalSize': totalSize,
+    };
   }
 }

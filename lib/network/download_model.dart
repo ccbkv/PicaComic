@@ -404,6 +404,8 @@ abstract class DownloadingItem with _TransferSpeedMixin {
 
   FutureOr<DownloadedItem> toDownloadedItem();
 
+  Future<void> saveChapterComments() async {}
+
   @override
   String toString() {
     return "$id: $downloadedPages/$totalPages";

@@ -815,4 +815,28 @@ class Comment {
   Comment(this.userName, this.avatar, this.content, this.time,
       this.replyCount, this.id,
       {this.score, this.isLiked, this.voteStatus});
+
+  Map<String, dynamic> toJson() => {
+        "userName": userName,
+        "avatar": avatar,
+        "content": content,
+        "time": time,
+        "replyCount": replyCount,
+        "id": id,
+        "score": score,
+        "isLiked": isLiked,
+        "voteStatus": voteStatus,
+      };
+
+  factory Comment.fromJson(Map<String, dynamic> json) => Comment(
+        json["userName"] ?? "",
+        json["avatar"],
+        json["content"] ?? "",
+        json["time"],
+        json["replyCount"],
+        json["id"],
+        score: json["score"],
+        isLiked: json["isLiked"],
+        voteStatus: json["voteStatus"],
+      );
 }

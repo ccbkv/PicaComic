@@ -48,8 +48,60 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
   int? maxPage;
   var controller = TextEditingController();
   bool sending = false;
+  bool _isOfflineMode = false;
+  bool _isUpdating = false;
+
+  bool get _shouldSaveComments =>
+      appdata.settings.length > 102 && appdata.settings[102] == "1";
+
+  void _saveCommentsToLocal() async {
+    if (!_shouldSaveComments || _comments == null) return;
+    // 检查是否被锁定
+    var isLocked = await ChapterCommentsStorage.isLocked(
+      widget.source.key,
+      widget.comicId,
+      widget.epId,
+    );
+    if (isLocked) return; // 已锁定，不保存
+    
+    ChapterCommentsStorage.saveComments(
+      sourceKey: widget.source.key,
+      comicId: widget.comicId,
+      epId: widget.epId,
+      comments: _comments!.map((c) => c.toJson()).toList(),
+      comicName: widget.comicTitle,
+      chapterTitle: widget.chapterTitle,
+    );
+  }
 
   void firstLoad() async {
+    // 检查是否被锁定
+    var isLocked = await ChapterCommentsStorage.isLocked(
+      widget.source.key,
+      widget.comicId,
+      widget.epId,
+    );
+    
+    // 如果锁定且本地有保存的评论，直接显示本地评论
+    if (isLocked) {
+      var saved = await ChapterCommentsStorage.loadComments(
+        widget.source.key,
+        widget.comicId,
+        widget.epId,
+      );
+      if (saved != null && saved.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _comments = saved.map((c) => Comment.fromJson(c)).toList();
+            _loading = false;
+            _isOfflineMode = true;
+          });
+        }
+        return;
+      }
+      // 锁定但没有本地数据，继续联网加载
+    }
+    
     var res = await widget.source.chapterCommentsLoader!(
       widget.comicId,
       widget.epId,
@@ -57,6 +109,21 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
       widget.replyComment?.id,
     );
     if (res.error) {
+      var saved = await ChapterCommentsStorage.loadComments(
+        widget.source.key,
+        widget.comicId,
+        widget.epId,
+      );
+      if (saved != null && saved.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _comments = saved.map((c) => Comment.fromJson(c)).toList();
+            _loading = false;
+            _isOfflineMode = true;
+          });
+        }
+        return;
+      }
       setState(() {
         _error = res.errorMessage;
         _loading = false;
@@ -66,8 +133,59 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
       setState(() {
         _comments = filteredComments;
         _loading = false;
+        _isOfflineMode = false;
         maxPage = res.subData;
       });
+      _saveCommentsToLocal();
+    }
+  }
+
+  void _manualUpdate() async {
+    if (_isUpdating) return;
+    
+    // 检查是否被锁定
+    var isLocked = await ChapterCommentsStorage.isLocked(
+      widget.source.key,
+      widget.comicId,
+      widget.epId,
+    );
+    if (isLocked) {
+      if (mounted) {
+        context.showMessage(message: "该章节评论已锁定，无法更新".tl);
+      }
+      return;
+    }
+    
+    setState(() {
+      _isUpdating = true;
+    });
+    var res = await widget.source.chapterCommentsLoader!(
+      widget.comicId,
+      widget.epId,
+      1,
+      widget.replyComment?.id,
+    );
+    if (res.error) {
+      if (mounted) {
+        context.showMessage(message: res.errorMessage ?? "Unknown Error");
+        setState(() {
+          _isUpdating = false;
+        });
+      }
+    } else if (mounted) {
+      var filteredComments = res.data.where((c) => !_shouldBlockComment(c)).toList();
+      setState(() {
+        _comments = filteredComments;
+        _loading = false;
+        _isOfflineMode = false;
+        _page = 1;
+        maxPage = res.subData;
+        _isUpdating = false;
+      });
+      _saveCommentsToLocal();
+      if (mounted) {
+        context.showMessage(message: "评论已更新并保存".tl);
+      }
     }
   }
 
@@ -89,6 +207,7 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
           maxPage = _page;
         }
       });
+      _saveCommentsToLocal();
     }
   }
 
@@ -101,10 +220,62 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text("章节评论".tl, style: const TextStyle(fontSize: 18)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("章节评论".tl, style: const TextStyle(fontSize: 18)),
+                if (_isOfflineMode)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text("离线".tl, style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.onTertiaryContainer,
+                    )),
+                  ),
+              ],
+            ),
             Text(widget.chapterTitle, style: const TextStyle(fontSize: 12)),
           ],
         ),
+        actions: [
+          if (_shouldSaveComments)
+            GestureDetector(
+              onTap: _isUpdating ? null : _manualUpdate,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline,
+                    width: 0.8,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isUpdating)
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.5,
+                          color: Theme.of(context).colorScheme.onSurface),
+                      )
+                    else
+                      Text("更新已保存评论", style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      )),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
       body: buildBody(context),
     );

@@ -68,6 +68,7 @@ part "blocking_keyword_page.dart";
 part "app_settings.dart";
 part 'components.dart';
 part 'debug.dart';
+part 'chapter_comments_manager_page.dart';
 
 class SettingsPage extends StatefulWidget {
   static void open([int initialPage = -1, VoidCallback? onPop]) {
@@ -982,6 +983,23 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
                     appdata.settings.add("1");
                   }
                   appdata.settings[92] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.save),
+            title: Text("下载时保存章节评论".tl),
+            subtitle: Text("断网时也可查看已保存的章节评论".tl),
+            trailing: Switch(
+              value: appdata.settings.length > 102 ? appdata.settings[102] == "1" : false,
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 102) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[102] = b ? "1" : "0";
                 });
                 appdata.updateSettings();
               },

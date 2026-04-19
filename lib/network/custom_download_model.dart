@@ -214,4 +214,46 @@ class CustomDownloadingItem extends DownloadingItem {
   Future<Stream<DownloadProgress>> downloadImage(String link) async {
     return await _getImage(link);
   }
+
+  @override
+  Future<void> saveChapterComments() async {
+    if (!(appdata.settings.length > 102 && appdata.settings[102] == "1")) return;
+    if (source.chapterCommentsLoader == null || comic.chapters == null) return;
+    for (var ep in _downloadEps) {
+      try {
+        var epId = comic.chapters!.ids.elementAt(ep);
+        var chapterTitle = comic.chapters!.titles.elementAt(ep);
+        var res = await source.chapterCommentsLoader!(
+          comic.comicId,
+          epId,
+          1,
+          null,
+        );
+        if (!res.error && res.data.isNotEmpty) {
+          var allComments = res.data.toList();
+          var maxP = res.subData;
+          for (var p = 2; maxP != null && p <= maxP; p++) {
+            var r = await source.chapterCommentsLoader!(
+              comic.comicId,
+              epId,
+              p,
+              null,
+            );
+            if (r.error) break;
+            allComments.addAll(r.data);
+          }
+          await ChapterCommentsStorage.saveComments(
+            sourceKey: source.key,
+            comicId: comic.comicId,
+            epId: epId,
+            comments: allComments.map((c) => c.toJson()).toList(),
+            comicName: comic.title,
+            chapterTitle: chapterTitle,
+          );
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+  }
 }

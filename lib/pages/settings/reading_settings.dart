@@ -94,7 +94,34 @@ class _ReadingSettingsState extends State<ReadingSettings> {
             ),
           ),
 
-        
+           ListTile(
+            leading: const Icon(Icons.save),
+            title: Text("下载时保存章节评论".tl),
+            subtitle: Text("断网时也可查看已保存的章节评论".tl),
+            trailing: Switch(
+              value: appdata.settings.length > 102 ? appdata.settings[102] == "1" : false,
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 102) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[102] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.folder),
+            title: Text("管理已保存的章节评论".tl),
+            subtitle: Text("查看或删除已保存的评论文件".tl),
+            onTap: () {
+              context.to(() => const ChapterCommentsManagerPage());
+            },
+          ),
+
+
+
         ListTile(
           leading: const Icon(Icons.timer_sharp),
           subtitle: SizedBox(

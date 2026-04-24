@@ -186,7 +186,7 @@ class _NhentaiComicTile extends ComicTile {
   }
 
   @override
-  String get subTitle => "ID: ${comic.id}";
+  String get subTitle => '';
 
   @override
   String get title => comic.title;

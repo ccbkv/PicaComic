@@ -12,6 +12,7 @@ class HitomiComicBrief extends BaseComic {
   String name;
   String type;
   String lang;
+  int? pages;
   List<Tag> tagList;
   String time;
   String artist;
@@ -27,7 +28,9 @@ class HitomiComicBrief extends BaseComic {
     this.time,
     this.artist,
     this.link,
-    this.cover,
+    this.cover, {
+    this.pages,
+  }
   );
 
   @override
@@ -174,7 +177,8 @@ class HitomiComic with HistoryMixin {
       time,
       (artists ?? ["未知"]).isEmpty ? "未知" : (artists ?? ["未知"])[0],
       link,
-      cover);
+      cover,
+      pages: files.length);
 
   @override
   final String cover;

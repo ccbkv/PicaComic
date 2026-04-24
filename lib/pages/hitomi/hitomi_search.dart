@@ -280,6 +280,9 @@ class _HitomiSearchComicTile extends ComicTile {
   String get title => comic.name;
 
   @override
+  int? get pages => comic.pages;
+
+  @override
   FavoriteItem? get favoriteItem => FavoriteItem.fromHitomi(comic);
 
   @override

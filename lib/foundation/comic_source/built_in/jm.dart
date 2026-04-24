@@ -291,6 +291,9 @@ class _JmComicTile extends ComicTile {
   String get title => comic.name;
 
   @override
+  int? get pages => comic.pages;
+
+  @override
   ActionFunc? get read => () async {
         bool cancel = false;
         var dialog = showLoadingDialog(

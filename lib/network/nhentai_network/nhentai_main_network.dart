@@ -202,6 +202,85 @@ class NhentaiNetwork {
     }
   }
 
+  Future<Res<List<NhentaiFilterTerm>>> autocompleteTags(
+    String type,
+    String query, {
+    int limit = 10,
+    CancelToken? cancelToken,
+  }) async {
+    if (cookieJar == null) {
+      await init();
+    }
+    try {
+      final res = await dio.post<dynamic>(
+        '$apiUrl/tags/autocomplete',
+        data: {
+          'type': type,
+          'query': query,
+          'limit': limit,
+        },
+        options: Options(headers: _defaultHeaders),
+        cancelToken: cancelToken,
+      );
+      if (res.data is! List) {
+        return const Res(<NhentaiFilterTerm>[]);
+      }
+      final suggestions = <NhentaiFilterTerm>[];
+      for (final item in res.data) {
+        if (item is! Map) {
+          continue;
+        }
+        final namespace = item['type']?.toString().trim();
+        final name = item['name']?.toString().trim();
+        if (namespace == null ||
+            namespace.isEmpty ||
+            name == null ||
+            name.isEmpty) {
+          continue;
+        }
+        suggestions.add(
+          NhentaiFilterTerm(namespace: namespace, value: name),
+        );
+      }
+      return Res(_dedupeNhentaiFilterTerms(suggestions));
+    } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        return Res(null, errorMessage: 'cancelled');
+      }
+      return Res(null, errorMessage: e.toString());
+    } catch (e) {
+      return Res(null, errorMessage: e.toString());
+    }
+  }
+
+  Future<Res<List<NhentaiFilterTerm>>> autocompleteTagsByTypes(
+    String query, {
+    required List<String> types,
+    int limit = 10,
+    CancelToken? cancelToken,
+  }) async {
+    final responses = await Future.wait([
+      for (final type in types)
+        autocompleteTags(
+          type,
+          query,
+          limit: limit,
+          cancelToken: cancelToken,
+        ),
+    ]);
+    if (cancelToken?.isCancelled ?? false) {
+      return Res(null, errorMessage: 'cancelled');
+    }
+    final suggestions = <NhentaiFilterTerm>[];
+    for (final response in responses) {
+      final data = response.dataOrNull;
+      if (!response.error && data != null && data.isNotEmpty) {
+        suggestions.addAll(data);
+      }
+    }
+    return Res(_dedupeNhentaiFilterTerms(suggestions));
+  }
+
   Future<Res<dynamic>> delete(String url, {bool withAuth = false, bool retried = false}) async {
     if (cookieJar == null) {
       await init();

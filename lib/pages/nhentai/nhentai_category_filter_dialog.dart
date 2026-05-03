@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +30,21 @@ class _NhentaiCategoryFilterDialogState
   static const _numericLabelWidth = 132.0;
   static const _numericOperatorWidth = 72.0;
   static const _numericFieldHeight = 48.0;
+  static const _remoteSearchDelay = Duration(milliseconds: 500);
+  static const _localSuggestionLimit = 10;
+  static const _remoteSuggestionLimit = 10;
+  static const _remoteSuggestionNamespaces = [
+    'tag',
+    'character',
+    'parody',
+    'artist',
+    'group',
+  ];
+  static const _localLanguageTerms = [
+    NhentaiFilterTerm(namespace: 'language', value: 'chinese'),
+    NhentaiFilterTerm(namespace: 'language', value: 'japanese'),
+    NhentaiFilterTerm(namespace: 'language', value: 'english'),
+  ];
 
   late final TextEditingController _searchController;
   late final TextEditingController _pagesController;
@@ -41,6 +59,11 @@ class _NhentaiCategoryFilterDialogState
   String _pagesComparison = _comparisons.first;
   String _favoritesComparison = _comparisons.first;
   String _uploadedComparison = _comparisons.first;
+  List<NhentaiFilterTerm> _localSuggestions = const [];
+  List<NhentaiFilterTerm> _remoteSuggestions = const [];
+  Timer? _remoteSearchDebounce;
+  CancelToken? _remoteSearchCancelToken;
+  int _remoteSearchVersion = 0;
 
   @override
   void initState() {
@@ -65,6 +88,8 @@ class _NhentaiCategoryFilterDialogState
 
   @override
   void dispose() {
+    _remoteSearchDebounce?.cancel();
+    _remoteSearchCancelToken?.cancel();
     _searchController.dispose();
     _pagesController.dispose();
     _favoritesController.dispose();
@@ -74,19 +99,137 @@ class _NhentaiCategoryFilterDialogState
 
   List<String> get _commonTags => nhentaiTags.values.take(10).toList();
 
-  List<String> get _searchResults {
-    final query = _searchText.trim().toLowerCase();
-    if (query.isEmpty) {
-      return const [];
-    }
-    return nhentaiTags.values
-        .where((value) => value.toLowerCase().contains(query))
-        .take(20)
-        .toList();
+  List<NhentaiFilterTerm> get _searchSuggestions {
+    return _mergeSuggestionTerms(_localSuggestions, _remoteSuggestions);
   }
 
   String _numericLabel(String label, NhentaiNumericCondition condition) {
     return '$label ${condition.comparison} ${condition.value}';
+  }
+
+  String _suggestionKey(NhentaiFilterTerm term) {
+    return term.displayValue.trim().toLowerCase();
+  }
+
+  List<NhentaiFilterTerm> _mergeSuggestionTerms(
+    List<NhentaiFilterTerm> primary,
+    List<NhentaiFilterTerm> secondary,
+  ) {
+    final seen = <String>{};
+    final merged = <NhentaiFilterTerm>[];
+    for (final term in [...primary, ...secondary]) {
+      if (_terms.contains(term)) {
+        continue;
+      }
+      if (seen.add(_suggestionKey(term))) {
+        merged.add(term);
+      }
+    }
+    return merged;
+  }
+
+  List<NhentaiFilterTerm> _findLocalSuggestionTerms(
+    String namespace,
+    Iterable<String> values,
+    String query,
+  ) {
+    final matches = <NhentaiFilterTerm>[];
+    final seen = <String>{};
+    for (final value in values) {
+      if (!value.toLowerCase().contains(query)) {
+        continue;
+      }
+      final term = NhentaiFilterTerm(namespace: namespace, value: value);
+      if (seen.add(_suggestionKey(term)) && !_terms.contains(term)) {
+        matches.add(term);
+      }
+      if (matches.length >= _localSuggestionLimit) {
+        break;
+      }
+    }
+    return matches;
+  }
+
+  List<NhentaiFilterTerm> _buildLocalSuggestions(String query) {
+    final normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      return const [];
+    }
+    return _mergeSuggestionTerms([
+      ..._findLocalSuggestionTerms('tag', nhentaiTags.values, normalizedQuery),
+      ..._findLocalSuggestionTerms(
+        'character',
+        nhentaiCharacterTags.values,
+        normalizedQuery,
+      ),
+      ..._findLocalSuggestionTerms(
+        'parody',
+        nhentaiParodyTags.values,
+        normalizedQuery,
+      ),
+      ..._findLocalSuggestionTerms(
+        'language',
+        _localLanguageTerms.map((term) => term.value),
+        normalizedQuery,
+      ),
+    ], const []);
+  }
+
+  void _updateSearchInput(String value) {
+    final localSuggestions = _buildLocalSuggestions(value);
+    setState(() {
+      _searchText = value;
+      _localSuggestions = localSuggestions;
+      _remoteSuggestions = const [];
+    });
+    _scheduleRemoteSuggestions(value);
+  }
+
+  void _resetSuggestionState() {
+    _remoteSearchDebounce?.cancel();
+    _remoteSearchCancelToken?.cancel();
+    _remoteSearchCancelToken = null;
+    _searchController.clear();
+    _searchText = '';
+    _localSuggestions = const [];
+    _remoteSuggestions = const [];
+  }
+
+  void _scheduleRemoteSuggestions(String value) {
+    _remoteSearchDebounce?.cancel();
+    _remoteSearchCancelToken?.cancel();
+
+    final query = value.trim();
+    if (query.length < 2) {
+      _remoteSearchCancelToken = null;
+      return;
+    }
+
+    final version = ++_remoteSearchVersion;
+    _remoteSearchDebounce = Timer(_remoteSearchDelay, () async {
+      final cancelToken = CancelToken();
+      _remoteSearchCancelToken = cancelToken;
+      final response = await NhentaiNetwork().autocompleteTagsByTypes(
+        query,
+        types: _remoteSuggestionNamespaces,
+        limit: _remoteSuggestionLimit,
+        cancelToken: cancelToken,
+      );
+      if (!mounted ||
+          cancelToken.isCancelled ||
+          version != _remoteSearchVersion ||
+          _searchText.trim() != query) {
+        return;
+      }
+      final remoteData = response.dataOrNull;
+      setState(() {
+        _remoteSuggestions = remoteData == null
+            ? const []
+            : _mergeSuggestionTerms(_localSuggestions, remoteData)
+                .skip(_localSuggestions.length)
+                .toList();
+      });
+    });
   }
 
   void _addTerm(NhentaiFilterTerm term) {
@@ -95,8 +238,7 @@ class _NhentaiCategoryFilterDialogState
     }
     setState(() {
       _terms = [..._terms, term];
-      _searchController.clear();
-      _searchText = '';
+      _resetSuggestionState();
     });
   }
 
@@ -326,7 +468,7 @@ class _NhentaiCategoryFilterDialogState
   }
 
   Widget _buildFilterEditorSection() {
-    final suggestions = _searchResults;
+    final suggestions = _searchSuggestions;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -345,11 +487,7 @@ class _NhentaiCategoryFilterDialogState
               icon: const Icon(Icons.add),
             ),
           ),
-          onChanged: (value) {
-            setState(() {
-              _searchText = value;
-            });
-          },
+          onChanged: _updateSearchInput,
           onSubmitted: _addRawQuery,
         ),
         const SizedBox(height: 8),
@@ -388,9 +526,9 @@ class _NhentaiCategoryFilterDialogState
             runSpacing: 8,
             children: suggestions
                 .map(
-                  (value) => ActionChip(
-                    label: Text(value),
-                    onPressed: () => _addTag(value),
+                  (term) => ActionChip(
+                    label: Text(term.displayValue),
+                    onPressed: () => _addTerm(term),
                   ),
                 )
                 .toList(),

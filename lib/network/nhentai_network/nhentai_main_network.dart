@@ -674,7 +674,7 @@ String buildNhentaiCategoryQueryFromParam(
     if (filter.favorites != null)
       'favorites:${filter.favorites!.comparison}${filter.favorites!.value}',
     if (filter.uploadedDays != null)
-      'uploaded:${filter.uploadedDays!.comparison}${filter.uploadedDays!.value}',
+      'uploaded:${filter.uploadedDays!.comparison}${filter.uploadedDays!.value}d',
   ];
 
   if (!filter.hasExplicitLanguage &&
@@ -701,6 +701,9 @@ NhentaiNumericCondition _parseNhentaiNumericCondition(
 }
 
 String _buildNhentaiNamespaceQueryFragment(NhentaiFilterTerm term) {
+  if (term.namespace == nhentaiCategoryFilterRawQueryNamespace) {
+    return term.value;
+  }
   if (term.namespace == 'language') {
     return 'language:${term.value}';
   }
@@ -723,6 +726,7 @@ List<NhentaiFilterTerm> _dedupeNhentaiFilterTerms(
 
 
 const nhentaiCategoryFilterDelimiter = '@@@';
+const nhentaiCategoryFilterRawQueryNamespace = 'search';
 const nhentaiCategoryFilterNamespaces = [
   'tag',
   'character',
@@ -741,7 +745,16 @@ class NhentaiFilterTerm {
   final String namespace;
   final String value;
 
-  String toPathToken() => '/$namespace/$value';
+  bool get isRawQuery => namespace == nhentaiCategoryFilterRawQueryNamespace;
+
+  String get displayValue => value;
+
+  String toPathToken() {
+    if (isRawQuery) {
+      return '/$namespace/${Uri.encodeComponent(value)}';
+    }
+    return '/$namespace/$value';
+  }
 
   @override
   bool operator ==(Object other) {
@@ -780,7 +793,13 @@ class NhentaiCategoryFilter {
   final NhentaiNumericCondition? uploadedDays;
 
   bool get hasExplicitLanguage =>
-      terms.any((term) => term.namespace == 'language');
+      terms.any(
+        (term) =>
+            term.namespace == 'language' ||
+            (term.isRawQuery &&
+                RegExp(r'(^|\s)language:')
+                    .hasMatch(term.value.toLowerCase())),
+      );
 
   factory NhentaiCategoryFilter.fromParam(String? param) {
     if (param == null || param.trim().isEmpty) {
@@ -799,7 +818,7 @@ class NhentaiCategoryFilter {
       }
 
       final type = parts[0];
-      final value = parts[1];
+      final value = parts.sublist(1).join('/');
 
       switch (type) {
         case 'pages':
@@ -812,7 +831,14 @@ class NhentaiCategoryFilter {
           uploadedDays = _parseNhentaiNumericCondition(token, value);
           break;
         default:
-          terms.add(NhentaiFilterTerm(namespace: type, value: value));
+          terms.add(
+            NhentaiFilterTerm(
+              namespace: type,
+              value: type == nhentaiCategoryFilterRawQueryNamespace
+                  ? Uri.decodeComponent(value)
+                  : value,
+            ),
+          );
       }
     }
 

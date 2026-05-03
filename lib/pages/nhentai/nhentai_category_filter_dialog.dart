@@ -24,6 +24,9 @@ class NhentaiCategoryFilterDialog extends StatefulWidget {
 class _NhentaiCategoryFilterDialogState
     extends State<NhentaiCategoryFilterDialog> {
   static const _comparisons = ['>=', '>', '=', '<', '<='];
+  static const _numericLabelWidth = 132.0;
+  static const _numericOperatorWidth = 72.0;
+  static const _numericFieldHeight = 48.0;
 
   late final TextEditingController _searchController;
   late final TextEditingController _pagesController;
@@ -86,12 +89,7 @@ class _NhentaiCategoryFilterDialogState
     return '$label ${condition.comparison} ${condition.value}';
   }
 
-  void _addTag(String value) {
-    value = value.trim();
-    if (value.isEmpty) {
-      return;
-    }
-    final term = NhentaiFilterTerm(namespace: 'tag', value: value);
+  void _addTerm(NhentaiFilterTerm term) {
     if (_terms.contains(term)) {
       return;
     }
@@ -100,6 +98,27 @@ class _NhentaiCategoryFilterDialogState
       _searchController.clear();
       _searchText = '';
     });
+  }
+
+  void _addTag(String value) {
+    value = value.trim();
+    if (value.isEmpty) {
+      return;
+    }
+    _addTerm(NhentaiFilterTerm(namespace: 'tag', value: value));
+  }
+
+  void _addRawQuery(String value) {
+    value = value.trim();
+    if (value.isEmpty) {
+      return;
+    }
+    _addTerm(
+      NhentaiFilterTerm(
+        namespace: nhentaiCategoryFilterRawQueryNamespace,
+        value: value,
+      ),
+    );
   }
 
   void _removeTerm(NhentaiFilterTerm term) {
@@ -202,7 +221,7 @@ class _NhentaiCategoryFilterDialogState
             children: [
               ..._terms.map(
                 (term) => Chip(
-                  label: Text(term.value),
+                  label: Text(term.displayValue),
                   onDeleted: () => _removeTerm(term),
                 ),
               ),
@@ -234,40 +253,71 @@ class _NhentaiCategoryFilterDialogState
     required TextEditingController controller,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 14),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          SizedBox(width: 96, child: Text(label)),
-          const SizedBox(width: 8),
-          DropdownButton<String>(
-            value: comparison,
-            items: _comparisons
-                .map(
-                  (value) => DropdownMenuItem(
-                    value: value,
-                    child: Text(value),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value == null) {
-                return;
-              }
-              _updateNumericCondition(field, value, controller.text);
-            },
+          SizedBox(
+            width: _numericLabelWidth,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(label),
+            ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
-              ],
-              decoration: InputDecoration(hintText: '整数'.tl),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: _numericOperatorWidth,
+            height: _numericFieldHeight,
+            child: DropdownButtonFormField<String>(
+              value: comparison,
+              isDense: true,
+              icon: const Icon(Icons.arrow_drop_down_rounded, size: 20),
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
+              ),
+              items: _comparisons
+                  .map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(value),
+                    ),
+                  )
+                  .toList(),
               onChanged: (value) {
-                _updateNumericCondition(field, comparison, value);
+                if (value == null) {
+                  return;
+                }
+                _updateNumericCondition(field, value, controller.text);
               },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: _numericFieldHeight,
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                textAlignVertical: TextAlignVertical.center,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                ],
+                decoration: InputDecoration(
+                  hintText: '整数'.tl,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 0,
+                    vertical: 12,
+                  ),
+                ),
+                onChanged: (value) {
+                  _updateNumericCondition(field, comparison, value);
+                },
+              ),
             ),
           ),
         ],
@@ -291,7 +341,7 @@ class _NhentaiCategoryFilterDialogState
           decoration: InputDecoration(
             hintText: '搜索或直接输入标签'.tl,
             suffixIcon: IconButton(
-              onPressed: () => _addTag(_searchController.text),
+              onPressed: () => _addRawQuery(_searchController.text),
               icon: const Icon(Icons.add),
             ),
           ),
@@ -300,12 +350,12 @@ class _NhentaiCategoryFilterDialogState
               _searchText = value;
             });
           },
-          onSubmitted: _addTag,
+          onSubmitted: _addRawQuery,
         ),
         const SizedBox(height: 8),
         if (_searchText.trim().isNotEmpty)
           TextButton(
-            onPressed: () => _addTag(_searchController.text),
+            onPressed: () => _addRawQuery(_searchController.text),
             child: Text('${'添加标签'.tl}: ${_searchText.trim()}'),
           ),
         const SizedBox(height: 4),

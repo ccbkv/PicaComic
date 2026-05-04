@@ -927,7 +927,7 @@ class ComicTilePlaceholder extends StatelessWidget {
 }
 
 class CustomComicTile extends ComicTile {
-  const CustomComicTile(this.comic, {super.key, this.addonMenuOptions});
+  const CustomComicTile(this.comic, {super.key, this.addonMenuOptions, this.badge_});
 
   @override
   String? get sourceKey => comic.sourceKey;
@@ -976,6 +976,11 @@ class CustomComicTile extends ComicTile {
   String? get comicID => comic.id;
 
   @override
+  String? get badge => badge_;
+
+  final String? badge_;
+
+  @override
   get read => () async {
     bool cancel = false;
     var dialog = showLoadingDialog(
@@ -1007,7 +1012,7 @@ class CustomComicTile extends ComicTile {
 }
 
 Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
-    {List<ComicTileMenuOption>? addonMenuOptions}) {
+    {List<ComicTileMenuOption>? addonMenuOptions, String? badge}) {
   var source = ComicSource.find(sourceKey);
   if (source == null) {
     throw "Comic Source $sourceKey Not Found";
@@ -1040,14 +1045,37 @@ Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
     }
   }
   if (source.comicTileBuilderOverride != null) {
-    return source.comicTileBuilderOverride!(
+    final tile = source.comicTileBuilderOverride!(
       context,
       item,
       addonMenuOptions,
     );
+    if (badge != null) {
+      return Stack(
+        children: [
+          tile,
+          Positioned(
+            bottom: 4,
+            right: 4,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+              decoration: BoxDecoration(
+                color: context.colorScheme.tertiaryContainer,
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
+              ),
+              child: Text(
+                badge,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return tile;
   } else {
     return CustomComicTile(item as CustomComic,
-        addonMenuOptions: addonMenuOptions);
+        addonMenuOptions: addonMenuOptions, badge_: badge);
   }
 }
 

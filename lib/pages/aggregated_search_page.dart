@@ -153,21 +153,42 @@ class _MergedSearchComicList extends ComicsPage<BaseComic> {
             e.searchPageData != null && e.searchPageData!.loadPage != null)
         .toList();
 
-    final merged = <BaseComic>[];
-    final ids = <String>{};
-    dynamic firstSubData;
-
-    for (final source in sources) {
+    // Fetch all sources in parallel
+    final results = await Future.wait(sources.map((source) async {
       final options = (source.searchPageData!.searchOptions ?? [])
           .map((e) => e.defaultValue)
           .toList();
       final res = await source.searchPageData!.loadPage!(keyword, i, options);
-      if (res.error) continue;
-      firstSubData ??= res.subData;
-      for (final comic in res.data) {
-        if (ids.add(comic.id)) {
-          _comicSources[comic.id] = source.key;
-          merged.add(comic);
+      return (source: source, res: res);
+    }));
+
+    // Collect non-error results with their source keys
+    final sourceResults = <({ComicSource source, List<BaseComic> comics})>[];
+    for (final r in results) {
+      if (!r.res.error) {
+        sourceResults.add((source: r.source, comics: r.res.data));
+      }
+    }
+
+    final merged = <BaseComic>[];
+    final ids = <String>{};
+    dynamic firstSubData;
+
+    // Round-robin interleave: take one from each source in turn
+    final indices = List.filled(sourceResults.length, 0);
+    bool hasMore = true;
+    while (hasMore) {
+      hasMore = false;
+      for (var j = 0; j < sourceResults.length; j++) {
+        final entry = sourceResults[j];
+        if (indices[j] < entry.comics.length) {
+          hasMore = true;
+          final comic = entry.comics[indices[j]];
+          indices[j]++;
+          if (ids.add(comic.id)) {
+            _comicSources[comic.id] = entry.source.key;
+            merged.add(comic);
+          }
         }
       }
     }

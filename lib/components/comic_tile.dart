@@ -1045,11 +1045,34 @@ Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
     }
   }
   if (source.comicTileBuilderOverride != null) {
-    return source.comicTileBuilderOverride!(
+    final tile = source.comicTileBuilderOverride!(
       context,
       item,
       addonMenuOptions,
     );
+    if (badge != null) {
+      return Stack(
+        children: [
+          tile,
+          Positioned(
+            bottom: 4,
+            right: 4,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+              decoration: BoxDecoration(
+                color: context.colorScheme.tertiaryContainer,
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
+              ),
+              child: Text(
+                badge,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return tile;
   } else {
     return CustomComicTile(item as CustomComic,
         addonMenuOptions: addonMenuOptions, badge_: badge);

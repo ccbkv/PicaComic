@@ -142,7 +142,7 @@ class _MergedSearchComicList extends ComicsPage<BaseComic> {
   String? get title => null;
 
   @override
-  String? get tag => "aggregated_merged_$keyword";
+  String? get tag => "aggregated_merged";
 
   final Map<String, String> _comicSources = {};
 
@@ -182,7 +182,7 @@ class _MergedSearchComicList extends ComicsPage<BaseComic> {
       item,
       _comicSources[item.id] ?? sourceKey,
       addonMenuOptions: addonMenuOptions,
-      badge: ComicSource.find(_comicSources[item.id] ?? sourceKey)?.name.tl,
+      badge: ComicSource.find(_comicSources[item.id] ?? sourceKey)?.name,
     );
   }
 }

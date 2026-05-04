@@ -927,7 +927,7 @@ class ComicTilePlaceholder extends StatelessWidget {
 }
 
 class CustomComicTile extends ComicTile {
-  const CustomComicTile(this.comic, {super.key, this.addonMenuOptions});
+  const CustomComicTile(this.comic, {super.key, this.addonMenuOptions, this.badge_});
 
   @override
   String? get sourceKey => comic.sourceKey;
@@ -976,6 +976,11 @@ class CustomComicTile extends ComicTile {
   String? get comicID => comic.id;
 
   @override
+  String? get badge => badge_;
+
+  final String? badge_;
+
+  @override
   get read => () async {
     bool cancel = false;
     var dialog = showLoadingDialog(
@@ -1007,7 +1012,7 @@ class CustomComicTile extends ComicTile {
 }
 
 Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
-    {List<ComicTileMenuOption>? addonMenuOptions}) {
+    {List<ComicTileMenuOption>? addonMenuOptions, String? badge}) {
   var source = ComicSource.find(sourceKey);
   if (source == null) {
     throw "Comic Source $sourceKey Not Found";
@@ -1047,7 +1052,7 @@ Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
     );
   } else {
     return CustomComicTile(item as CustomComic,
-        addonMenuOptions: addonMenuOptions);
+        addonMenuOptions: addonMenuOptions, badge_: badge);
   }
 }
 

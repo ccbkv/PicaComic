@@ -8,6 +8,7 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/utils/io_tools.dart';
 import '../utils/font_manager.dart';
+import '../utils/android_first_use_manager.dart';
 import 'settings/settings_page.dart';
 
 import '../main.dart';
@@ -203,6 +204,11 @@ class _ImportBackupState extends State<_ImportBackup>
     if (!mounted) return;
 
     if (success) {
+      appdata.firstUse[3] = "1";
+      appdata.writeData();
+      if (App.isAndroid) {
+        AndroidFirstUseManager.instance.setFirstUse3("1");
+      }
       await ComicSource.reload();
       if (mounted) {
         context.to(() => const MainPage());

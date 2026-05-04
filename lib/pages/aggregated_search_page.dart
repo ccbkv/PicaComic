@@ -7,7 +7,6 @@ import 'package:pica_comic/network/base_comic.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 
 class AggregatedSearchPage extends StatefulWidget {
@@ -125,7 +124,7 @@ class _AggregatedSearchPageState extends State<AggregatedSearchPage> {
 }
 
 class _MergedSearchComicList extends ComicsPage<BaseComic> {
-  const _MergedSearchComicList({
+  _MergedSearchComicList({
     super.key,
     required this.keyword,
     required this.header,
@@ -145,6 +144,8 @@ class _MergedSearchComicList extends ComicsPage<BaseComic> {
   @override
   String? get tag => "aggregated_merged_$keyword";
 
+  final Map<String, String> _comicSources = {};
+
   @override
   Future<Res<List<BaseComic>>> getComics(int i) async {
     final sources = ComicSource.sources
@@ -154,7 +155,7 @@ class _MergedSearchComicList extends ComicsPage<BaseComic> {
 
     final merged = <BaseComic>[];
     final ids = <String>{};
-    String? firstSubData;
+    dynamic firstSubData;
 
     for (final source in sources) {
       final options = (source.searchPageData!.searchOptions ?? [])
@@ -165,12 +166,24 @@ class _MergedSearchComicList extends ComicsPage<BaseComic> {
       firstSubData ??= res.subData;
       for (final comic in res.data) {
         if (ids.add(comic.id)) {
+          _comicSources[comic.id] = source.key;
           merged.add(comic);
         }
       }
     }
 
     return Res<List<BaseComic>>(merged, subData: firstSubData);
+  }
+
+  @override
+  Widget buildItem(BuildContext context, BaseComic item) {
+    return buildComicTile(
+      context,
+      item,
+      _comicSources[item.id] ?? sourceKey,
+      addonMenuOptions: addonMenuOptions,
+      badge: ComicSource.find(_comicSources[item.id] ?? sourceKey)?.name.tl,
+    );
   }
 }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
@@ -128,6 +130,13 @@ class PreSearchController extends StateController {
 
   int aggregatedSearchMode = 0; // 0: disabled, 1: separate, 2: merged
 
+  Timer? _suggestionsDebounce;
+
+  void debounceSuggestions(void Function() callback) {
+    _suggestionsDebounce?.cancel();
+    _suggestionsDebounce = Timer(const Duration(milliseconds: 150), callback);
+  }
+
   void updateOptions() {
     for (var source in ComicSource.sources) {
       if (source.key == target &&
@@ -157,6 +166,12 @@ class PreSearchController extends StateController {
     }
     target = appdata.appSettings.initialSearchTarget;
     updateOptions();
+  }
+
+  @override
+  void dispose() {
+    _suggestionsDebounce?.cancel();
+    super.dispose();
   }
 }
 
@@ -285,8 +300,10 @@ class PreSearchPage extends StatelessWidget {
                 },
                 controller: controller,
                 onChanged: (s) {
-                  findSuggestions();
-                  searchController.update([1, 100]);
+                  searchController.debounceSuggestions(() {
+                    findSuggestions();
+                    searchController.update([1, 100]);
+                  });
                 },
                 focusNode: _focusNode,
               ),
@@ -606,7 +623,6 @@ class PreSearchPage extends StatelessWidget {
               ],
             ).paddingHorizontal(12),
             ListTile(
-              contentPadding: EdgeInsets.zero,
               title: Text("聚合搜索".tl),
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 8),

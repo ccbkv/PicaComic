@@ -271,6 +271,13 @@ final nhCategory = CategoryData(
       const FixedCategoryPart("language", ["chinese", "japanese", "english"],
           "search_with_namespace"),
       RandomCategoryPartWithRuntimeData(
-          "Tags", () => nhentaiTags.values.toList(), 50, "search"),
+          "tag", () => nhentaiTags.values.toList(), 50, "category",
+          buildParam: (tag) => "/tag/$tag"),
+      RandomCategoryPartWithRuntimeData(
+          "character", () => nhentaiCharacterTags.values.toList(), 50, "category",
+          buildParam: (tag) => "/character/$tag"),
+      RandomCategoryPartWithRuntimeData(
+          "parody", () => nhentaiParodyTags.values.toList(), 50, "category",
+          buildParam: (tag) => "/parody/$tag"),
     ],
     enableRankingPage: false);

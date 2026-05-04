@@ -5,6 +5,7 @@ import 'package:pica_comic/components/category_selector.dart';
 import "package:pica_comic/foundation/app.dart";
 import 'package:pica_comic/network/base_comic.dart';
 import "package:pica_comic/network/res.dart";
+import 'package:pica_comic/pages/nhentai/nhentai_category_filter_dialog.dart';
 import "package:pica_comic/utils/translations.dart";
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
@@ -32,13 +33,16 @@ class CategoryComicsPage extends StatefulWidget {
 class _CategoryComicsPageState extends State<CategoryComicsPage> {
   late final CategoryComicsData data;
   late final List<CategoryComicsOptions> options;
+  late final ComicSource source;
   late List<String> optionsValue;
+  late String? currentParam;
   List<String> selectedCategories = [];
   bool showCategorySelector = false;
 
   void findData() {
     for (final source in ComicSource.sources) {
       if (source.categoryData?.key == widget.categoryKey) {
+        this.source = source;
         data = source.categoryComicsData!;
         options = data.options.where((element) {
           if (element.notShowWhen.contains(widget.category)) {
@@ -64,8 +68,69 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
 
   @override
   void initState() {
+    currentParam = widget.param;
     findData();
     super.initState();
+  }
+
+  bool get _isNhentai => source.key == "nhentai";
+
+  Future<void> _openFilterDialog() async {
+    if (_isNhentai) {
+      await showDialog(
+        context: context,
+        builder: (context) => NhentaiCategoryFilterDialog(
+          initialParam: currentParam ?? '',
+          onConfirm: (nextParam) {
+            setState(() {
+              currentParam = nextParam;
+            });
+          },
+        ),
+      );
+      return;
+    }
+
+    if (App.isFluent) {
+      await fluent.showDialog(
+        context: context,
+        builder: (context) => CategorySelectorDialog(
+          categories: _getCategories(source),
+          initialSelectedCategories: selectedCategories,
+          onCategoriesSelected: (newSelectedCategories) {
+            setState(() {
+              selectedCategories = newSelectedCategories;
+            });
+          },
+        ),
+      );
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => GestureDetector(
+        onTap: () {
+          Navigator.of(context).pop();
+        },
+        child: Material(
+          color: Colors.transparent,
+          child: GestureDetector(
+            onTap: () {},
+            child: CategorySelectorDialog(
+              categories: _getCategories(source),
+              initialSelectedCategories: selectedCategories,
+              onCategoriesSelected: (newSelectedCategories) {
+                setState(() {
+                  selectedCategories = newSelectedCategories;
+                });
+              },
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -73,8 +138,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     // 获取分类列表
     final source = ComicSource.sources
         .firstWhere((e) => e.categoryData?.key == widget.categoryKey);
-    final categories = _getCategories(source);
-    
+
     if (App.isFluent) {
       return fluent.ScaffoldPage(
         header: fluent.PageHeader(
@@ -89,31 +153,14 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
               fluent.CommandBarButton(
                 label: const Text("分类过滤"),
                 icon: const Icon(fluent.FluentIcons.filter),
-                onPressed: () {
-                  Future.delayed(Duration.zero, () {
-                    if (mounted) {
-                      fluent.showDialog(
-                        context: context,
-                        builder: (context) => CategorySelectorDialog(
-                          categories: categories,
-                          initialSelectedCategories: selectedCategories,
-                          onCategoriesSelected: (newSelectedCategories) {
-                            setState(() {
-                              selectedCategories = newSelectedCategories;
-                            });
-                          },
-                        ),
-                      );
-                    }
-                  });
-                },
+                onPressed: _openFilterDialog,
               ),
             ],
           ) : null,
         ),
         content: Column(
           children: [
-            if (selectedCategories.length > 1) ...[
+            if (!_isNhentai && selectedCategories.length > 1) ...[
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Wrap(
@@ -149,11 +196,11 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
             Expanded(
               child: _CategoryComicsList(
                 key: ValueKey(
-                    "${selectedCategories.join(',')} with $optionsValue"),
+                    "${selectedCategories.join(',')} with $optionsValue and $currentParam"),
                 loader: data.load,
                 category: selectedCategories.join(','),
                 options: optionsValue,
-                param: widget.param,
+                param: currentParam,
                 header: buildOptions(),
                 sourceKey: source.key,
               ),
@@ -181,36 +228,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
                 border: Border.all(color: Theme.of(context).colorScheme.outline),
               ),
               child: TextButton(
-                onPressed: () {
-                  Future.delayed(Duration.zero, () {
-                    if (mounted) {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) => GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Material(
-                            color: Colors.transparent,
-                            child: GestureDetector(
-                              onTap: () {},
-                              child: CategorySelectorDialog(
-                                categories: categories,
-                                initialSelectedCategories: selectedCategories,
-                                onCategoriesSelected: (newSelectedCategories) {
-                                  setState(() {
-                                    selectedCategories = newSelectedCategories;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                  });
-                },
+                onPressed: _openFilterDialog,
                 style: TextButton.styleFrom(
                   foregroundColor: Theme.of(context).colorScheme.onSurface,
                   padding:
@@ -224,7 +242,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
       body: Column(
         children: [
           // 显示已选分类
-          if (selectedCategories.length > 1) ...[
+          if (!_isNhentai && selectedCategories.length > 1) ...[
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Wrap(
@@ -247,11 +265,11 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
           Expanded(
             child: _CategoryComicsList(
               key: ValueKey(
-                  "${selectedCategories.join(',')} with $optionsValue"),
+                  "${selectedCategories.join(',')} with $optionsValue and $currentParam"),
               loader: data.load,
               category: selectedCategories.join(','),
               options: optionsValue,
-              param: widget.param, // 保留原始参数，特别是作者搜索的"a"参数
+              param: currentParam,
               header: buildOptions(),
               sourceKey: source.key,
             ),

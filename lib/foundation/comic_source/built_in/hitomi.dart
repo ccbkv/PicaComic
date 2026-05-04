@@ -128,10 +128,22 @@ class _HiComicTile extends ComicTile {
   }
 
   @override
-  String get subTitle => comic.artist;
+  String get subTitle {
+    final author = comic.artist.trim();
+    if (author.isEmpty ||
+        author == 'N/A' ||
+        author == 'Unknown' ||
+        author == '未知') {
+      return '';
+    }
+    return author;
+  }
 
   @override
   String get title => comic.name;
+
+  @override
+  int? get pages => comic.pages;
 
   @override
   FavoriteItem? get favoriteItem => FavoriteItem.fromHitomi(comic);

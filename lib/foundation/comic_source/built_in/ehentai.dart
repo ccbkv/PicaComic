@@ -262,6 +262,18 @@ class _EhGalleryTile extends ComicTile {
     return res + res2;
   }
 
+  String _extractAuthor() {
+    for (final tag in gallery.tags) {
+      if (tag.startsWith('artist:')) {
+        final author = tag.substring('artist:'.length).trim();
+        if (author.isNotEmpty) {
+          return author;
+        }
+      }
+    }
+    return '';
+  }
+
   @override
   int get maxLines => 2;
       // MediaQuery.of(App.globalContext!).size.width < 430 ? 1 : 2;
@@ -374,7 +386,7 @@ class _EhGalleryTile extends ComicTile {
   }
 
   @override
-  String get subTitle => gallery.uploader;
+  String get subTitle => _extractAuthor();
 
   @override
   String get title => gallery.title;

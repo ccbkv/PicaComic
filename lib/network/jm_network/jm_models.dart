@@ -22,6 +22,7 @@ class JmComicBrief extends BaseComic {
   String id;
   String author;
   String name;
+  int? pages;
   @override
   String description;
   List<ComicCategoryInfo> categories;
@@ -33,7 +34,9 @@ class JmComicBrief extends BaseComic {
     this.author,
     this.name,
     this.description,
-    this.categories
+    this.categories, {
+    this.pages,
+  }
   );
 
   @override

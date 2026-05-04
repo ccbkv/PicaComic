@@ -6,6 +6,7 @@ import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/pages/main_page.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/utils/translations.dart';
+import 'package:pica_comic/utils/io_tools.dart';
 import '../utils/font_manager.dart';
 import 'settings/settings_page.dart';
 
@@ -48,6 +49,7 @@ class _WelcomePageState extends State<WelcomePage> {
                 physics: const NeverScrollableScrollPhysics(),
                 children: const [
                   _AppIcon(),
+                  _ImportBackup(),
                   _AppInfo(),
                   _AppAppearance(),
                   _ComicsDisplaySettings(),
@@ -97,7 +99,7 @@ mixin class _WelcomePageComponents {
                 ],
               )),
         const Spacer(),
-        if (page != 6)
+        if (page != 7)
           Button.filled(
               padding: const EdgeInsets.fromLTRB(24, 6, 12, 6),
               onPressed: state.next,
@@ -175,6 +177,109 @@ class _AppIcon extends StatelessWidget with _WelcomePageComponents {
   }
 }
 
+class _ImportBackup extends StatefulWidget {
+  const _ImportBackup();
+
+  @override
+  State<_ImportBackup> createState() => _ImportBackupState();
+}
+
+class _ImportBackupState extends State<_ImportBackup>
+    with _WelcomePageComponents {
+  bool _isImporting = false;
+
+  Future<void> _importBackup() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['picadata'],
+    );
+
+    if (result == null || result.files.single.path == null) return;
+
+    setState(() => _isImporting = true);
+
+    final success = await importData(result.files.single.path!);
+
+    if (!mounted) return;
+
+    if (success) {
+      await ComicSource.reload();
+      if (mounted) {
+        context.to(() => const MainPage());
+        final route = ModalRoute.of(context);
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (route != null && route.isActive) {
+            Navigator.of(context).removeRoute(route);
+          }
+        });
+      }
+    } else {
+      setState(() => _isImporting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("导入失败".tl)),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return buildView(
+      children: [
+        buildTitle("导入备份".tl),
+        const SizedBox(height: 8),
+        Text(
+          "如果你之前使用过本软件，可以在此导入备份数据，快速恢复你的设置、收藏、历史记录等。"
+              .tl,
+          style: context.width > 500 ? ts.s16.withHeight(1.8) : ts.s14.withHeight(1.5),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          "支持导入 .picadata 格式的备份文件".tl,
+          style: (context.width > 500 ? ts.s14 : ts.s12)
+              .withColor(context.colorScheme.outline),
+        ),
+        const Spacer(),
+        Center(
+          child: _isImporting
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text("正在导入...".tl),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Button.filled(
+                      onPressed: _importBackup,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.file_open),
+                          const SizedBox(width: 8),
+                          Text("选择备份文件".tl),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "支持 WebDAV 同步导出的备份文件".tl,
+                      style: ts.s12.withColor(context.colorScheme.outline),
+                    ),
+                  ],
+                ),
+        ),
+        const Spacer(),
+        buildBottom(context, 1),
+      ],
+    );
+  }
+}
+
 class _AppInfo extends StatefulWidget {
   const _AppInfo();
 
@@ -217,7 +322,7 @@ class _AppInfoState extends State<_AppInfo> with _WelcomePageComponents {
           ],
         ),
         const Spacer(),
-        buildBottom(context, 1, agree)
+        buildBottom(context, 2, agree)
       ],
     );
   }
@@ -303,7 +408,7 @@ class _AppAppearanceState extends State<_AppAppearance>
           },
         ),
         const Spacer(),
-        buildBottom(context, 2)
+        buildBottom(context, 3)
       ],
     );
   }
@@ -349,7 +454,7 @@ class _ComicsDisplaySettingsState extends State<_ComicsDisplaySettings>
             }),
         Text("需要手动切换页面".tl).paddingHorizontal(16),
         const Spacer(),
-        buildBottom(context, 3)
+        buildBottom(context, 4)
       ],
     );
   }
@@ -368,7 +473,7 @@ class _ReadingSettings extends StatelessWidget with _WelcomePageComponents {
             child: ReadingSettings(false),
           ),
         ),
-        buildBottom(context, 4)
+        buildBottom(context, 5)
       ],
     );
   }
@@ -408,7 +513,7 @@ class _ComicSourceState extends State<_ComicSource>
             },
           ),
         ),
-        buildBottom(context, 5)
+        buildBottom(context, 6)
       ],
     );
   }
@@ -489,7 +594,7 @@ class _More extends StatelessWidget with _WelcomePageComponents {
           trailing: const Icon(Icons.arrow_right),
         ),
         const Spacer(),
-        buildBottom(context, 6)
+        buildBottom(context, 7)
       ],
     );
   }

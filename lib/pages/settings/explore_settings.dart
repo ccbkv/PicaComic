@@ -134,13 +134,6 @@ Widget buildExploreSettings(BuildContext context, bool popUp) {
           StateController.findOrNull(tag: "me_page_history")?.update();
         },
       ),
-      SettingsTitle("实验性".tl),
-      SwitchSetting(
-        title: "多标签或门搜索".tl,
-        subTitle: "将搜索关键词通过空格分割，将分割后的关键词分别搜索后合并搜索结果".tl,
-        settingsIndex: 97,
-        icon: const Icon(Icons.science_outlined),
-      ),
       SettingsTitle("漫画块".tl),
       SelectSetting(
         leading: const Icon(Icons.web),

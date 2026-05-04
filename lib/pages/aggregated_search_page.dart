@@ -4,15 +4,23 @@ import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/network/base_comic.dart';
+import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
 import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 
 class AggregatedSearchPage extends StatefulWidget {
-  const AggregatedSearchPage({super.key, required this.keyword});
+  const AggregatedSearchPage({
+    super.key,
+    required this.keyword,
+    this.displayMode = 1,
+  });
 
   final String keyword;
+
+  /// 1: separate display (分开展示), 2: merged display (合并展示)
+  final int displayMode;
 
   @override
   State<AggregatedSearchPage> createState() => _AggregatedSearchPageState();
@@ -51,6 +59,32 @@ class _AggregatedSearchPageState extends State<AggregatedSearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.displayMode == 2) {
+      return Scaffold(
+        appBar: AppBar(
+          title: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: "搜索".tl,
+              border: InputBorder.none,
+            ),
+            onSubmitted: onSearch,
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () => onSearch(searchController.text),
+            ),
+          ],
+        ),
+        body: _MergedSearchComicList(
+          key: ValueKey(_keyword),
+          keyword: _keyword,
+          header: const SliverToBoxAdapter(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: TextField(
@@ -87,6 +121,56 @@ class _AggregatedSearchPageState extends State<AggregatedSearchPage> {
         ],
       ),
     );
+  }
+}
+
+class _MergedSearchComicList extends ComicsPage<BaseComic> {
+  const _MergedSearchComicList({
+    super.key,
+    required this.keyword,
+    required this.header,
+  });
+
+  final String keyword;
+
+  @override
+  final Widget header;
+
+  @override
+  String get sourceKey => "__aggregated__";
+
+  @override
+  String? get title => null;
+
+  @override
+  String? get tag => "aggregated_merged_$keyword";
+
+  @override
+  Future<Res<List<BaseComic>>> getComics(int i) async {
+    final sources = ComicSource.sources
+        .where((e) =>
+            e.searchPageData != null && e.searchPageData!.loadPage != null)
+        .toList();
+
+    final merged = <BaseComic>[];
+    final ids = <String>{};
+    String? firstSubData;
+
+    for (final source in sources) {
+      final options = (source.searchPageData!.searchOptions ?? [])
+          .map((e) => e.defaultValue)
+          .toList();
+      final res = await source.searchPageData!.loadPage!(keyword, i, options);
+      if (res.error) continue;
+      firstSubData ??= res.subData;
+      for (final comic in res.data) {
+        if (ids.add(comic.id)) {
+          merged.add(comic);
+        }
+      }
+    }
+
+    return Res<List<BaseComic>>(merged, subData: firstSubData);
   }
 }
 

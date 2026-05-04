@@ -126,7 +126,7 @@ class PreSearchController extends StateController {
 
   bool limitHistory = true;
 
-  bool aggregatedSearch = false;
+  int aggregatedSearchMode = 0; // 0: disabled, 1: separate, 2: merged
 
   void updateOptions() {
     for (var source in ComicSource.sources) {
@@ -189,10 +189,13 @@ class PreSearchPage extends StatelessWidget {
 
     var context = App.mainNavigatorKey!.currentContext!;
 
-    if (searchController.aggregatedSearch) {
-      // 聚合搜索：同時搜索所有可用的漫畫源
+    if (searchController.aggregatedSearchMode != 0) {
+      // 聚合搜索
       context.to(
-        () => AggregatedSearchPage(keyword: keyword),
+        () => AggregatedSearchPage(
+          keyword: keyword,
+          displayMode: searchController.aggregatedSearchMode,
+        ),
       );
     } else {
       context.to(
@@ -581,9 +584,9 @@ class PreSearchPage extends StatelessWidget {
           padding: const EdgeInsets.all(4),
           child: FilterChipFixedWidth(
             label: Text(text),
-            selected: logic.target == id || logic.aggregatedSearch,
+            selected: logic.target == id || logic.aggregatedSearchMode != 0,
             onSelected: (b) {
-              if (logic.aggregatedSearch) return;
+              if (logic.aggregatedSearchMode != 0) return;
               logic.updateTarget(id);
             },
           ),
@@ -605,12 +608,31 @@ class PreSearchPage extends StatelessWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text("聚合搜索".tl),
-              leading: Checkbox(
-                value: logic.aggregatedSearch,
-                onChanged: (value) {
-                  logic.aggregatedSearch = value ?? false;
-                  logic.update();
-                },
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    OptionChip(
+                      text: "分开展示".tl,
+                      isSelected: logic.aggregatedSearchMode == 1,
+                      onTap: () {
+                        logic.aggregatedSearchMode =
+                            logic.aggregatedSearchMode == 1 ? 0 : 1;
+                        logic.update();
+                      },
+                    ),
+                    OptionChip(
+                      text: "合并展示".tl,
+                      isSelected: logic.aggregatedSearchMode == 2,
+                      onTap: () {
+                        logic.aggregatedSearchMode =
+                            logic.aggregatedSearchMode == 2 ? 0 : 2;
+                        logic.update();
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8)
@@ -649,7 +671,7 @@ class PreSearchPage extends StatelessWidget {
       id: "mode",
       builder: (logic) {
         // 聚合搜索時隱藏搜索選項
-        if (logic.aggregatedSearch) {
+        if (logic.aggregatedSearchMode != 0) {
           return const SizedBox();
         }
 

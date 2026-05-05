@@ -32,13 +32,14 @@ class _NhentaiCategoryFilterDialogState
   late final TextEditingController _uploadedController;
 
   late List<NhentaiFilterTerm> _terms;
-  NhentaiNumericCondition? _pages;
-  NhentaiNumericCondition? _favorites;
-  NhentaiNumericCondition? _uploadedDays;
+  late List<NhentaiNumericCondition> _pages;
+  late List<NhentaiNumericCondition> _favorites;
+  late List<NhentaiNumericCondition> _uploadedDays;
   String _searchText = '';
-  String _pagesComparison = '>=';
-  String _favoritesComparison = '>=';
-  String _uploadedComparison = '>=';
+  String _pagesComparison = '<=';
+  String _favoritesComparison = '<=';
+  String _uploadedComparison = '<=';
+  String _uploadedUnit = 'd';
   List<NhentaiFilterTerm> _localSuggestions = const [];
   List<NhentaiFilterTerm> _remoteSuggestions = const [];
   Timer? _remoteSearchDebounce;
@@ -50,20 +51,16 @@ class _NhentaiCategoryFilterDialogState
     super.initState();
     final filter = NhentaiCategoryFilter.fromParam(widget.initialParam);
     _terms = List.of(filter.terms);
-    _pages = filter.pages;
-    _favorites = filter.favorites;
-    _uploadedDays = filter.uploadedDays;
-    _pagesComparison = filter.pages?.comparison ?? '>=';
-    _favoritesComparison = filter.favorites?.comparison ?? '>=';
-    _uploadedComparison = filter.uploadedDays?.comparison ?? '>=';
+    _pages = List.of(filter.pages);
+    _favorites = List.of(filter.favorites);
+    _uploadedDays = List.of(filter.uploadedDays);
+    _uploadedUnit = _uploadedDays.isEmpty
+        ? 'd'
+        : (_uploadedDays.first.suffix.isEmpty ? 'd' : _uploadedDays.first.suffix);
     _searchController = TextEditingController();
-    _pagesController =
-        TextEditingController(text: filter.pages?.value.toString() ?? '');
-    _favoritesController =
-        TextEditingController(text: filter.favorites?.value.toString() ?? '');
-    _uploadedController = TextEditingController(
-      text: filter.uploadedDays?.value.toString() ?? '',
-    );
+    _pagesController = TextEditingController();
+    _favoritesController = TextEditingController();
+    _uploadedController = TextEditingController();
   }
 
   @override
@@ -185,6 +182,79 @@ class _NhentaiCategoryFilterDialogState
     });
   }
 
+  bool _canAddNumericCondition(
+    List<NhentaiNumericCondition> existing,
+    String comparison,
+    String text,
+  ) {
+    final value = int.tryParse(text.trim());
+    if (value == null || existing.length >= 2) {
+      return false;
+    }
+
+    final next = NhentaiNumericCondition(comparison: comparison, value: value);
+    if (existing.contains(next) || existing.any((it) => it.comparison == '=')) {
+      return false;
+    }
+    if (comparison == '=') {
+      return existing.isEmpty;
+    }
+    if (existing.isEmpty) {
+      return true;
+    }
+
+    final first = existing.first.comparison;
+    final firstIsLower = first == '>=' || first == '>';
+    final firstIsUpper = first == '<=' || first == '<';
+    if (firstIsLower) {
+      return comparison == '<=' || comparison == '<';
+    }
+    if (firstIsUpper) {
+      return comparison == '>=' || comparison == '>';
+    }
+    return false;
+  }
+
+  List<String> _availableNumericComparisons(
+    List<NhentaiNumericCondition> existing,
+  ) {
+    if (existing.any((it) => it.comparison == '=')) {
+      return const ['='];
+    }
+    if (existing.length >= 2) {
+      return const [];
+    }
+    if (existing.isEmpty) {
+      return const ['<=', '<', '=', '>=', '>'];
+    }
+
+    final first = existing.first.comparison;
+    if (first == '>=' || first == '>') {
+      return const ['<=', '<'];
+    }
+    if (first == '<=' || first == '<') {
+      return const ['>=', '>'];
+    }
+    return const ['<=', '<', '=', '>=', '>'];
+  }
+
+  String _uploadedUnitLabel(String unit) {
+    switch (unit) {
+      case 'h':
+        return '小时'.tl;
+      case 'd':
+        return '天'.tl;
+      case 'w':
+        return '周'.tl;
+      case 'm':
+        return '月'.tl;
+      case 'y':
+        return '年'.tl;
+      default:
+        return unit;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final suggestions = _mergeSuggestionTerms(
@@ -192,10 +262,32 @@ class _NhentaiCategoryFilterDialogState
       _remoteSuggestions,
     );
     final searching = _searchText.trim().isNotEmpty;
+    final isCompact = MediaQuery.sizeOf(context).width < 480;
+    final dialogWidth = (MediaQuery.sizeOf(context).width - 48)
+        .clamp(320.0, 560.0)
+        .toDouble();
+    final filterLabelWidth = isCompact ? 76.0 : 96.0;
+    final filterSpacing = isCompact ? 8.0 : 12.0;
+    final comparisonWidth = isCompact ? 64.0 : 72.0;
+    final comparisonHeight = isCompact ? 44.0 : 48.0;
+    final uploadedUnitWidth = isCompact ? 44.0 : 50.0;
+    final addButtonStyle = TextButton.styleFrom(
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 8, vertical: 8),
+    );
+    final pagesAvailableComparisons = _availableNumericComparisons(_pages);
+    final favoritesAvailableComparisons = _availableNumericComparisons(
+      _favorites,
+    );
+    final uploadedAvailableComparisons = _availableNumericComparisons(
+      _uploadedDays,
+    );
     final content = Material(
       color: Colors.transparent,
       child: SizedBox(
-        width: 560,
+        width: dialogWidth,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -225,9 +317,9 @@ class _NhentaiCategoryFilterDialogState
               ),
               const SizedBox(height: 8),
               if (_terms.isEmpty &&
-                  _pages == null &&
-                  _favorites == null &&
-                  _uploadedDays == null)
+                  _pages.isEmpty &&
+                  _favorites.isEmpty &&
+                  _uploadedDays.isEmpty)
                 Text('暂无筛选条件'.tl)
               else
                 Wrap(
@@ -246,37 +338,47 @@ class _NhentaiCategoryFilterDialogState
                         }),
                       ),
                     ),
-                    if (_pages != null)
-                      Chip(
-                        label: Text(
-                          "${'页数'.tl} ${_pages!.comparison} ${_pages!.value}",
+                    ..._pages.map(
+                      (condition) => ActionChip(
+                        key: ValueKey(
+                          'pages-condition-${condition.comparison}-${condition.value}',
                         ),
-                        onDeleted: () => setState(() {
-                          _pages = null;
-                          _pagesController.clear();
+                        label: Text('pages:${condition.comparison}${condition.value}'),
+                        onPressed: () => setState(() {
+                          _pages = _pages
+                              .where((item) => item != condition)
+                              .toList();
                         }),
                       ),
-                    if (_favorites != null)
-                      Chip(
-                        label: Text(
-                          "${'收藏数'.tl} ${_favorites!.comparison} ${_favorites!.value}",
+                    ),
+                    ..._favorites.map(
+                      (condition) => ActionChip(
+                        key: ValueKey(
+                          'favorites-condition-${condition.comparison}-${condition.value}',
                         ),
-                        onDeleted: () => setState(() {
-                          _favorites = null;
-                          _favoritesController.clear();
+                        label: Text('favorites:${condition.comparison}${condition.value}'),
+                        onPressed: () => setState(() {
+                          _favorites = _favorites
+                              .where((item) => item != condition)
+                              .toList();
                         }),
                       ),
-                    if (_uploadedDays != null)
-                      Chip(
-                        label: Text(
-                          "${'上传日期天数'.tl} "
-                          "${_uploadedDays!.comparison} ${_uploadedDays!.value}",
+                    ),
+                    ..._uploadedDays.map(
+                      (condition) => ActionChip(
+                        key: ValueKey(
+                          'uploaded-condition-${condition.comparison}-${condition.value}-${condition.suffix}',
                         ),
-                        onDeleted: () => setState(() {
-                          _uploadedDays = null;
-                          _uploadedController.clear();
+                        label: Text(
+                          'uploaded:${condition.comparison}${condition.value}${condition.suffix}',
+                        ),
+                        onPressed: () => setState(() {
+                          _uploadedDays = _uploadedDays
+                              .where((item) => item != condition)
+                              .toList();
                         }),
                       ),
+                    ),
                   ],
                 ),
               const SizedBox(height: 16),
@@ -296,7 +398,10 @@ class _NhentaiCategoryFilterDialogState
                   suffixIcon: Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: TextButton(
-                      onPressed: () {
+                key: const ValueKey('search-add-button'),
+                onPressed: _searchText.trim().isEmpty
+                    ? null
+                    : () {
                         final value = _searchController.text.trim();
                         if (value.isEmpty) {
                           return;
@@ -401,57 +506,60 @@ class _NhentaiCategoryFilterDialogState
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     SizedBox(
-                      width: 132,
+                      width: filterLabelWidth,
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text('页数'.tl),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: filterSpacing),
                     SizedBox(
-                      width: 72,
-                      height: 48,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _pagesComparison,
-                        isDense: true,
-                        icon: const Icon(Icons.arrow_drop_down_rounded, size: 20),
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 12,
-                          ),
-                        ),
-                        items: const ['>=', '>', '=', '<', '<=']
-                            .map(
-                              (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(value),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value == null) {
-                            return;
-                          }
+                      width: comparisonWidth,
+                      height: comparisonHeight,
+                      child: PopupMenuButton<String>(
+                        key: const ValueKey('pages-comparison-dropdown'),
+                        enabled: pagesAvailableComparisons.isNotEmpty,
+                        onSelected: (value) {
                           setState(() {
                             _pagesComparison = value;
-                            final parsed = int.tryParse(_pagesController.text.trim());
-                            _pages = parsed == null
-                                ? null
-                                : NhentaiNumericCondition(
-                                    comparison: value,
-                                    value: parsed,
-                                  );
                           });
                         },
+                        itemBuilder: (context) => [
+                          for (final value in pagesAvailableComparisons)
+                            PopupMenuItem<String>(
+                              key: ValueKey('pages-comparison-option-$value'),
+                              value: value,
+                              child: Text(value),
+                            ),
+                        ],
+                        child: Container(
+                          height: comparisonHeight,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_pagesComparison),
+                              const Icon(
+                                Icons.arrow_drop_down_rounded,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: filterSpacing),
                     Expanded(
                       child: SizedBox(
                         height: 48,
                         child: TextField(
+                          key: const ValueKey('pages-input'),
                           controller: _pagesController,
                           keyboardType: TextInputType.number,
                           textAlignVertical: TextAlignVertical.center,
@@ -467,18 +575,40 @@ class _NhentaiCategoryFilterDialogState
                             ),
                           ),
                           onChanged: (value) {
-                            setState(() {
-                              final parsed = int.tryParse(value.trim());
-                              _pages = parsed == null
-                                  ? null
-                                  : NhentaiNumericCondition(
-                                      comparison: _pagesComparison,
-                                      value: parsed,
-                                    );
-                            });
+                            setState(() {});
                           },
                         ),
                       ),
+                    ),
+                    SizedBox(width: filterSpacing),
+                    TextButton(
+                      key: const ValueKey('pages-add-button'),
+                      style: addButtonStyle,
+                      onPressed: _canAddNumericCondition(
+                        _pages,
+                        _pagesComparison,
+                        _pagesController.text,
+                      )
+                          ? () {
+                              final parsed = int.tryParse(
+                                _pagesController.text.trim(),
+                              );
+                              if (parsed == null) {
+                                return;
+                              }
+                              setState(() {
+                                _pages = [
+                                  ..._pages,
+                                  NhentaiNumericCondition(
+                                    comparison: _pagesComparison,
+                                    value: parsed,
+                                  ),
+                                ];
+                                _pagesController.clear();
+                              });
+                            }
+                          : null,
+                      child: Text('添加'.tl),
                     ),
                   ],
                 ),
@@ -489,58 +619,61 @@ class _NhentaiCategoryFilterDialogState
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     SizedBox(
-                      width: 132,
+                      width: filterLabelWidth,
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text('收藏数'.tl),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: filterSpacing),
                     SizedBox(
-                      width: 72,
-                      height: 48,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _favoritesComparison,
-                        isDense: true,
-                        icon: const Icon(Icons.arrow_drop_down_rounded, size: 20),
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 12,
-                          ),
-                        ),
-                        items: const ['>=', '>', '=', '<', '<=']
-                            .map(
-                              (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(value),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value == null) {
-                            return;
-                          }
+                      width: comparisonWidth,
+                      height: comparisonHeight,
+                      child: PopupMenuButton<String>(
+                        key: const ValueKey('favorites-comparison-dropdown'),
+                        enabled: favoritesAvailableComparisons.isNotEmpty,
+                        onSelected: (value) {
                           setState(() {
                             _favoritesComparison = value;
-                            final parsed =
-                                int.tryParse(_favoritesController.text.trim());
-                            _favorites = parsed == null
-                                ? null
-                                : NhentaiNumericCondition(
-                                    comparison: value,
-                                    value: parsed,
-                                  );
                           });
                         },
+                        itemBuilder: (context) => [
+                          for (final value in favoritesAvailableComparisons)
+                            PopupMenuItem<String>(
+                              key: ValueKey(
+                                  'favorites-comparison-option-$value'),
+                              value: value,
+                              child: Text(value),
+                            ),
+                        ],
+                        child: Container(
+                          height: comparisonHeight,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_favoritesComparison),
+                              const Icon(
+                                Icons.arrow_drop_down_rounded,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: filterSpacing),
                     Expanded(
                       child: SizedBox(
                         height: 48,
                         child: TextField(
+                          key: const ValueKey('favorites-input'),
                           controller: _favoritesController,
                           keyboardType: TextInputType.number,
                           textAlignVertical: TextAlignVertical.center,
@@ -556,18 +689,40 @@ class _NhentaiCategoryFilterDialogState
                             ),
                           ),
                           onChanged: (value) {
-                            setState(() {
-                              final parsed = int.tryParse(value.trim());
-                              _favorites = parsed == null
-                                  ? null
-                                  : NhentaiNumericCondition(
-                                      comparison: _favoritesComparison,
-                                      value: parsed,
-                                    );
-                            });
+                            setState(() {});
                           },
                         ),
                       ),
+                    ),
+                    SizedBox(width: filterSpacing),
+                    TextButton(
+                      key: const ValueKey('favorites-add-button'),
+                      style: addButtonStyle,
+                      onPressed: _canAddNumericCondition(
+                        _favorites,
+                        _favoritesComparison,
+                        _favoritesController.text,
+                      )
+                          ? () {
+                              final parsed = int.tryParse(
+                                _favoritesController.text.trim(),
+                              );
+                              if (parsed == null) {
+                                return;
+                              }
+                              setState(() {
+                                _favorites = [
+                                  ..._favorites,
+                                  NhentaiNumericCondition(
+                                    comparison: _favoritesComparison,
+                                    value: parsed,
+                                  ),
+                                ];
+                                _favoritesController.clear();
+                              });
+                            }
+                          : null,
+                      child: Text('添加'.tl),
                     ),
                   ],
                 ),
@@ -578,58 +733,61 @@ class _NhentaiCategoryFilterDialogState
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     SizedBox(
-                      width: 132,
+                      width: filterLabelWidth,
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: Text('上传日期天数'.tl),
+                        child: Text('上传日期'.tl),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: filterSpacing),
                     SizedBox(
-                      width: 72,
-                      height: 48,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _uploadedComparison,
-                        isDense: true,
-                        icon: const Icon(Icons.arrow_drop_down_rounded, size: 20),
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 12,
-                          ),
-                        ),
-                        items: const ['>=', '>', '=', '<', '<=']
-                            .map(
-                              (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(value),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value == null) {
-                            return;
-                          }
+                      width: comparisonWidth,
+                      height: comparisonHeight,
+                      child: PopupMenuButton<String>(
+                        key: const ValueKey('uploaded-comparison-dropdown'),
+                        enabled: uploadedAvailableComparisons.isNotEmpty,
+                        onSelected: (value) {
                           setState(() {
                             _uploadedComparison = value;
-                            final parsed =
-                                int.tryParse(_uploadedController.text.trim());
-                            _uploadedDays = parsed == null
-                                ? null
-                                : NhentaiNumericCondition(
-                                    comparison: value,
-                                    value: parsed,
-                                  );
                           });
                         },
+                        itemBuilder: (context) => [
+                          for (final value in uploadedAvailableComparisons)
+                            PopupMenuItem<String>(
+                              key:
+                                  ValueKey('uploaded-comparison-option-$value'),
+                              value: value,
+                              child: Text(value),
+                            ),
+                        ],
+                        child: Container(
+                          height: comparisonHeight,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_uploadedComparison),
+                              const Icon(
+                                Icons.arrow_drop_down_rounded,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: filterSpacing),
                     Expanded(
                       child: SizedBox(
                         height: 48,
                         child: TextField(
+                          key: const ValueKey('uploaded-input'),
                           controller: _uploadedController,
                           keyboardType: TextInputType.number,
                           textAlignVertical: TextAlignVertical.center,
@@ -645,18 +803,85 @@ class _NhentaiCategoryFilterDialogState
                             ),
                           ),
                           onChanged: (value) {
-                            setState(() {
-                              final parsed = int.tryParse(value.trim());
-                              _uploadedDays = parsed == null
-                                  ? null
-                                  : NhentaiNumericCondition(
-                                      comparison: _uploadedComparison,
-                                      value: parsed,
-                                    );
-                            });
+                            setState(() {});
                           },
                         ),
                       ),
+                    ),
+                    SizedBox(width: filterSpacing),
+                    SizedBox(
+                      width: uploadedUnitWidth,
+                      height: 44,
+                      child: PopupMenuButton<String>(
+                        key: const ValueKey('uploaded-unit-dropdown'),
+                        padding: EdgeInsets.zero,
+                        onSelected: (value) {
+                          setState(() {
+                            _uploadedUnit = value;
+                          });
+                        },
+                        itemBuilder: (context) => [
+                          for (final value in const ['h', 'd', 'w', 'm', 'y'])
+                            PopupMenuItem<String>(
+                              key: ValueKey('uploaded-unit-option-$value'),
+                              value: value,
+                              child: Text(_uploadedUnitLabel(value)),
+                            ),
+                        ],
+                        child: Container(
+                          height: 44,
+                          padding: const EdgeInsets.only(left: 2, right: 0),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_uploadedUnitLabel(_uploadedUnit)),
+                              const Spacer(),
+                              const Icon(
+                                Icons.arrow_drop_down_rounded,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: filterSpacing),
+                    TextButton(
+                      key: const ValueKey('uploaded-add-button'),
+                      style: addButtonStyle,
+                      onPressed: _canAddNumericCondition(
+                        _uploadedDays,
+                        _uploadedComparison,
+                        _uploadedController.text,
+                      )
+                          ? () {
+                              final parsed = int.tryParse(
+                                _uploadedController.text.trim(),
+                              );
+                              if (parsed == null) {
+                                return;
+                              }
+                              setState(() {
+                                _uploadedDays = [
+                                  ..._uploadedDays,
+                                  NhentaiNumericCondition(
+                                    comparison: _uploadedComparison,
+                                    value: parsed,
+                                    suffix: _uploadedUnit,
+                                  ),
+                                ];
+                                _uploadedController.clear();
+                              });
+                            }
+                          : null,
+                      child: Text('添加'.tl),
                     ),
                   ],
                 ),
@@ -677,6 +902,7 @@ class _NhentaiCategoryFilterDialogState
             child: Text('取消'.tl),
           ),
           fluent.FilledButton(
+            key: const ValueKey('confirm-button'),
             onPressed: () {
               widget.onConfirm(
                 NhentaiCategoryFilter(
@@ -703,6 +929,7 @@ class _NhentaiCategoryFilterDialogState
           child: Text('取消'.tl),
         ),
         FilledButton(
+          key: const ValueKey('confirm-button'),
           onPressed: () {
             widget.onConfirm(
               NhentaiCategoryFilter(

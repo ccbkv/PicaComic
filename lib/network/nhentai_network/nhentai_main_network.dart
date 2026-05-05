@@ -748,12 +748,12 @@ String buildNhentaiCategoryQueryFromParam(
   final filter = NhentaiCategoryFilter.fromParam(param);
   final fragments = <String>[
     for (final term in filter.terms) _buildNhentaiNamespaceQueryFragment(term),
-    if (filter.pages != null)
-      'pages:${filter.pages!.comparison}${filter.pages!.value}',
-    if (filter.favorites != null)
-      'favorites:${filter.favorites!.comparison}${filter.favorites!.value}',
-    if (filter.uploadedDays != null)
-      'uploaded:${filter.uploadedDays!.comparison}${filter.uploadedDays!.value}d',
+    for (final condition in filter.pages)
+      'pages:${condition.comparison}${condition.value}',
+    for (final condition in filter.favorites)
+      'favorites:${condition.comparison}${condition.value}',
+    for (final condition in filter.uploadedDays)
+      'uploaded:${condition.comparison}${condition.value}${condition.suffix}',
   ];
 
   if (!filter.hasExplicitLanguage &&
@@ -767,15 +767,20 @@ String buildNhentaiCategoryQueryFromParam(
 
 NhentaiNumericCondition _parseNhentaiNumericCondition(
   String token,
-  String value,
+  String value, {
+  bool allowSuffix = false,
+}
 ) {
-  final match = RegExp(r'^(>=|>|=|<|<=)(\d+)$').firstMatch(value);
+  final match = RegExp(
+    allowSuffix ? r'^(>=|>|=|<|<=)(\d+)([hdwmy])?$' : r'^(>=|>|=|<|<=)(\d+)$',
+  ).firstMatch(value);
   if (match == null) {
     throw FormatException('Invalid nhentai numeric filter: $token');
   }
   return NhentaiNumericCondition(
     comparison: match.group(1)!,
     value: int.parse(match.group(2)!),
+    suffix: allowSuffix ? (match.group(3) ?? 'd') : '',
   );
 }
 
@@ -803,6 +808,39 @@ List<NhentaiFilterTerm> _dedupeNhentaiFilterTerms(
   return result;
 }
 
+List<NhentaiNumericCondition> _normalizeNhentaiNumericConditions(
+  List<NhentaiNumericCondition> conditions,
+) {
+  final result = <NhentaiNumericCondition>[];
+  for (final condition in conditions) {
+    if (result.contains(condition)) {
+      continue;
+    }
+    if (condition.comparison == '=') {
+      return [condition];
+    }
+    if (result.any((it) => it.comparison == '=')) {
+      return result;
+    }
+
+    final hasSameDirection = result.any(
+      (it) =>
+          ((it.comparison == '>=' || it.comparison == '>') &&
+              (condition.comparison == '>=' || condition.comparison == '>')) ||
+          ((it.comparison == '<=' || it.comparison == '<') &&
+              (condition.comparison == '<=' || condition.comparison == '<')),
+    );
+    if (hasSameDirection) {
+      continue;
+    }
+
+    result.add(condition);
+    if (result.length == 2) {
+      break;
+    }
+  }
+  return result;
+}
 
 const nhentaiCategoryFilterDelimiter = '@@@';
 const nhentaiCategoryFilterRawQueryNamespace = 'search';
@@ -850,26 +888,39 @@ class NhentaiNumericCondition {
   const NhentaiNumericCondition({
     required this.comparison,
     required this.value,
+    this.suffix = '',
   });
 
   final String comparison;
   final int value;
+  final String suffix;
 
-  String toPathToken(String field) => '/$field/$comparison$value';
+  String toPathToken(String field) => '/$field/$comparison$value$suffix';
+
+  @override
+  bool operator ==(Object other) {
+    return other is NhentaiNumericCondition &&
+        other.comparison == comparison &&
+        other.value == value &&
+        other.suffix == suffix;
+  }
+
+  @override
+  int get hashCode => Object.hash(comparison, value, suffix);
 }
 
 class NhentaiCategoryFilter {
   const NhentaiCategoryFilter({
     this.terms = const [],
-    this.pages,
-    this.favorites,
-    this.uploadedDays,
+    this.pages = const [],
+    this.favorites = const [],
+    this.uploadedDays = const [],
   });
 
   final List<NhentaiFilterTerm> terms;
-  final NhentaiNumericCondition? pages;
-  final NhentaiNumericCondition? favorites;
-  final NhentaiNumericCondition? uploadedDays;
+  final List<NhentaiNumericCondition> pages;
+  final List<NhentaiNumericCondition> favorites;
+  final List<NhentaiNumericCondition> uploadedDays;
 
   bool get hasExplicitLanguage =>
       terms.any(
@@ -886,9 +937,9 @@ class NhentaiCategoryFilter {
     }
 
     final terms = <NhentaiFilterTerm>[];
-    NhentaiNumericCondition? pages;
-    NhentaiNumericCondition? favorites;
-    NhentaiNumericCondition? uploadedDays;
+    final pages = <NhentaiNumericCondition>[];
+    final favorites = <NhentaiNumericCondition>[];
+    final uploadedDays = <NhentaiNumericCondition>[];
 
     for (final token in splitNhentaiCategoryFilterParam(param)) {
       final parts = token.split('/').where((part) => part.isNotEmpty).toList();
@@ -901,13 +952,13 @@ class NhentaiCategoryFilter {
 
       switch (type) {
         case 'pages':
-          pages = _parseNhentaiNumericCondition(token, value);
+          pages.add(_parseNhentaiNumericCondition(token, value));
           break;
         case 'favorites':
-          favorites = _parseNhentaiNumericCondition(token, value);
+          favorites.add(_parseNhentaiNumericCondition(token, value));
           break;
         case 'uploaded':
-          uploadedDays = _parseNhentaiNumericCondition(token, value);
+          uploadedDays.add(_parseNhentaiNumericCondition(token, value, allowSuffix: true),);
           break;
         default:
           terms.add(
@@ -923,18 +974,18 @@ class NhentaiCategoryFilter {
 
     return NhentaiCategoryFilter(
       terms: _dedupeNhentaiFilterTerms(terms),
-      pages: pages,
-      favorites: favorites,
-      uploadedDays: uploadedDays,
+      pages: _normalizeNhentaiNumericConditions(pages),
+      favorites: _normalizeNhentaiNumericConditions(favorites),
+      uploadedDays: _normalizeNhentaiNumericConditions(uploadedDays),
     );
   }
 
   String toParam() {
     final tokens = <String>[
       for (final term in _dedupeNhentaiFilterTerms(terms)) term.toPathToken(),
-      if (pages != null) pages!.toPathToken('pages'),
-      if (favorites != null) favorites!.toPathToken('favorites'),
-      if (uploadedDays != null) uploadedDays!.toPathToken('uploaded'),
+      for (final condition in pages) condition.toPathToken('pages'),
+      for (final condition in favorites) condition.toPathToken('favorites'),
+      for (final condition in uploadedDays) condition.toPathToken('uploaded'),
     ];
     return tokens.join(nhentaiCategoryFilterDelimiter);
   }

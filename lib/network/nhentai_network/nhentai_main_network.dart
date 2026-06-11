@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:pica_comic/base.dart';
@@ -203,6 +202,85 @@ class NhentaiNetwork {
     }
   }
 
+  Future<Res<List<NhentaiFilterTerm>>> autocompleteTags(
+    String type,
+    String query, {
+    int limit = 10,
+    CancelToken? cancelToken,
+  }) async {
+    if (cookieJar == null) {
+      await init();
+    }
+    try {
+      final res = await dio.post<dynamic>(
+        '$apiUrl/tags/autocomplete',
+        data: {
+          'type': type,
+          'query': query,
+          'limit': limit,
+        },
+        options: Options(headers: _defaultHeaders),
+        cancelToken: cancelToken,
+      );
+      if (res.data is! List) {
+        return const Res(<NhentaiFilterTerm>[]);
+      }
+      final suggestions = <NhentaiFilterTerm>[];
+      for (final item in res.data) {
+        if (item is! Map) {
+          continue;
+        }
+        final namespace = item['type']?.toString().trim();
+        final name = item['name']?.toString().trim();
+        if (namespace == null ||
+            namespace.isEmpty ||
+            name == null ||
+            name.isEmpty) {
+          continue;
+        }
+        suggestions.add(
+          NhentaiFilterTerm(namespace: namespace, value: name),
+        );
+      }
+      return Res(_dedupeNhentaiFilterTerms(suggestions));
+    } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        return Res(null, errorMessage: 'cancelled');
+      }
+      return Res(null, errorMessage: e.toString());
+    } catch (e) {
+      return Res(null, errorMessage: e.toString());
+    }
+  }
+
+  Future<Res<List<NhentaiFilterTerm>>> autocompleteTagsByTypes(
+    String query, {
+    required List<String> types,
+    int limit = 10,
+    CancelToken? cancelToken,
+  }) async {
+    final responses = await Future.wait([
+      for (final type in types)
+        autocompleteTags(
+          type,
+          query,
+          limit: limit,
+          cancelToken: cancelToken,
+        ),
+    ]);
+    if (cancelToken?.isCancelled ?? false) {
+      return Res(null, errorMessage: 'cancelled');
+    }
+    final suggestions = <NhentaiFilterTerm>[];
+    for (final response in responses) {
+      final data = response.dataOrNull;
+      if (!response.error && data != null && data.isNotEmpty) {
+        suggestions.addAll(data);
+      }
+    }
+    return Res(_dedupeNhentaiFilterTerms(suggestions));
+  }
+
   Future<Res<dynamic>> delete(String url, {bool withAuth = false, bool retried = false}) async {
     if (cookieJar == null) {
       await init();
@@ -242,8 +320,11 @@ class NhentaiNetwork {
     var tags = <String>[];
     for (var tagId in tagIds) {
       var tagStr = tagId.toString();
-      if (nhentaiTags[tagStr] != null) {
-        tags.add(nhentaiTags[tagStr]!);
+      final tag = nhentaiTags[tagStr] ??
+          nhentaiCharacterTags[tagStr] ??
+          nhentaiParodyTags[tagStr];
+      if (tag != null) {
+        tags.add(tag);
       }
     }
     return tags;
@@ -455,8 +536,8 @@ class NhentaiNetwork {
       bool favorite = false;
       if (logged) {
         final favoriteRes = await checkFavorite(id);
-        if (!favoriteRes.error && favoriteRes.data != null) {
-          favorite = favoriteRes.data!;
+        if (!favoriteRes.error) {
+          favorite = favoriteRes.data;
         }
       }
 
@@ -601,18 +682,22 @@ class NhentaiNetwork {
   }
 
   Future<Res<List<NhentaiComicBrief>>> getCategoryComics(
-      String path, int page, NhentaiSort sort) async {
-    // 从path中提取标签类型和名称
-    // path格式如: /tag/abc/, /artist/xyz/, /group/123/
-    var parts = path.split('/').where((p) => p.isNotEmpty).toList();
-    if (parts.length < 2) {
-      return Res(null, errorMessage: "Invalid path");
+      String param, int page, NhentaiSort sort) async {
+    final languageFilter = switch (int.tryParse(appdata.settings[69]) ?? 0) {
+      1 => 'chinese',
+      2 => 'english',
+      3 => 'japanese',
+      _ => null,
+    };
+    late final String query;
+    try {
+      query = buildNhentaiCategoryQueryFromParam(
+        param,
+        preferredLanguage: languageFilter,
+      );
+    } on FormatException catch (error) {
+      return Res(null, errorMessage: error.message);
     }
-
-    var type = parts[0]; // tag, artist, group, etc.
-    var name = parts[1];
-
-    var query = "$type:\"$name\"";
     var sortStr = switch (sort) {
       NhentaiSort.recent => "date",
       NhentaiSort.popularToday => "popular-today",
@@ -643,6 +728,268 @@ class NhentaiNetwork {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");
     }
+  }
+}
+
+
+List<String> splitNhentaiCategoryFilterParam(String? param) {
+  if (param == null || param.trim().isEmpty) {
+    return const [];
+  }
+  return param
+      .split(nhentaiCategoryFilterDelimiter)
+      .map((token) => token.trim())
+      .where((token) => token.isNotEmpty)
+      .toList();
+}
+
+String buildNhentaiCategoryQueryFromParam(
+  String? param, {
+  String? preferredLanguage,
+}) {
+  final filter = NhentaiCategoryFilter.fromParam(param);
+  final fragments = <String>[
+    for (final term in filter.terms) _buildNhentaiNamespaceQueryFragment(term),
+    for (final condition in filter.pages)
+      'pages:${condition.comparison}${condition.value}',
+    for (final condition in filter.favorites)
+      'favorites:${condition.comparison}${condition.value}',
+    for (final condition in filter.uploadedDays)
+      'uploaded:${condition.comparison}${condition.value}${condition.suffix}',
+  ];
+
+  if (!filter.hasExplicitLanguage &&
+      preferredLanguage != null &&
+      preferredLanguage.isNotEmpty) {
+    fragments.add('language:$preferredLanguage');
+  }
+
+  return fragments.join(' ');
+}
+
+NhentaiNumericCondition _parseNhentaiNumericCondition(
+  String token,
+  String value, {
+  bool allowSuffix = false,
+}
+) {
+  final match = RegExp(
+    allowSuffix ? r'^(>=|>|=|<|<=)(\d+)([hdwmy])?$' : r'^(>=|>|=|<|<=)(\d+)$',
+  ).firstMatch(value);
+  if (match == null) {
+    throw FormatException('Invalid nhentai numeric filter: $token');
+  }
+  return NhentaiNumericCondition(
+    comparison: match.group(1)!,
+    value: int.parse(match.group(2)!),
+    suffix: allowSuffix ? (match.group(3) ?? 'd') : '',
+  );
+}
+
+String _buildNhentaiNamespaceQueryFragment(NhentaiFilterTerm term) {
+  if (term.namespace == nhentaiCategoryFilterRawQueryNamespace) {
+    return term.value;
+  }
+  if (term.namespace == 'language') {
+    return 'language:${term.value}';
+  }
+  return '${term.namespace}:"${term.value}"';
+}
+
+List<NhentaiFilterTerm> _dedupeNhentaiFilterTerms(
+  List<NhentaiFilterTerm> terms,
+) {
+  final seen = <String>{};
+  final result = <NhentaiFilterTerm>[];
+  for (final term in terms) {
+    final key = '${term.namespace}\u0000${term.value}';
+    if (seen.add(key)) {
+      result.add(term);
+    }
+  }
+  return result;
+}
+
+List<NhentaiNumericCondition> _normalizeNhentaiNumericConditions(
+  List<NhentaiNumericCondition> conditions,
+) {
+  final result = <NhentaiNumericCondition>[];
+  for (final condition in conditions) {
+    if (result.contains(condition)) {
+      continue;
+    }
+    if (condition.comparison == '=') {
+      return [condition];
+    }
+    if (result.any((it) => it.comparison == '=')) {
+      return result;
+    }
+
+    final hasSameDirection = result.any(
+      (it) =>
+          ((it.comparison == '>=' || it.comparison == '>') &&
+              (condition.comparison == '>=' || condition.comparison == '>')) ||
+          ((it.comparison == '<=' || it.comparison == '<') &&
+              (condition.comparison == '<=' || condition.comparison == '<')),
+    );
+    if (hasSameDirection) {
+      continue;
+    }
+
+    result.add(condition);
+    if (result.length == 2) {
+      break;
+    }
+  }
+  return result;
+}
+
+const nhentaiCategoryFilterDelimiter = '@@@';
+const nhentaiCategoryFilterRawQueryNamespace = 'search';
+const nhentaiCategoryFilterNamespaces = [
+  'tag',
+  'character',
+  'parody',
+  'language',
+  'artist',
+  'group',
+];
+
+class NhentaiFilterTerm {
+  const NhentaiFilterTerm({
+    required this.namespace,
+    required this.value,
+  });
+
+  final String namespace;
+  final String value;
+
+  bool get isRawQuery => namespace == nhentaiCategoryFilterRawQueryNamespace;
+
+  String get displayValue => value;
+
+  String toPathToken() {
+    if (isRawQuery) {
+      return '/$namespace/${Uri.encodeComponent(value)}';
+    }
+    return '/$namespace/$value';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is NhentaiFilterTerm &&
+        other.namespace == namespace &&
+        other.value == value;
+  }
+
+  @override
+  int get hashCode => Object.hash(namespace, value);
+}
+
+class NhentaiNumericCondition {
+  const NhentaiNumericCondition({
+    required this.comparison,
+    required this.value,
+    this.suffix = '',
+  });
+
+  final String comparison;
+  final int value;
+  final String suffix;
+
+  String toPathToken(String field) => '/$field/$comparison$value$suffix';
+
+  @override
+  bool operator ==(Object other) {
+    return other is NhentaiNumericCondition &&
+        other.comparison == comparison &&
+        other.value == value &&
+        other.suffix == suffix;
+  }
+
+  @override
+  int get hashCode => Object.hash(comparison, value, suffix);
+}
+
+class NhentaiCategoryFilter {
+  const NhentaiCategoryFilter({
+    this.terms = const [],
+    this.pages = const [],
+    this.favorites = const [],
+    this.uploadedDays = const [],
+  });
+
+  final List<NhentaiFilterTerm> terms;
+  final List<NhentaiNumericCondition> pages;
+  final List<NhentaiNumericCondition> favorites;
+  final List<NhentaiNumericCondition> uploadedDays;
+
+  bool get hasExplicitLanguage =>
+      terms.any(
+        (term) =>
+            term.namespace == 'language' ||
+            (term.isRawQuery &&
+                RegExp(r'(^|\s)language:')
+                    .hasMatch(term.value.toLowerCase())),
+      );
+
+  factory NhentaiCategoryFilter.fromParam(String? param) {
+    if (param == null || param.trim().isEmpty) {
+      return const NhentaiCategoryFilter();
+    }
+
+    final terms = <NhentaiFilterTerm>[];
+    final pages = <NhentaiNumericCondition>[];
+    final favorites = <NhentaiNumericCondition>[];
+    final uploadedDays = <NhentaiNumericCondition>[];
+
+    for (final token in splitNhentaiCategoryFilterParam(param)) {
+      final parts = token.split('/').where((part) => part.isNotEmpty).toList();
+      if (parts.length < 2 || !token.trimLeft().startsWith('/')) {
+        continue;
+      }
+
+      final type = parts[0];
+      final value = parts.sublist(1).join('/');
+
+      switch (type) {
+        case 'pages':
+          pages.add(_parseNhentaiNumericCondition(token, value));
+          break;
+        case 'favorites':
+          favorites.add(_parseNhentaiNumericCondition(token, value));
+          break;
+        case 'uploaded':
+          uploadedDays.add(_parseNhentaiNumericCondition(token, value, allowSuffix: true),);
+          break;
+        default:
+          terms.add(
+            NhentaiFilterTerm(
+              namespace: type,
+              value: type == nhentaiCategoryFilterRawQueryNamespace
+                  ? Uri.decodeComponent(value)
+                  : value,
+            ),
+          );
+      }
+    }
+
+    return NhentaiCategoryFilter(
+      terms: _dedupeNhentaiFilterTerms(terms),
+      pages: _normalizeNhentaiNumericConditions(pages),
+      favorites: _normalizeNhentaiNumericConditions(favorites),
+      uploadedDays: _normalizeNhentaiNumericConditions(uploadedDays),
+    );
+  }
+
+  String toParam() {
+    final tokens = <String>[
+      for (final term in _dedupeNhentaiFilterTerms(terms)) term.toPathToken(),
+      for (final condition in pages) condition.toPathToken('pages'),
+      for (final condition in favorites) condition.toPathToken('favorites'),
+      for (final condition in uploadedDays) condition.toPathToken('uploaded'),
+    ];
+    return tokens.join(nhentaiCategoryFilterDelimiter);
   }
 }
 

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:collection';
 
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
@@ -36,7 +35,26 @@ final nhentai = ComicSource.named(
       const FixedCategoryPart("language", ["中文", "日本語", "english"], "category",
           ["/language/chinese", "/language/japanese", "/language/english"]),
       RandomCategoryPartWithRuntimeData(
-          "Tags", () => nhentaiTags.values.toList(), 50, "search"),
+        "tag",
+        () => nhentaiTags.values.toList(),
+        50,
+        "category",
+        buildParam: (tag) => "/tag/$tag",
+      ),
+      RandomCategoryPartWithRuntimeData(
+        "character",
+        () => nhentaiCharacterTags.values.toList(),
+        50,
+        "category",
+        buildParam: (tag) => "/character/$tag",
+      ),
+      RandomCategoryPartWithRuntimeData(
+        "parody",
+        () => nhentaiParodyTags.values.toList(),
+        50,
+        "category",
+        buildParam: (tag) => "/parody/$tag",
+      ),
     ],
     enableRankingPage: false,
     buttons: [
@@ -49,19 +67,12 @@ final nhentai = ComicSource.named(
     ],
   ),
   categoryComicsData: CategoryComicsData.named(
-    load: (category, param, options, page) async {
-      var [_, type, name] = param!.split('/');
-      var lang = int.tryParse(appdata.settings[69]) ?? 0;
-      if (lang != 0) {
-        return NhentaiNetwork().search(
-          "$type:$name language:${["chinese", "english", "japanese"][lang-1]}",
+    load: (category, param, options, page) => NhentaiNetwork()
+        .getCategoryComics(
+          param ?? '',
           page,
           NhentaiSort.fromValue(options[0]),
-        );
-      }
-      return NhentaiNetwork().getCategoryComics(
-          "/$type/$name", page, NhentaiSort.fromValue(options[0]));
-    },
+        ),
     options: [
       CategoryComicsOptions.named(
         options: LinkedHashMap.of({

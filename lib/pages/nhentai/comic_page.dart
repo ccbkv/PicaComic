@@ -186,22 +186,18 @@ class NhentaiComicPage extends BaseComicPage<NhentaiComic> {
 
   @override
   void tapOnTag(String tag, String key) {
-    if (tag.contains(" | ")) {
-      tag = tag.replaceAll(' | ', '-');
-    }
-    if (tag.contains(" ")) {
-      tag = tag.replaceAll(' ', '-');
-    }
-    String? categoryParam = switch (key) {
-      "Parodies" => "/parody/$tag",
-      "Character" => "/character/$tag",
-      "Tags" => "/tag/$tag",
-      "Artists" => "/artist/$tag",
-      "Groups" => "/group/$tag",
-      "Languages" => "/language/$tag",
-      "Categories" => "/category/$tag",
-      _ => null
-    };
+    final categoryType = {
+      "Parodies": "parody",
+      "Characters": "character",
+      "Tags": "tag",
+      "Artists": "artist",
+      "Groups": "group",
+      "Languages": "language",
+      "Categories": "category",
+    }[key];
+    final categoryParam = categoryType == null
+        ? null
+        : "/$categoryType/$tag";
 
     if (categoryParam == null) {
       HistoryManager.addSearchHistory(tag);

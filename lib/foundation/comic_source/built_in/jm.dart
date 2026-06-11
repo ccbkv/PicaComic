@@ -285,10 +285,22 @@ class _JmComicTile extends ComicTile {
   }
 
   @override
-  String get subTitle => comic.author;
+  String get subTitle {
+    final author = comic.author.trim();
+    if (author.isEmpty ||
+        author == 'N/A' ||
+        author == 'Unknown' ||
+        author == '未知') {
+      return '';
+    }
+    return author;
+  }
 
   @override
   String get title => comic.name;
+
+  @override
+  int? get pages => comic.pages;
 
   @override
   ActionFunc? get read => () async {

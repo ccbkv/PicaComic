@@ -186,10 +186,13 @@ class _NhentaiComicTile extends ComicTile {
   }
 
   @override
-  String get subTitle => "ID: ${comic.id}";
+  String get subTitle => '';
 
   @override
   String get title => comic.title;
+  
+  @override
+  int? get pages => comic.pages;
 
   List<String> _generateTags(List<String> tags) {
     if (App.locale.languageCode != "zh") {

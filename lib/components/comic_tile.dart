@@ -323,9 +323,7 @@ abstract class ComicTile extends StatelessWidget {
                 Expanded(
                   child: _ComicDescription(
                     //标题中不应出现换行符, 爬虫可能多爬取换行符, 为避免麻烦, 直接在此处删去
-                    title: pages == null
-                        ? title.replaceAll("\n", "")
-                        : "[${pages}P]${title.replaceAll("\n", "")}",
+                    title: title.replaceAll("\n", ""),
                     user: subTitle,
                     description: description,
                     subDescription: buildSubDescription(context),
@@ -334,6 +332,7 @@ abstract class ComicTile extends StatelessWidget {
                     categories: categories,
                     sourceKey: sourceKey,
                     maxLines: maxLines,
+                    pages: pages,
                   ),
                 ),
               ],
@@ -428,14 +427,15 @@ abstract class ComicTile extends StatelessWidget {
 class _ComicDescription extends StatelessWidget {
   const _ComicDescription(
       {required this.title,
-        required this.user,
-        required this.description,
-        this.subDescription,
-        this.badge,
-        this.maxLines = 2,
-        this.tags,
-        this.categories,
-        this.sourceKey});
+      required this.user,
+      required this.description,
+      this.subDescription,
+      this.badge,
+      this.maxLines = 2,
+      this.tags,
+      this.categories,
+      this.sourceKey,
+      this.pages});
 
   final String title;
   final String user;
@@ -446,6 +446,7 @@ class _ComicDescription extends StatelessWidget {
   final List<String>? categories;
   final String? sourceKey;
   final int maxLines;
+  final int? pages;
 
   @override
   Widget build(BuildContext context) {
@@ -659,6 +660,17 @@ class _ComicDescription extends StatelessWidget {
                 ],
               ),
             ],
+          ),
+        if (pages != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              "${pages}P",
+              style: const TextStyle(
+                fontSize: 12.0,
+                color: Colors.black,
+              ),
+            ),
           ),
         const SizedBox(
           height: 2,

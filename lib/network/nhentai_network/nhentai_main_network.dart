@@ -258,6 +258,7 @@ class NhentaiNetwork {
       item.id.toString(),
       lang,
       tags,
+      pages: item.pages,
     );
   }
 
@@ -469,6 +470,7 @@ class NhentaiNetwork {
         thumbnails,
         recommendations,
         '',
+        pages: gallery.numPages,
       ));
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");

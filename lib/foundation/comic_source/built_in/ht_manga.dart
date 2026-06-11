@@ -226,7 +226,10 @@ class _HtComicTile extends ComicTile {
   }
 
   @override
-  String get subTitle => "${comic.pages} Pages";
+  String get subTitle => "";
+
+  @override
+  int? get pages => comic.pages;
 
   @override
   ActionFunc? get read => () async {

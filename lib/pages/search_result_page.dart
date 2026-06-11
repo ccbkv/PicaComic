@@ -60,7 +60,6 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
       String keyword, int page, ComicSource source) async {
     final loader = source.searchPageData!.loadPage!;
 
-    // 对于Picacg源，传递分类参数
     if (sourceKey == "picacg" && selectedCategories.isNotEmpty) {
       return await PicacgNetwork().search(keyword, options[0], page,
           categories: selectedCategories, addToHistory: true);
@@ -71,37 +70,7 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
   @override
   Future<Res<List<BaseComic>>> getComics(int i) async {
     final source = ComicSource.find(sourceKey)!;
-
-    final enableOrSearch = appdata.appSettings.enableOrKeywordSearch;
-    final splitKeywords = keyword
-        .split(RegExp(r'\s+'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    Res<List<BaseComic>> res;
-    if (!enableOrSearch || splitKeywords.length <= 1) {
-      res = await _searchSingleKeyword(keyword, i, source);
-    } else {
-      final merged = <BaseComic>[];
-      final ids = <String>{};
-      String? firstSubData;
-
-      for (final k in splitKeywords) {
-        final current = await _searchSingleKeyword(k, i, source);
-        if (current.error) {
-          return current;
-        }
-        firstSubData ??= current.subData;
-        for (final comic in current.data) {
-          if (ids.add(comic.id)) {
-            merged.add(comic);
-          }
-        }
-      }
-
-      res = Res<List<BaseComic>>(merged, subData: firstSubData);
-    }
+    final res = await _searchSingleKeyword(keyword, i, source);
 
     if (res.error || !appdata.appSettings.hideReadInList) {
       return res;
@@ -197,12 +166,10 @@ class _SearchResultPageState extends State<_SearchResultPage> {
     var plainKeyword = HistoryManager.getPlainSearchKeyword(widget.keyword);
     controller.text = plainKeyword;
 
-    // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
     if (sourceKey == "jm") {
       keyword = _addJmBlockingKeywords(keyword);
     }
 
-    // 添加语言筛选
     if (!keyword.contains('language') &&
         ComicSource.find(sourceKey)?.searchPageData?.enableLanguageFilter ==
             true) {

@@ -4,15 +4,22 @@ import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/network/base_comic.dart';
+import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
-import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 
 class AggregatedSearchPage extends StatefulWidget {
-  const AggregatedSearchPage({super.key, required this.keyword});
+  const AggregatedSearchPage({
+    super.key,
+    required this.keyword,
+    this.displayMode = 1,
+  });
 
   final String keyword;
+
+  /// 1: separate display (分开展示), 2: merged display (合并展示)
+  final int displayMode;
 
   @override
   State<AggregatedSearchPage> createState() => _AggregatedSearchPageState();
@@ -51,6 +58,32 @@ class _AggregatedSearchPageState extends State<AggregatedSearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.displayMode == 2) {
+      return Scaffold(
+        appBar: AppBar(
+          title: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: "搜索".tl,
+              border: InputBorder.none,
+            ),
+            onSubmitted: onSearch,
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () => onSearch(searchController.text),
+            ),
+          ],
+        ),
+        body: _MergedSearchComicList(
+          key: ValueKey(_keyword),
+          keyword: _keyword,
+          header: const SliverToBoxAdapter(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: TextField(
@@ -86,6 +119,91 @@ class _AggregatedSearchPageState extends State<AggregatedSearchPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MergedSearchComicList extends ComicsPage<BaseComic> {
+  _MergedSearchComicList({
+    super.key,
+    required this.keyword,
+    required this.header,
+  });
+
+  final String keyword;
+
+  @override
+  final Widget header;
+
+  @override
+  String get sourceKey => "__aggregated__";
+
+  @override
+  String? get title => null;
+
+  @override
+  String? get tag => "aggregated_merged";
+
+  final Map<String, String> _comicSources = {};
+
+  @override
+  Future<Res<List<BaseComic>>> getComics(int i) async {
+    final sources = ComicSource.sources
+        .where((e) =>
+            e.searchPageData != null && e.searchPageData!.loadPage != null)
+        .toList();
+
+    // Fetch all sources in parallel
+    final results = await Future.wait(sources.map((source) async {
+      final options = (source.searchPageData!.searchOptions ?? [])
+          .map((e) => e.defaultValue)
+          .toList();
+      final res = await source.searchPageData!.loadPage!(keyword, i, options);
+      return (source: source, res: res);
+    }));
+
+    // Collect non-error results with their source keys
+    final sourceResults = <({ComicSource source, List<BaseComic> comics})>[];
+    for (final r in results) {
+      if (!r.res.error) {
+        sourceResults.add((source: r.source, comics: r.res.data));
+      }
+    }
+
+    final merged = <BaseComic>[];
+    final ids = <String>{};
+    dynamic firstSubData;
+
+    // Round-robin interleave: take one from each source in turn
+    final indices = List.filled(sourceResults.length, 0);
+    bool hasMore = true;
+    while (hasMore) {
+      hasMore = false;
+      for (var j = 0; j < sourceResults.length; j++) {
+        final entry = sourceResults[j];
+        if (indices[j] < entry.comics.length) {
+          hasMore = true;
+          final comic = entry.comics[indices[j]];
+          indices[j]++;
+          if (ids.add(comic.id)) {
+            _comicSources[comic.id] = entry.source.key;
+            merged.add(comic);
+          }
+        }
+      }
+    }
+
+    return Res<List<BaseComic>>(merged, subData: firstSubData);
+  }
+
+  @override
+  Widget buildItem(BuildContext context, BaseComic item) {
+    return buildComicTile(
+      context,
+      item,
+      _comicSources[item.id] ?? sourceKey,
+      addonMenuOptions: addonMenuOptions,
+      badge: ComicSource.find(_comicSources[item.id] ?? sourceKey)?.name,
     );
   }
 }

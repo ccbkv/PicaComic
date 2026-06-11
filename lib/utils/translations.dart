@@ -15,7 +15,7 @@ extension AppTranslation on String {
 
   String get tl => _translate();
 
-  String get tlEN => translations["en_US"]![this] ?? this;
+  String get tlEN => (translations["en_US"]?[this]) ?? this;
 
   String tlParams(Map<String, String> values) {
     var res = _translate();
@@ -25,7 +25,7 @@ extension AppTranslation on String {
     return res;
   }
 
-  static late final Map<String, Map<String, String>> translations;
+  static Map<String, Map<String, String>> translations = {};
 
   static Future<void> init() async{
     var data = await rootBundle.load("assets/translation.json");

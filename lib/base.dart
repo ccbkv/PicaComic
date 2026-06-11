@@ -1013,20 +1013,6 @@ class _Settings {
     appdata.settings[96] = value == 1 ? "1" : "0";
   }
 
-  bool get enableOrKeywordSearch {
-    while (appdata.settings.length <= 97) {
-      appdata.settings.add("0");
-    }
-    return appdata.settings[97] == "1";
-  }
-
-  set enableOrKeywordSearch(bool value) {
-    while (appdata.settings.length <= 97) {
-      appdata.settings.add("0");
-    }
-    appdata.settings[97] = value ? "1" : "0";
-  }
-
   bool get enableClockAndBatteryInfoInReader {
     while (appdata.settings.length <= 98) {
       appdata.settings.add("0");

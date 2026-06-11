@@ -162,7 +162,10 @@ class TapController {
       if (logic.tools) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       } else {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+        final alwaysShowStatusBar = appdata.settings.length > 95 && appdata.settings[95] == "1";
+        SystemChrome.setEnabledSystemUIMode(
+          alwaysShowStatusBar ? SystemUiMode.edgeToEdge : SystemUiMode.immersive,
+        );
       }
       return;
     }
@@ -278,7 +281,10 @@ class TapController {
       if (logic.tools) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       } else {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+        final alwaysShowStatusBar = appdata.settings.length > 95 && appdata.settings[95] == "1";
+        SystemChrome.setEnabledSystemUIMode(
+          alwaysShowStatusBar ? SystemUiMode.edgeToEdge : SystemUiMode.immersive,
+        );
       }
       return;
     }
@@ -337,9 +343,10 @@ class TapController {
       if (logic.tools) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       } else {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-        if(appdata.settings[81] == "1") {
-        }
+        final alwaysShowStatusBar = appdata.settings.length > 95 && appdata.settings[95] == "1";
+        SystemChrome.setEnabledSystemUIMode(
+          alwaysShowStatusBar ? SystemUiMode.edgeToEdge : SystemUiMode.immersive,
+        );
       }
     }
   }

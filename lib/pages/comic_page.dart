@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:liquid_glass_widgets/widgets/overlays/glass_menu.dart';
+import 'package:liquid_glass_widgets/widgets/overlays/glass_menu_item.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1051,10 +1054,88 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
         child: Text(title!),
       ),
       actions: [
-        IconButton(
-            onPressed: showMoreActions, icon: const Icon(Icons.more_horiz))
+        if (enableLiquidGlassUi)
+          Builder(builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final scheme = Theme.of(context).colorScheme;
+            // Restore the actual display size for GlassMenu's
+            // autoAdjustToScreen, since _RouteViewportInset may have
+            // overridden MediaQuery.size to a smaller value on wide screens.
+            final view = View.of(context);
+            final actualSize = Size(
+              view.physicalSize.width / view.devicePixelRatio,
+              view.physicalSize.height / view.devicePixelRatio,
+            );
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(size: actualSize),
+              child: GlassMenu(
+                autoAdjustToScreen: true,
+                menuWidth: 220,
+                settings: LiquidGlassSettings(
+                  blur: 18,
+                  glassColor: isDark
+                      ? scheme.surfaceContainerHighest.withValues(alpha: 0.24)
+                      : Colors.white.withValues(alpha: 0.16),
+                  ambientStrength: isDark ? 0.34 : 0.48,
+                  saturation: 1.14,
+                  thickness: 18,
+                ),
+                items: _buildGlassMenuItems(),
+                triggerBuilder: (ctx, toggle) => GlassIconActionButton(
+                  icon: Icons.more_horiz,
+                  tooltip: "更多".tl,
+                  onTap: toggle,
+                ),
+              ),
+            );
+          })
+        else
+          IconButton(
+              onPressed: showMoreActions, icon: const Icon(Icons.more_horiz))
       ],
     );
+  }
+
+  List<Widget> _buildGlassMenuItems() {
+    return [
+      GlassMenuItem(
+        title: "复制标题".tl,
+        icon: const Icon(Icons.copy),
+        onTap: () {
+          var text = title!;
+          if (url != null) {
+            text += ":$url";
+          }
+          Clipboard.setData(ClipboardData(text: text));
+          App.globalContext!.showMessage(message: "已复制".tl);
+        },
+      ),
+      GlassMenuItem(
+        title: "复制ID".tl,
+        icon: const Icon(Icons.copy_rounded),
+        onTap: () {
+          Clipboard.setData(ClipboardData(text: id));
+          App.globalContext!.showMessage(message: "已复制".tl);
+        },
+      ),
+      if (url != null)
+        GlassMenuItem(
+          title: "复制URL".tl,
+          icon: const Icon(Icons.link),
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: url!));
+            App.globalContext!.showMessage(message: "已复制".tl);
+          },
+        ),
+      if (url != null)
+        GlassMenuItem(
+          title: "打开网页".tl,
+          icon: const Icon(Icons.open_in_browser),
+          onTap: () {
+            launchUrlString(url!);
+          },
+        ),
+    ];
   }
 
  void showMoreActions() {
@@ -1108,7 +1189,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
 
   Widget buildComicInfo(ComicPageLogic<T> logic, BuildContext context,
       [bool sliver = true]) {
-    var body = LayoutBuilder(builder: (context, constrains) {
+    Widget body = LayoutBuilder(builder: (context, constrains) {
       var width = constrains.maxWidth;
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -1171,6 +1252,15 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
         ],
       );
     });
+
+    if (enableLiquidGlassUi) {
+      body = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: SizedBox(
+          child: body,
+        ),
+      );
+    }
 
     if (sliver == true) {
       return SliverToBoxAdapter(
@@ -1337,6 +1427,21 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
       );
     }
 
+    final translatedLabel = enableTranslationToCN
+        ? (title
+            ? text.translateTagsCategoryToCN
+            : (() {
+                var translated =
+                    TagsTranslation.translationTagWithNamespace(text, key);
+                return translated;
+              }()))
+        : text;
+
+    final child = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      child: label(translatedLabel),
+    );
+
     return GestureDetector(
       onLongPressStart: (details) {
         showMenu(
@@ -1364,30 +1469,18 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                 items: buildPopMenus());
           },
           child: Card(
-            margin: EdgeInsets.zero,
-            color: title
-                ? colors[_logic.colorIndex % colors.length]
-                    .shade100
-                    .withOpacity(0.6)
-                : ElevationOverlay.applySurfaceTint(
-                    colorScheme.surface, colorScheme.surfaceTint, 3),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-              child: enableTranslationToCN
-                  ? (title
-                      ? label(text.translateTagsCategoryToCN)
-                      : label(() {
-                          var translated =
-                              TagsTranslation.translationTagWithNamespace(
-                                  text, key);
-                          return translated;
-                        }()))
-                  : label(text),
-            ),
-          ),
+                  margin: EdgeInsets.zero,
+                  color: title
+                      ? colors[_logic.colorIndex % colors.length]
+                          .shade100
+                          .withOpacity(0.6)
+                      : ElevationOverlay.applySurfaceTint(
+                          colorScheme.surface, colorScheme.surfaceTint, 3),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                  child: child,
+                ),
         ),
       ),
     );
@@ -1606,20 +1699,35 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Divider(),
-          SizedBox(
-              width: 100,
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 18,
+          enableLiquidGlassUi
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: SizedBox(
+                    child: Row(
+                      children: [
+                        Text(
+                          "信息".tl,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w500, fontSize: 18),
+                        )
+                      ],
+                    ),
                   ),
-                  Text(
-                    "信息".tl,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w500, fontSize: 18),
-                  )
-                ],
-              )),
+                )
+              : SizedBox(
+                  width: 100,
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 18,
+                      ),
+                      Text(
+                        "信息".tl,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w500, fontSize: 18),
+                      )
+                    ],
+                  )),
           const SizedBox(
             height: 12,
           ),
@@ -1724,20 +1832,39 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(mainAxisAlignment: MainAxisAlignment.start, children: [
-          Text(
-            "章节".tl,
-            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18),
-          ),
+          enableLiquidGlassUi
+              ? Expanded(
+                  child: SizedBox(
+                    child: Text(
+                      "章节".tl,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w500, fontSize: 18),
+                    ),
+                  ),
+                )
+              : Text(
+                  "章节".tl,
+                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18),
+                ),
           const Spacer(),
           Tooltip(
             message: "排序".tl,
-            child: IconButton(
-              icon: const Icon(Icons.swap_vert),
-              onPressed: () {
-                _logic.reverseEpsOrder = !_logic.reverseEpsOrder;
-                _logic.update();
-              },
-            ),
+            child: enableLiquidGlassUi
+                ? GlassIconActionButton(
+                    icon: Icons.swap_vert,
+                    tooltip: "排序".tl,
+                    onTap: () {
+                      _logic.reverseEpsOrder = !_logic.reverseEpsOrder;
+                      _logic.update();
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.swap_vert),
+                    onPressed: () {
+                      _logic.reverseEpsOrder = !_logic.reverseEpsOrder;
+                      _logic.update();
+                    },
+                  ),
           )
         ]),
       ),

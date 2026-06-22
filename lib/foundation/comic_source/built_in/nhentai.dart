@@ -35,7 +35,7 @@ final nhentai = ComicSource.named(
       const FixedCategoryPart("language", ["中文", "日本語", "english"], "category",
           ["/language/chinese", "/language/japanese", "/language/english"]),
       RandomCategoryPartWithRuntimeData(
-        "tag",
+                  "tag",
         () => nhentaiTags.values.toList(),
         50,
         "category",
@@ -197,11 +197,11 @@ class _NhentaiComicTile extends ComicTile {
   }
 
   @override
-  String get subTitle => '';
+    String get subTitle => '';
 
   @override
   String get title => comic.title;
-  
+
   @override
   int? get pages => comic.pages;
 

@@ -1136,7 +1136,35 @@ class PicacgNetwork {
 }
 
 String getImageUrl(String url) {
-  return url;
+  if (!url.contains("/tobeimg/")) {
+    return url;
+  }
+  try {
+    final uri = Uri.parse(url);
+    if (uri.pathSegments.isEmpty) {
+      return url;
+    }
+    final lastSegment = uri.pathSegments.last;
+    final dotIndex = lastSegment.lastIndexOf('.');
+    final encodedPart =
+        dotIndex == -1 ? lastSegment : lastSegment.substring(0, dotIndex);
+    if (encodedPart.isEmpty) {
+      return url;
+    }
+    final padding = encodedPart.length % 4;
+    final normalized = padding == 0
+        ? encodedPart
+        : encodedPart.padRight(encodedPart.length + 4 - padding, '=');
+    final decodedBytes = convert.base64Url.decode(normalized);
+    final decodedUrl = convert.utf8.decode(decodedBytes);
+    if (decodedUrl.startsWith("http")) {
+      return decodedUrl;
+    } else {
+      return "${uri.scheme}://${uri.authority}/$decodedUrl";
+    }
+  } catch (_) {
+    return url;
+  }
 }
 
 PicacgNetwork get network => PicacgNetwork();

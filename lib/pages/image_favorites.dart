@@ -29,6 +29,8 @@ import 'nhentai/comic_page.dart';
 import 'comic_page.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
+const int _imageFavoritesPageSize = 10;
+
 class ImageFavoritesPage extends StatefulWidget {
   const ImageFavoritesPage({super.key, this.initialKeyword});
 
@@ -45,6 +47,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
 
   // 所有的图片收藏漫画分组
   List<ImageFavoritesComic> comics = [];
+  int currentPage = 1;
 
   late var controller =
       TextEditingController(text: widget.initialKeyword ?? "");
@@ -65,16 +68,16 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
     }
   }
 
-  void updateImageFavorites() async {
+  void updateImageFavorites({bool resetPage = false}) async {
     var allFavorites = searchMode
         ? ImageFavoriteManager.search(keyword)
         : ImageFavoriteManager.getAll();
     comics = ImageFavoritesComic.fromFavorites(allFavorites);
-    sortImageFavorites();
+    sortImageFavorites(resetPage: resetPage);
     update();
   }
 
-  void sortImageFavorites() {
+  void sortImageFavorites({bool resetPage = false}) {
     var allFavorites = searchMode
         ? ImageFavoriteManager.search(keyword)
         : ImageFavoriteManager.getAll();
@@ -114,6 +117,100 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
         });
         break;
     }
+
+    _syncCurrentPage(resetPage: resetPage);
+  }
+
+  int get maxPage {
+    if (comics.isEmpty) {
+      return 1;
+    }
+    return ((comics.length - 1) ~/ _imageFavoritesPageSize) + 1;
+  }
+
+  List<ImageFavoritesComic> get paginatedComics {
+    if (comics.isEmpty) {
+      return const [];
+    }
+    final start = (currentPage - 1) * _imageFavoritesPageSize;
+    var end = start + _imageFavoritesPageSize;
+    if (end > comics.length) {
+      end = comics.length;
+    }
+    return comics.sublist(start, end);
+  }
+
+  void _syncCurrentPage({bool resetPage = false}) {
+    if (resetPage || comics.isEmpty) {
+      currentPage = 1;
+      return;
+    }
+    if (currentPage > maxPage) {
+      currentPage = maxPage;
+    }
+    if (currentPage < 1) {
+      currentPage = 1;
+    }
+  }
+
+  void nextPage() {
+    if (currentPage >= maxPage) {
+      showToast(message: "已经是最后一页了".tl);
+      return;
+    }
+    setState(() {
+      currentPage++;
+    });
+  }
+
+  void prevPage() {
+    if (currentPage <= 1) {
+      showToast(message: "已经是第一页了".tl);
+      return;
+    }
+    setState(() {
+      currentPage--;
+    });
+  }
+
+  Future<void> selectPage() async {
+    String value = '';
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return ContentDialog(
+          title: "跳转到页面".tl,
+          content: TextField(
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: "页面".tl,
+            ),
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly
+            ],
+            onChanged: (v) {
+              value = v;
+            },
+          ).paddingHorizontal(16),
+          actions: [
+            Button.filled(
+              onPressed: () {
+                Navigator.of(context).pop();
+                var page = int.tryParse(value);
+                if (page == null || page < 1 || page > maxPage) {
+                  this.context.showMessage(message: "输入的数字不正确".tl);
+                  return;
+                }
+                setState(() {
+                  currentPage = page;
+                });
+              },
+              child: Text("跳转".tl),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -228,7 +325,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
               setState(() {
                 searchMode = false;
                 controller.clear();
-                updateImageFavorites();
+                updateImageFavorites(resetPage: true);
               });
             },
           )
@@ -306,7 +403,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
             setState(() {
               searchMode = false;
               controller.clear();
-              updateImageFavorites();
+              updateImageFavorites(resetPage: true);
             });
           },
         )
@@ -376,7 +473,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
                       child: Icon(fluent.FluentIcons.search),
                     ),
                     onChanged: (value) {
-                      updateImageFavorites();
+                      updateImageFavorites(resetPage: true);
                     },
                   )
                 : TextField(
@@ -386,30 +483,88 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
                       prefixIcon: const Icon(Icons.search),
                     ),
                     onChanged: (value) {
-                      updateImageFavorites();
+                      updateImageFavorites(resetPage: true);
                     },
                   ),
           ),
-          Expanded(child: _buildComicsList()),
+          Expanded(child: _buildPagedComicsList()),
         ],
       );
     } else {
-      return _buildComicsList();
+      return _buildPagedComicsList();
     }
   }
 
-  Widget _buildComicsList() {
-    return ListView.builder(
-      itemCount: comics.length,
-      itemBuilder: (context, index) {
-        return _ImageFavoritesComicTile(
-          comic: comics[index],
-          selectedImageFavorites: selectedImageFavorites,
-          addSelected: addSelected,
-          multiSelectMode: multiSelectMode,
-        );
-      },
+  Widget _buildPagedComicsList() {
+    if (comics.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: [
+        _buildPageSelector(context),
+        Expanded(
+          child: ListView.builder(
+            itemCount: paginatedComics.length,
+            itemBuilder: (context, index) {
+              return _ImageFavoritesComicTile(
+                comic: paginatedComics[index],
+                selectedImageFavorites: selectedImageFavorites,
+                addSelected: addSelected,
+                multiSelectMode: multiSelectMode,
+              );
+            },
+          ),
+        ),
+        _buildPageSelector(context),
+      ],
     );
+  }
+
+  Widget _buildPageSelector(BuildContext context) {
+    final currentPageButton = Material(
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          selectPage();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Text(
+            "${"页面".tl} $currentPage / $maxPage",
+          ),
+        ),
+      ),
+    );
+    return Row(
+          children: [
+            FilledButton(
+              onPressed: currentPage > 1
+                  ? () {
+                      prevPage();
+                    }
+                  : null,
+              child: Text("后退".tl),
+            ).fixWidth(84),
+            Expanded(
+              child: Center(
+                child: currentPageButton,
+              ),
+            ),
+            FilledButton(
+              onPressed: currentPage < maxPage
+                  ? () {
+                      nextPage();
+                    }
+                  : null,
+              child: Text("前进".tl),
+            ).fixWidth(84),
+          ],
+        )
+        .paddingVertical(8)
+        .paddingHorizontal(16);
   }
 
   void selectAll() {
@@ -480,7 +635,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
                   timeFilterSelect = timeFilter;
                   numFilterSelect = numFilter;
                 });
-                sortImageFavorites();
+                sortImageFavorites(resetPage: true);
               },
             );
           },

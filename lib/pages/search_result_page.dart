@@ -13,7 +13,10 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:pica_comic/foundation/pair.dart';
 import 'package:pica_comic/network/base_comic.dart';
+import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/network/res.dart';
+import 'package:pica_comic/foundation/app_page_route.dart';
+import 'package:pica_comic/pages/nhentai/nhentai_category_filter_dialog.dart';
 import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/tags_translation.dart';
 import 'package:pica_comic/utils/translations.dart';
@@ -60,6 +63,7 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
       String keyword, int page, ComicSource source) async {
     final loader = source.searchPageData!.loadPage!;
 
+    // 对于Picacg源，传递分类参数
     if (sourceKey == "picacg" && selectedCategories.isNotEmpty) {
       return await PicacgNetwork().search(keyword, options[0], page,
           categories: selectedCategories, addToHistory: true);
@@ -70,6 +74,7 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
   @override
   Future<Res<List<BaseComic>>> getComics(int i) async {
     final source = ComicSource.find(sourceKey)!;
+
     final res = await _searchSingleKeyword(keyword, i, source);
 
     if (res.error || !appdata.appSettings.hideReadInList) {
@@ -150,6 +155,7 @@ class _SearchResultPageState extends State<_SearchResultPage> {
   bool _showFab = true;
   late String keyword;
   List<String> selectedCategories = []; // 存储选中的分类
+  String nhentaiCategoryFilterParam = '';
 
   OverlayEntry? get suggestionOverlay => suggestionsController.entry;
   late _SuggestionsController suggestionsController;
@@ -166,10 +172,12 @@ class _SearchResultPageState extends State<_SearchResultPage> {
     var plainKeyword = HistoryManager.getPlainSearchKeyword(widget.keyword);
     controller.text = plainKeyword;
 
+    // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
     if (sourceKey == "jm") {
       keyword = _addJmBlockingKeywords(keyword);
     }
 
+    // 添加语言筛选
     if (!keyword.contains('language') &&
         ComicSource.find(sourceKey)?.searchPageData?.enableLanguageFilter ==
             true) {
@@ -228,9 +236,11 @@ class _SearchResultPageState extends State<_SearchResultPage> {
     } else if (suggestionsController.suggestions.isNotEmpty) {
       suggestionsController.entry = OverlayEntry(
         builder: (context) {
+          final leftInset =
+              RouteDisplayInsets.maybeOf(context)?.padding.left ?? 0.0;
           return Positioned(
             top: context.padding.top + 56 + 16,
-            left: 0,
+            left: leftInset,
             right: 0,
             bottom: 0,
             child: Material(
@@ -253,34 +263,138 @@ class _SearchResultPageState extends State<_SearchResultPage> {
     }
   }
 
+  String? _preferredSearchLanguage(String currentKeyword) {
+    if (ComicSource.find(sourceKey)?.searchPageData?.enableLanguageFilter !=
+        true) {
+      return null;
+    }
+    if (currentKeyword.toLowerCase().contains('language:')) {
+      return null;
+    }
+    final lang = int.tryParse(appdata.settings[69]) ?? 0;
+    if (lang == 0) {
+      return null;
+    }
+    return ["chinese", "english", "japanese"][lang - 1];
+  }
+
+  String _buildSearchKeyword(String input) {
+    var newKeyword = input.trim();
+    if (sourceKey == "jm") {
+      newKeyword = _addJmBlockingKeywords(newKeyword);
+    }
+
+    final preferredLanguage = _preferredSearchLanguage(newKeyword);
+    if (sourceKey == "nhentai" && nhentaiCategoryFilterParam.trim().isNotEmpty) {
+      final filterQuery = buildNhentaiCategoryQueryFromParam(
+        nhentaiCategoryFilterParam,
+        preferredLanguage: preferredLanguage,
+      );
+      return [newKeyword, filterQuery]
+          .where((element) => element.trim().isNotEmpty)
+          .join(' ');
+    }
+
+    if (preferredLanguage != null) {
+      return newKeyword.isEmpty
+          ? "language:$preferredLanguage"
+          : "$newKeyword language:$preferredLanguage";
+    }
+    return newKeyword;
+  }
+
+  void _submitSearch(String input) {
+    suggestionsController.suggestions.clear();
+    suggestionsController.remove();
+    HistoryManager.addSearchHistory(input);
+    final newKeyword = _buildSearchKeyword(input);
+    if (newKeyword == keyword) {
+      return;
+    }
+    setState(() {
+      keyword = newKeyword;
+      if (sourceKey == "picacg") {
+        selectedCategories = [];
+      }
+    });
+  }
+
+  Widget _buildGlassTextAction({
+    required String text,
+    required VoidCallback onTap,
+    EdgeInsetsGeometry padding =
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+  }) {
+    if (!enableLiquidGlassUi) {
+      return TextButton(
+        onPressed: onTap,
+        child: Text(text),
+      );
+    }
+    return GlassSurface(
+      borderRadius: 16,
+      onTap: onTap,
+      padding: padding,
+      child: Text(text),
+    );
+  }
+
+  Widget _buildGlassIconAction({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    if (!enableLiquidGlassUi) {
+      return Button.icon(
+        icon: Icon(icon),
+        onPressed: onTap,
+      );
+    }
+    return GlassIconActionButton(
+      icon: icon,
+      tooltip: tooltip,
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget trailing;
+    final showCategoryFilterButton =
+        sourceKey == "picacg" || sourceKey == "nhentai";
     if (context.width < 400) {
       trailing = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 为Picacg源添加分类过滤按钮
-          if (sourceKey == "picacg")
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: TextButton(
-                onPressed: showCategoryFilter,
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.black,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                ),
-                child: const Text("分类"),
-              ),
-            ),
-          if (sourceKey == "picacg") const SizedBox(width: 4),
-          Button.icon(
-            icon: const Icon(Icons.more_horiz),
-            onPressed: more,
+          // 为支持分类过滤的源添加分类过滤按钮
+          if (showCategoryFilterButton)
+            enableLiquidGlassUi
+                ? _buildGlassTextAction(
+                    text: "分类",
+                    onTap: showCategoryFilter,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  )
+                : Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: TextButton(
+                      onPressed: showCategoryFilter,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
+                      child: const Text("分类"),
+                    ),
+                  ),
+          if (showCategoryFilterButton) const SizedBox(width: 4),
+          _buildGlassIconAction(
+            icon: Icons.more_horiz,
+            tooltip: "更多".tl,
+            onTap: more,
           ),
         ],
       );
@@ -288,34 +402,41 @@ class _SearchResultPageState extends State<_SearchResultPage> {
       trailing = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 为Picacg源添加分类过滤按钮
-          if (sourceKey == "picacg")
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 1.5),
-              ),
-              child: TextButton(
-                onPressed: showCategoryFilter,
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onSurface,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                ),
-                child: const Text("分类过滤"),
-              ),
-            ),
-          if (sourceKey == "picacg") const SizedBox(width: 4),
-          Button.icon(
-            icon: const Icon(Icons.dataset_outlined),
-            onPressed: changeSource,
+          // 为支持分类过滤的源添加分类过滤按钮
+          if (showCategoryFilterButton)
+            enableLiquidGlassUi
+                ? _buildGlassTextAction(
+                    text: "分类过滤",
+                    onTap: showCategoryFilter,
+                  )
+                : Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 1.5),
+                    ),
+                    child: TextButton(
+                      onPressed: showCategoryFilter,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.onSurface,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      ),
+                      child: const Text("分类过滤"),
+                    ),
+                  ),
+          if (showCategoryFilterButton) const SizedBox(width: 4),
+          _buildGlassIconAction(
+            icon: Icons.dataset_outlined,
+            tooltip: "切换源".tl,
+            onTap: changeSource,
           ),
           const SizedBox(
             width: 4,
           ),
-          Button.icon(
-            icon: const Icon(Icons.tune),
-            onPressed: showSearchOptions,
+          _buildGlassIconAction(
+            icon: Icons.tune,
+            tooltip: "搜索选项".tl,
+            onTap: showSearchOptions,
           ),
         ],
       );
@@ -441,36 +562,68 @@ class _SearchResultPageState extends State<_SearchResultPage> {
     }
     return Scaffold(
       floatingActionButton: _showFab
-          ? FloatingActionButton(
-              child: const Icon(Icons.search),
-              onPressed: () {
-                var s = controller.text;
-                HistoryManager.addSearchHistory(s);
-                String newKeyword = s;
-                // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
-                if (sourceKey == "jm") {
-                  newKeyword = _addJmBlockingKeywords(newKeyword);
-                }
-                if (!newKeyword.contains('language') &&
-                    ComicSource.find(sourceKey)
-                            ?.searchPageData
-                            ?.enableLanguageFilter ==
-                        true) {
-                  var lang = int.tryParse(appdata.settings[69]) ?? 0;
-                  if (lang != 0) {
-                    newKeyword += " language:${[
-                      "chinese",
-                      "english",
-                      "japanese"
-                    ][lang - 1]}";
-                  }
-                }
-                if (newKeyword == keyword) return;
-                setState(() {
-                  keyword = newKeyword;
-                });
-              },
-            )
+          ? enableLiquidGlassUi
+              ? GlassIconActionButton(
+                  icon: Icons.search,
+                  tooltip: "搜索".tl,
+                  onTap: () {
+                    var s = controller.text;
+                    HistoryManager.addSearchHistory(s);
+                    String newKeyword = s;
+                    if (sourceKey == "jm") {
+                      newKeyword = _addJmBlockingKeywords(newKeyword);
+                    }
+                    if (!newKeyword.contains('language') &&
+                        ComicSource.find(sourceKey)
+                                ?.searchPageData
+                                ?.enableLanguageFilter ==
+                            true) {
+                      var lang = int.tryParse(appdata.settings[69]) ?? 0;
+                      if (lang != 0) {
+                        newKeyword += " language:${[
+                          "chinese",
+                          "english",
+                          "japanese"
+                        ][lang - 1]}";
+                      }
+                    }
+                    if (newKeyword == keyword) return;
+                    setState(() {
+                      keyword = newKeyword;
+                    });
+                  },
+                  size: 56,
+                )
+              : FloatingActionButton(
+                  child: const Icon(Icons.search),
+                  onPressed: () {
+                    var s = controller.text;
+                    HistoryManager.addSearchHistory(s);
+                    String newKeyword = s;
+                    // 如果是禁漫天堂漫画源，自动添加屏蔽关键词
+                    if (sourceKey == "jm") {
+                      newKeyword = _addJmBlockingKeywords(newKeyword);
+                    }
+                    if (!newKeyword.contains('language') &&
+                        ComicSource.find(sourceKey)
+                                ?.searchPageData
+                                ?.enableLanguageFilter ==
+                            true) {
+                      var lang = int.tryParse(appdata.settings[69]) ?? 0;
+                      if (lang != 0) {
+                        newKeyword += " language:${[
+                          "chinese",
+                          "english",
+                          "japanese"
+                        ][lang - 1]}";
+                      }
+                    }
+                    if (newKeyword == keyword) return;
+                    setState(() {
+                      keyword = newKeyword;
+                    });
+                  },
+                )
           : null,
       body: NotificationListener<ScrollUpdateNotification>(
         onNotification: (notification) {
@@ -703,6 +856,22 @@ class _SearchResultPageState extends State<_SearchResultPage> {
   }
 
   void showCategoryFilter() {
+    if (sourceKey == "nhentai") {
+      showDialog(
+        context: context,
+        builder: (context) => NhentaiCategoryFilterDialog(
+          initialParam: nhentaiCategoryFilterParam,
+          onConfirm: (nextParam) {
+            setState(() {
+              nhentaiCategoryFilterParam = nextParam;
+              keyword = _buildSearchKeyword(controller.text);
+            });
+          },
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => CategorySelectorDialog(
@@ -1067,6 +1236,49 @@ class _SearchOptionsState extends State<_SearchOptions> {
     );
   }
 
+  Widget _buildOptionChip(BuildContext context, int index, MapEntry<String, String> e) {
+    final selected = options[index] == e.key;
+    if (enableLiquidGlassUi) {
+      return GlassSurface(
+        borderRadius: 12,
+        onTap: () {
+          setState(() {
+            options[index] = e.key;
+          });
+        },
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Text(
+          e.value.tl,
+          style: TextStyle(
+            color: selected ? context.colorScheme.primary : null,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      );
+    }
+    return InkWell(
+      onTap: () {
+        setState(() {
+          options[index] = e.key;
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          color: selected
+              ? context.colorScheme.primaryContainer
+              : context.colorScheme.primaryContainer.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(e.value.tl),
+        ),
+      ),
+    );
+  }
+
   Widget buildSearchOptions(BuildContext context) {
     var children = <Widget>[];
     if (data.customOptionsBuilder != null) {
@@ -1079,37 +1291,29 @@ class _SearchOptionsState extends State<_SearchOptions> {
       final searchOptions = data.searchOptions ?? <SearchOptions>[];
       for (int i = 0; i < searchOptions.length; i++) {
         final option = searchOptions[i];
-        children.add(ListTile(
-          title: Text(option.label),
-        ));
-        children.add(Wrap(
-          runSpacing: 8,
-          spacing: 8,
-          children: option.options.entries.map((e) {
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  options[i] = e.key;
-                });
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                decoration: BoxDecoration(
-                  color: options[i] == e.key
-                      ? context.colorScheme.primaryContainer
-                      : context.colorScheme.primaryContainer.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(e.value.tl),
-                ),
-              ),
-            );
-          }).toList(),
-        ).paddingHorizontal(16));
+        final optionContent = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              title: Text(option.label),
+            ),
+            Wrap(
+              runSpacing: 8,
+              spacing: 8,
+              children: option.options.entries
+                  .map((e) => _buildOptionChip(context, i, e))
+                  .toList(),
+            ).paddingHorizontal(16),
+          ],
+        );
+        children.add(enableLiquidGlassUi
+            ? GlassSurface(
+                margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                borderRadius: 18,
+                padding: const EdgeInsets.only(bottom: 12),
+                child: optionContent,
+              )
+            : optionContent);
       }
     }
     return Column(

@@ -204,6 +204,57 @@ class _MenuRoute<T> extends PopupRoute<T> {
     if (top + height > size.height - 15) {
       top = size.height - height - 15;
     }
+
+    if (enableLiquidGlassUi) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final scheme = Theme.of(context).colorScheme;
+      return Stack(
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            child: GlassContainer(
+              width: width,
+              useOwnLayer: true,
+              shape: LiquidRoundedSuperellipse(borderRadius: 20),
+              settings: LiquidGlassSettings(
+                blur: 18,
+                glassColor: isDark
+                    ? scheme.surfaceContainerHighest
+                        .withValues(alpha: 0.24)
+                    : Colors.white.withValues(alpha: 0.16),
+                ambientStrength: isDark ? 0.34 : 0.48,
+                saturation: 1.14,
+                thickness: 18,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: width,
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (title != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                          child: title!,
+                        ),
+                        const Divider(height: 1),
+                        const SizedBox(height: 8),
+                      ],
+                      ...entries.map((e) => buildEntry(e, context)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          )
+        ],
+      );
+    }
+
     return Stack(
       children: [
         Positioned(

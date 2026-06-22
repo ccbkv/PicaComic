@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/components/window_frame.dart';
 import 'package:pica_comic/foundation/app.dart';
@@ -33,6 +34,7 @@ void main(List<String> args) {
   }
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    await LiquidGlassWidgets.initialize();
     await init();
     FlutterError.onError = (details) {
       LogManager.addLog(LogLevel.error, "Unhandled Exception",
@@ -88,6 +90,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   DateTime time = DateTime.fromMillisecondsSinceEpoch(0);
 
   bool forceRebuild = false;
+
+  bool get enableLiquidGlassUi =>
+      appdata.settings.length > 103 && appdata.settings[103] == "1";
 
   OverlayEntry? hideContentOverlay;
 
@@ -325,7 +330,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     return DynamicColorBuilder(builder: (light, dark) {
       var (lightColor, darkColor) = _generateColorSchemes(light, dark);
       if (appdata.settings.length > 91 && appdata.settings[91] == "1") {
-        return fluent.FluentApp(
+        Widget app = fluent.FluentApp(
           title: 'Pica Comic',
           debugShowCheckedModeBanner: false,
           navigatorKey: App.navigatorKey,
@@ -457,8 +462,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             throw ('widget is null');
           },
         );
+        if (enableLiquidGlassUi) {
+          app = LiquidGlassWidgets.wrap(
+            child: _GlobalGlassShell(child: app),
+          );
+        }
+        return app;
       }
-      return MaterialApp(
+      Widget app = MaterialApp(
         title: 'Pica Comic',
         debugShowCheckedModeBanner: false,
         navigatorKey: App.navigatorKey,
@@ -554,11 +565,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 child: WindowFrame(widget),
               );
             }
-            return _SystemUiProvider(widget);
+            widget = _SystemUiProvider(widget);
+            if (enableLiquidGlassUi) {
+              widget = _GlobalGlassShell(child: widget);
+            }
+            return widget;
           }
           throw ('widget is null');
         },
       );
+      if (enableLiquidGlassUi) {
+        app = LiquidGlassWidgets.wrap(child: app);
+      }
+      return app;
     });
   }
 }
@@ -586,6 +605,90 @@ class _SystemUiProvider extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: systemUiStyle,
       child: child,
+    );
+  }
+}
+
+class _GlobalGlassShell extends StatelessWidget {
+  const _GlobalGlassShell({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    Widget glow({
+      required Alignment alignment,
+      required double size,
+      required Color color,
+    }) {
+      return Align(
+        alignment: alignment,
+        child: IgnorePointer(
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  color,
+                  color.withValues(alpha: color.a * 0.35),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            isDark ? scheme.surface : Colors.white,
+            isDark
+                ? scheme.surfaceContainerHighest.withValues(alpha: 0.98)
+                : scheme.surfaceContainerLowest.withValues(alpha: 0.96),
+            isDark
+                ? scheme.surfaceContainer.withValues(alpha: 0.96)
+                : scheme.surface.withValues(alpha: 0.98),
+          ],
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          glow(
+            alignment: const Alignment(-1.1, -0.95),
+            size: 320,
+            color: scheme.primary.withValues(alpha: isDark ? 0.12 : 0.10),
+          ),
+          glow(
+            alignment: const Alignment(1.05, -0.25),
+            size: 280,
+            color: scheme.secondary.withValues(alpha: isDark ? 0.10 : 0.08),
+          ),
+          glow(
+            alignment: const Alignment(0.9, 1.0),
+            size: 260,
+            color: scheme.tertiary.withValues(alpha: isDark ? 0.08 : 0.06),
+          ),
+          if (!isDark)
+            ColoredBox(
+              color: Colors.white.withValues(alpha: 0.72),
+            ),
+          GlassBackdropScope(
+            child: child,
+          ),
+        ],
+      ),
     );
   }
 }

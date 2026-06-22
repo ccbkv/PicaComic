@@ -37,7 +37,7 @@ class _EhSettingsState extends State<EhSettings> {
           leading: const Icon(Icons.image),
           title: Text("优先加载原图".tl),
           subtitle: Text("可能导致加载失败".tl),
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: appdata.settings[29] == "1",
             onChanged: (b) {
               setState(() {
@@ -50,7 +50,7 @@ class _EhSettingsState extends State<EhSettings> {
         ListTile(
           leading: const Icon(Icons.notifications_off_outlined),
           title: Text("忽略警告".tl),
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: appdata.settings[47] == "1",
             onChanged: (b) {
               setState(() {
@@ -64,7 +64,7 @@ class _EhSettingsState extends State<EhSettings> {
           leading: const Icon(Icons.notes),
           title: Text("优先显示副标题".tl),
           subtitle: Text("适用于已下载的画廊".tl),
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: appdata.settings[78] == "1",
             onChanged: (b) {
               setState(() {

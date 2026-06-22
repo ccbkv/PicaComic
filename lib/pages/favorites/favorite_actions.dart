@@ -331,7 +331,7 @@ Future<void> sortFolders({VoidCallback? onReorder}) async {
               },
               itemCount: folders.length,
               itemBuilder: (context, index) {
-                return ReorderableDragStartListener(
+                return ReorderableDelayedDragStartListener(
                   key: ValueKey(folders[index]),
                   index: index,
                   child: Container(

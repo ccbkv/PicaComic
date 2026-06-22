@@ -30,6 +30,9 @@ class _AppbarState extends State<Appbar> {
   ScrollNotificationObserverState? _scrollNotificationObserver;
   bool _scrolledUnder = false;
 
+  bool get enableLiquidGlassUi =>
+      appdata.settings.length > 103 && appdata.settings[103] == "1";
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -76,6 +79,8 @@ class _AppbarState extends State<Appbar> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     var content = SizedBox(
       height: _kAppBarHeight,
       child: Row(
@@ -107,6 +112,25 @@ class _AppbarState extends State<Appbar> {
         ],
       ),
     ).paddingTop(context.padding.top);
+
+    if (enableLiquidGlassUi && widget.backgroundColor != Colors.transparent) {
+      return GlassContainer(
+        useOwnLayer: true,
+        quality: GlassQuality.minimal,
+        shape: const LiquidRoundedSuperellipse(borderRadius: 28),
+        settings: LiquidGlassSettings(
+          blur: 18,
+          glassColor: isDark
+              ? scheme.surfaceContainerHighest.withValues(alpha: 0.30)
+              : Colors.white.withValues(alpha: 0.18),
+          ambientStrength: isDark ? 0.34 : 0.48,
+          saturation: 1.15,
+          thickness: 18,
+        ),
+        child: content,
+      );
+    }
+
     if (widget.backgroundColor != Colors.transparent) {
       final elevation = widget.scrolledUnderElevation ??
           ((_scrolledUnder && UiMode.m1(context)) ? 1 : 0);
@@ -183,42 +207,68 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final bool enableLiquidGlassUi =
+        appdata.settings.length > 103 && appdata.settings[103] == "1";
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final content = Row(
+      children: [
+        const SizedBox(width: 8),
+        leading ??
+            (Navigator.of(context).canPop()
+                ? Tooltip(
+                    message: "返回".tl,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  )
+                : const SizedBox()),
+        const SizedBox(
+          width: 24,
+        ),
+        Expanded(
+          child: DefaultTextStyle(
+            style:
+                DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            child: title,
+          ),
+        ),
+        ...?actions,
+        const SizedBox(
+          width: 8,
+        )
+      ],
+    ).paddingTop(topPadding);
+
+    if (enableLiquidGlassUi) {
+      return SizedBox.expand(
+        child: GlassContainer(
+          useOwnLayer: true,
+          quality: GlassQuality.minimal,
+          shape: LiquidRoundedSuperellipse(borderRadius: radius == 0 ? 26 : radius),
+          settings: LiquidGlassSettings(
+            blur: 18,
+            glassColor: isDark
+                ? scheme.surfaceContainerHighest.withValues(alpha: 0.30)
+                : Colors.white.withValues(alpha: 0.18),
+            ambientStrength: isDark ? 0.34 : 0.48,
+            saturation: 1.14,
+            thickness: 18,
+          ),
+          child: content,
+        ),
+      );
+    }
+
     return SizedBox.expand(
       child: Material(
         color: color,
         elevation: 0,
         borderRadius: BorderRadius.circular(radius),
-        child: Row(
-          children: [
-            const SizedBox(width: 8),
-            leading ??
-                (Navigator.of(context).canPop()
-                    ? Tooltip(
-                        message: "返回".tl,
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      )
-                    : const SizedBox()),
-            const SizedBox(
-              width: 24,
-            ),
-            Expanded(
-              child: DefaultTextStyle(
-                style:
-                    DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                child: title,
-              ),
-            ),
-            ...?actions,
-            const SizedBox(
-              width: 8,
-            )
-          ],
-        ).paddingTop(topPadding),
+        child: content,
       ),
     );
   }
@@ -271,51 +321,75 @@ class _FloatingSearchBarState extends State<FloatingSearchBar> {
     return math.max(widget.height, 53);
   }
 
+  bool get enableLiquidGlassUi =>
+      appdata.settings.length > 103 && appdata.settings[103] == "1";
+
   @override
   Widget build(BuildContext context) {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     var text = widget.controller.text;
     if (text.isEmpty) {
       text = "Search";
     }
     var padding = 12.0;
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(children: [
+        Tooltip(
+          message: "返回".tl,
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextField(
+              controller: widget.controller,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+              onSubmitted: (s) {
+                widget.onSearch(s);
+              },
+              onChanged: widget.onChanged,
+            ),
+          ),
+        ),
+        if (widget.trailing != null) widget.trailing!
+      ]),
+    );
+
     return Container(
       padding: EdgeInsets.fromLTRB(padding, 9, padding, 0),
       width: double.infinity,
       height: effectiveHeight,
-      child: Material(
-        elevation: 0,
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(effectiveHeight / 2),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(children: [
-            Tooltip(
-              message: "返回".tl,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
+      child: enableLiquidGlassUi
+          ? GlassContainer(
+              useOwnLayer: true,
+              quality: GlassQuality.minimal,
+              shape: LiquidRoundedSuperellipse(
+                borderRadius: effectiveHeight / 2,
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: TextField(
-                  controller: widget.controller,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                  ),
-                  onSubmitted: (s) {
-                    widget.onSearch(s);
-                  },
-                  onChanged: widget.onChanged,
-                ),
+              settings: LiquidGlassSettings(
+                blur: 16,
+                glassColor: isDark
+                    ? colorScheme.primary.withValues(alpha: 0.18)
+                    : Colors.white.withValues(alpha: 0.16),
+                ambientStrength: isDark ? 0.34 : 0.46,
+                saturation: 1.12,
+                thickness: 18,
               ),
+              child: content,
+            )
+          : Material(
+              elevation: 0,
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(effectiveHeight / 2),
+              child: content,
             ),
-            if (widget.trailing != null) widget.trailing!
-          ]),
-        ),
-      ),
     );
   }
 }
@@ -649,6 +723,8 @@ class AppTabBar extends StatefulWidget {
 }
 
 class _AppTabBarState extends State<AppTabBar> {
+  static const _selectedIndexStorageId = 'app_tab_bar_selected_index';
+
   late TabController _controller;
 
   late List<GlobalKey> keys;
@@ -665,6 +741,10 @@ class _AppTabBarState extends State<AppTabBar> {
 
   var tabBarKey = GlobalKey();
 
+  final GlobalKey _glassTabBarKey = GlobalKey();
+
+  ScrollableState? _glassScrollable;
+
   var offsets = <double>[];
 
   @override
@@ -680,12 +760,45 @@ class _AppTabBarState extends State<AppTabBar> {
 
   PageStorageBucket get bucket => PageStorage.of(context);
 
+  bool get _useGlassTabBar =>
+      enableLiquidGlassUi &&
+      widget.tabs.length >= 2 &&
+      widget.tabs.every(_supportsGlassTab);
+
+  bool _supportsGlassTab(Tab tab) {
+    if (tab.text != null || tab.icon != null) {
+      return true;
+    }
+    return tab.child is Text;
+  }
+
+  List<GlassTab> _buildGlassTabs() {
+    return widget.tabs.map((tab) {
+      String? label = tab.text;
+      if (label == null && tab.child is Text) {
+        label = (tab.child as Text).data;
+      }
+      return GlassTab(
+        icon: tab.icon,
+        label: label,
+        semanticLabel: label,
+      );
+    }).toList();
+  }
+
   @override
   void didChangeDependencies() {
     _controller = widget.controller ?? DefaultTabController.of(context);
     initPainter();
     super.didChangeDependencies();
-    var prevIndex = bucket.readState(context) as int?;
+    final legacyState = bucket.readState(context);
+    if (legacyState is int) {
+      bucket.writeState(context, null);
+    }
+    var prevIndex = bucket.readState(
+      context,
+      identifier: _selectedIndexStorageId,
+    ) as int?;
     if (prevIndex != null &&
         prevIndex != _controller.index &&
         prevIndex >= 0 &&
@@ -731,21 +844,167 @@ class _AppTabBarState extends State<AppTabBar> {
     this.offsets = offsets;
   }
 
-  Widget buildTabBar(BuildContext context, Widget? _) {
-    var child = SingleChildScrollView(
-      key: const PageStorageKey('scroll'),
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.zero,
-      controller: scrollController,
-      child: CustomPaint(
-        painter: painter,
-        child: _TabRow(
-          callback: _tabLayoutCallback,
-          children: List.generate(widget.tabs.length, buildTab)
-            ..addIfNotNull(widget.actionButton?.padding(tabPadding)),
-        ),
-      ).paddingHorizontal(4),
+  ScrollableState? _resolveGlassScrollable() {
+    if (_glassScrollable != null && _glassScrollable!.mounted) {
+      return _glassScrollable;
+    }
+    final context = _glassTabBarKey.currentContext;
+    if (context is! Element) {
+      return null;
+    }
+
+    ScrollableState? scrollable;
+
+    void visitor(Element element) {
+      if (scrollable != null) {
+        return;
+      }
+      if (element is StatefulElement && element.state is ScrollableState) {
+        scrollable = element.state as ScrollableState;
+        return;
+      }
+      element.visitChildElements(visitor);
+    }
+
+    context.visitChildElements(visitor);
+    _glassScrollable = scrollable;
+    return scrollable;
+  }
+
+  void _handleGlassTabBarPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) {
+      return;
+    }
+
+    final scrollable = _resolveGlassScrollable();
+    if (scrollable == null) {
+      return;
+    }
+    final position = scrollable.position;
+    if (position.maxScrollExtent <= position.minScrollExtent) {
+      return;
+    }
+
+    final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta == 0) {
+      return;
+    }
+
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
     );
+    if (target != position.pixels) {
+      position.jumpTo(target);
+    }
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !scrollController.hasClients) {
+      return;
+    }
+    final position = scrollController.position;
+    if (position.maxScrollExtent <= position.minScrollExtent) {
+      return;
+    }
+
+    final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta == 0) {
+      return;
+    }
+
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target != position.pixels) {
+      scrollController.jumpTo(target);
+    }
+  }
+
+  Widget buildTabBar(BuildContext context, Widget? _) {
+    if (_useGlassTabBar) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _resolveGlassScrollable();
+      });
+      final textStyle = DefaultTextStyle.of(context).style;
+      final glassTabBar = Listener(
+        key: _glassTabBarKey,
+        behavior: HitTestBehavior.translucent,
+        onPointerSignal: _handleGlassTabBarPointerSignal,
+        child: Container(
+          key: tabBarKey,
+          constraints: const BoxConstraints(minHeight: _kTabHeight),
+          child: GlassTabBar(
+            height: _kTabHeight,
+            isScrollable: true,
+            useOwnLayer: true,
+            borderRadius: BorderRadius.circular(20),
+            tabs: _buildGlassTabs(),
+            selectedIndex: _controller.animation?.value.round() ?? _controller.index,
+            onTabSelected: onTabClicked,
+            selectedLabelStyle: textStyle.copyWith(
+              color: context.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+            unselectedLabelStyle: textStyle.copyWith(
+              color: context.colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+            selectedIconColor: context.colorScheme.primary,
+            unselectedIconColor: context.colorScheme.onSurface,
+          ),
+        ),
+      );
+
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        child: SizedBox(
+          height: _kTabHeight,
+          child: Row(
+            children: [
+              Expanded(child: glassTabBar),
+              if (widget.actionButton != null) ...[
+                const SizedBox(width: 8),
+                widget.actionButton!,
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    _glassScrollable = null;
+
+    var child = Listener(
+      onPointerSignal: _handlePointerSignal,
+      child: SingleChildScrollView(
+        key: const PageStorageKey('scroll'),
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        controller: scrollController,
+        child: CustomPaint(
+          painter: painter,
+          child: _TabRow(
+            callback: _tabLayoutCallback,
+            children: List.generate(widget.tabs.length, buildTab)
+              ..addIfNotNull(widget.actionButton?.padding(tabPadding)),
+          ),
+        ).paddingHorizontal(4),
+      ),
+    );
+    if (enableLiquidGlassUi) {
+      return GlassSurface(
+        key: tabBarKey,
+        height: _kTabHeight,
+        borderRadius: 20,
+        margin: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        child: child,
+      );
+    }
     return Container(
       key: tabBarKey,
       height: _kTabHeight,
@@ -771,9 +1030,15 @@ class _AppTabBarState extends State<AppTabBar> {
     if (i == previousIndex) {
       return;
     }
-    updateScrollOffset(i);
+    if (!_useGlassTabBar) {
+      updateScrollOffset(i);
+    }
     previousIndex = i;
-    bucket.writeState(context, i);
+    bucket.writeState(
+      context,
+      i,
+      identifier: _selectedIndexStorageId,
+    );
   }
 
   void updateScrollOffset(int i) {
@@ -804,24 +1069,38 @@ class _AppTabBarState extends State<AppTabBar> {
   }
 
   Widget buildTab(int i) {
+    final selected = i == _controller.animation?.value.round();
+    final content = KeyedSubtree(
+      key: keys[i],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: DefaultTextStyle(
+          style: DefaultTextStyle.of(context).style.copyWith(
+                color: selected
+                    ? context.colorScheme.primary
+                    : context.colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+          child: widget.tabs[i],
+        ),
+      ),
+    );
+
+    if (enableLiquidGlassUi && selected) {
+      return Padding(
+        padding: tabPadding,
+        child: GlassSurface(
+          borderRadius: tabRadius,
+          onTap: () => onTabClicked(i),
+          child: content,
+        ),
+      );
+    }
+
     return InkWell(
       onTap: () => onTabClicked(i),
       borderRadius: BorderRadius.circular(tabRadius),
-      child: KeyedSubtree(
-        key: keys[i],
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: DefaultTextStyle(
-            style: DefaultTextStyle.of(context).style.copyWith(
-                  color: i == _controller.animation?.value.round()
-                      ? context.colorScheme.primary
-                      : context.colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
-                ),
-            child: widget.tabs[i],
-          ),
-        ),
-      ),
+      child: content,
     ).padding(tabPadding);
   }
 }
@@ -844,23 +1123,31 @@ class TabActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final content = Container(
+      height: _kTabHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: IconTheme(
+        data: IconThemeData(size: 20, color: context.colorScheme.primary),
+        child: Row(
+          children: [
+            icon,
+            const SizedBox(width: 8),
+            Text(text, style: TextStyle(color: context.colorScheme.primary)),
+          ],
+        ),
+      ),
+    );
+    if (enableLiquidGlassUi) {
+      return GlassSurface(
+        borderRadius: 12,
+        onTap: onPressed,
+        child: content,
+      );
+    }
     return InkWell(
       onTap: onPressed,
       borderRadius: BorderRadius.circular(8),
-      child: Container(
-        height: _kTabHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: IconTheme(
-          data: IconThemeData(size: 20, color: context.colorScheme.primary),
-          child: Row(
-            children: [
-              icon,
-              const SizedBox(width: 8),
-              Text(text, style: TextStyle(color: context.colorScheme.primary)),
-            ],
-          ),
-        ),
-      ),
+      child: content,
     );
   }
 }

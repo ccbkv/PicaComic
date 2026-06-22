@@ -318,6 +318,11 @@ class DownloadManager with _DownloadDb implements Listenable {
     return _getComicWithDb(id);
   }
 
+  /// 更新已下载漫画的存储信息（如章节列表更新）
+  void updateComic(DownloadedItem item) {
+    _addToDb(item, item.directory ?? getDirectory(item.id));
+  }
+
   ///删除已下载的漫画
   Future<void> delete(List<String> ids) async {
     for (var id in ids) {

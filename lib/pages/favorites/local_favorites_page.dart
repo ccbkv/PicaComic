@@ -316,8 +316,31 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
 
   var scrollController = ScrollController();
 
+  Widget _buildGlassToolbarIcon({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    if (!enableLiquidGlassUi) {
+      return IconButton(
+        icon: Icon(icon, color: color),
+        onPressed: onTap,
+      );
+    }
+    return IconTheme(
+      data: IconThemeData(color: color),
+      child: GlassIconActionButton(
+        icon: icon,
+        tooltip: tooltip,
+        onTap: onTap,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bottomInset = bottomOverlayInsetOf(context);
     var title = favPage.folder ?? "未选择".tl;
     if (title == _localAllFolderLabel) {
       title = "全部".tl;
@@ -339,10 +362,11 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
               title: title,
               topPadding: MediaQuery.of(context).padding.top,
               leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-                  ? IconButton(
-                      icon: const Icon(Icons.menu),
+                  ? _buildGlassToolbarIcon(
+                      icon: Icons.menu,
+                      tooltip: "菜单".tl,
                       color: Theme.of(context).colorScheme.primary,
-                      onPressed: favPage.showFolderSelector,
+                      onTap: favPage.showFolderSelector,
                     )
                   : null,
               titleGesture: MediaQuery.of(context).size.width < _kTwoPanelChangeWidth
@@ -387,9 +411,11 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                       );
                     },
                     child: Builder(builder: (context) {
-                      return IconButton(
-                        icon: Icon(Icons.sync, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                        onPressed: () {
+                      return _buildGlassToolbarIcon(
+                        icon: Icons.sync,
+                        tooltip: "同步".tl,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        onTap: () {
                           Flyout.of(context).show();
                         },
                       );
@@ -398,11 +424,13 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                 ),
               Tooltip(
                 message: "筛选".tl,
-                child: IconButton(
-                  icon: Icon(Icons.sort_rounded, color: readFilterSelect != "全部"
+                child: _buildGlassToolbarIcon(
+                  icon: Icons.sort_rounded,
+                  tooltip: "筛选".tl,
+                  color: readFilterSelect != "全部"
                       ? Theme.of(context).colorScheme.onSurface
-                      : Theme.of(context).colorScheme.onSurfaceVariant),
-                  onPressed: () {
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                  onTap: () {
                     showDialog(
                       context: context,
                       builder: (context) {
@@ -422,9 +450,11 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
               ),
               Tooltip(
                 message: "搜索".tl,
-                child: IconButton(
-                  icon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  onPressed: () {
+                child: _buildGlassToolbarIcon(
+                  icon: Icons.search,
+                  tooltip: "搜索".tl,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  onTap: () {
                     setState(() {
                       keyword = "";
                       searchMode = true;
@@ -494,9 +524,10 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
           SliverAppBar(
             leading: Tooltip(
               message: "取消".tl,
-              child: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () {
+              child: _buildGlassToolbarIcon(
+                icon: Icons.close,
+                tooltip: "取消".tl,
+                onTap: () {
                   setState(() {
                     multiSelectMode = false;
                     selectedComics.clear();
@@ -611,27 +642,48 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
           SliverAppBar(
             leading: Tooltip(
               message: "取消".tl,
-              child: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () {
+              child: _buildGlassToolbarIcon(
+                icon: Icons.close,
+                tooltip: "取消".tl,
+                onTap: () {
                   setState(() {
                     searchMode = false;
                   });
                 },
               ),
             ),
-            title: TextField(
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: "搜索".tl,
-                border: InputBorder.none,
-              ),
-              onChanged: (s) {
-                keyword = s;
-                searchHasUpper = s.toLowerCase() != s;
-                updateSearchResult();
-              },
-            ),
+            title: enableLiquidGlassUi
+                ? GlassSurface(
+                    height: 42,
+                    borderRadius: 20,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Center(
+                      child: TextField(
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: "搜索".tl,
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (s) {
+                          keyword = s;
+                          searchHasUpper = s.toLowerCase() != s;
+                          updateSearchResult();
+                        },
+                      ),
+                    ),
+                  )
+                : TextField(
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: "搜索".tl,
+                      border: InputBorder.none,
+                    ),
+                    onChanged: (s) {
+                      keyword = s;
+                      searchHasUpper = s.toLowerCase() != s;
+                      updateSearchResult();
+                    },
+                  ),
           ),
         // 顶部分页控件（在AppBar下方）
         if (isPaginationMode && !searchMode && !multiSelectMode && displayComics.isNotEmpty)
@@ -734,6 +786,9 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
         // 底部分页控件
         if (isPaginationMode && !searchMode && !multiSelectMode && displayComics.isNotEmpty)
           _buildPaginationSliver(context),
+        SliverToBoxAdapter(
+          child: SizedBox(height: bottomInset),
+        ),
       ],
     );
 
@@ -742,14 +797,21 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
         Positioned.fill(child: body),
         Positioned(
           right: 16,
-          bottom: MediaQuery.of(context).padding.bottom + 16,
+          bottom: MediaQuery.of(context).padding.bottom + bottomInset + 16,
           child: Tooltip(
             message: '随机'.tl,
-            child: FloatingActionButton(
-              heroTag: 'local_fav_random_${widget.folder}',
-              onPressed: () => openRandomComic(displayComics),
-              child: const Icon(Icons.shuffle),
-            ),
+            child: enableLiquidGlassUi
+                ? GlassIconActionButton(
+                    icon: Icons.shuffle,
+                    tooltip: '随机'.tl,
+                    onTap: () => openRandomComic(displayComics),
+                    size: 56,
+                  )
+                : FloatingActionButton(
+                    heroTag: 'local_fav_random_${widget.folder}',
+                    onPressed: () => openRandomComic(displayComics),
+                    child: const Icon(Icons.shuffle),
+                  ),
           ),
         ),
       ],
@@ -1254,29 +1316,39 @@ class _LocalFavoritesAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return SizedBox.expand(
-      child: Material(
-        color: Theme.of(context).colorScheme.surface,
-        elevation: shrinkOffset > 0 ? 2 : 0,
-        child: Row(
-          children: [
-            const SizedBox(width: 8),
-            leading ?? const SizedBox(),
-            const SizedBox(width: 16),
-            Expanded(
-              child: GestureDetector(
-                onTap: titleGesture,
-                child: Text(
-                  title,
-                  style: const TextStyle(fontSize: 20),
-                ),
-              ),
+    final child = Row(
+      children: [
+        const SizedBox(width: 8),
+        leading ?? const SizedBox(),
+        const SizedBox(width: 16),
+        Expanded(
+          child: GestureDetector(
+            onTap: titleGesture,
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 20),
             ),
-            ...actions,
-            const SizedBox(width: 8),
-          ],
-        ).paddingTop(topPadding),
-      ),
+          ),
+        ),
+        ...actions,
+        const SizedBox(width: 8),
+      ],
+    ).paddingTop(topPadding);
+
+    return SizedBox.expand(
+      child: enableLiquidGlassUi
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: GlassSurface(
+                borderRadius: 20,
+                child: child,
+              ),
+            )
+          : Material(
+              color: Theme.of(context).colorScheme.surface,
+              elevation: shrinkOffset > 0 ? 2 : 0,
+              child: child,
+            ),
     );
   }
 

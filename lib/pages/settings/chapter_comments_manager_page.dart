@@ -40,6 +40,158 @@ class _ChapterCommentsInfo {
   String get displayTitle => chapterTitle ?? "章节 $epId".tl;
 }
 
+const int _comicCommentsPageSize = 20;
+const int _chapterCommentsPageSize = 30;
+
+int _calculatePageCount(int totalItems, int pageSize) {
+  if (totalItems <= 0) {
+    return 1;
+  }
+  return ((totalItems - 1) ~/ pageSize) + 1;
+}
+
+int _normalizePage(int page, int maxPage) {
+  if (page < 1) {
+    return 1;
+  }
+  if (page > maxPage) {
+    return maxPage;
+  }
+  return page;
+}
+
+List<T> _slicePageItems<T>(List<T> items, int page, int pageSize) {
+  if (items.isEmpty) {
+    return const [];
+  }
+  var maxPage = _calculatePageCount(items.length, pageSize);
+  var normalizedPage = _normalizePage(page, maxPage);
+  var start = (normalizedPage - 1) * pageSize;
+  var end = start + pageSize;
+  if (end > items.length) {
+    end = items.length;
+  }
+  return items.sublist(start, end);
+}
+
+Widget _buildManagerSearchBox({
+  required BuildContext context,
+  required TextEditingController controller,
+  required ValueChanged<String> onChanged,
+  String hintText = "搜索",
+}) {
+  final field = TextField(
+    controller: controller,
+    decoration: InputDecoration(
+      border: InputBorder.none,
+      hintText: hintText.tl,
+      prefixIcon: const Icon(Icons.search),
+      suffixIcon: controller.text.isEmpty
+          ? null
+          : IconButton(
+              onPressed: () {
+                controller.clear();
+                onChanged("");
+                FocusScope.of(context).unfocus();
+              },
+              icon: const Icon(Icons.close),
+              tooltip: "清空".tl,
+            ),
+    ),
+    onChanged: onChanged,
+  );
+
+  return Material(
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    borderRadius: BorderRadius.circular(12),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: field,
+    ),
+  );
+}
+
+Widget _buildManagerPageSelector({
+  required BuildContext context,
+  required int currentPage,
+  required int totalPages,
+  required VoidCallback onPrevPage,
+  required VoidCallback onNextPage,
+  required VoidCallback onSelectPage,
+}) {
+  final currentPageButton = Material(
+    color: Theme.of(context).colorScheme.surfaceContainer,
+    borderRadius: BorderRadius.circular(8),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onSelectPage,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Text("${"页面".tl} $currentPage / $totalPages"),
+      ),
+    ),
+  );
+
+  return Row(
+        children: [
+          FilledButton(
+            onPressed: currentPage > 1 ? onPrevPage : null,
+            child: Text("后退".tl),
+          ).fixWidth(84),
+          Expanded(
+            child: Center(child: currentPageButton),
+          ),
+          FilledButton(
+            onPressed: currentPage < totalPages ? onNextPage : null,
+            child: Text("前进".tl),
+          ).fixWidth(84),
+        ],
+      )
+      .paddingHorizontal(16);
+}
+
+Future<void> _selectManagerPage({
+  required BuildContext context,
+  required int maxPage,
+  required ValueChanged<int> onSelected,
+}) async {
+  String value = "";
+  await showDialog(
+    context: context,
+    builder: (dialogContext) {
+      return ContentDialog(
+        title: "跳转到页面".tl,
+        content: TextField(
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: "页面".tl,
+          ),
+          inputFormatters: <TextInputFormatter>[
+            FilteringTextInputFormatter.digitsOnly,
+          ],
+          onChanged: (v) {
+            value = v;
+          },
+        ).paddingHorizontal(16),
+        actions: [
+          Button.filled(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              var page = int.tryParse(value);
+              if (page == null || page < 1 || page > maxPage) {
+                context.showMessage(message: "输入的数字不正确".tl);
+                return;
+              }
+              onSelected(page);
+            },
+            child: Text("跳转".tl),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 class ChapterCommentsManagerPage extends StatefulWidget {
   const ChapterCommentsManagerPage({super.key});
 
@@ -49,14 +201,23 @@ class ChapterCommentsManagerPage extends StatefulWidget {
 
 class _ChapterCommentsManagerPageState extends State<ChapterCommentsManagerPage> {
   List<_ComicCommentsGroup> _comics = [];
+  List<_ComicCommentsGroup> _filteredComics = [];
   bool _loading = true;
   int _totalFiles = 0;
   int _totalSize = 0;
+  int _currentPage = 1;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -116,7 +277,78 @@ class _ChapterCommentsManagerPageState extends State<ChapterCommentsManagerPage>
       _totalFiles = totalFiles;
       _totalSize = totalSize;
       _loading = false;
+      _rebuildComicView();
     });
+  }
+
+  int get _maxPage => _calculatePageCount(_filteredComics.length, _comicCommentsPageSize);
+
+  int get _filteredFiles => _filteredComics.fold(0, (sum, comic) => sum + comic.chapters.length);
+
+  List<_ComicCommentsGroup> get _pageComics =>
+      _slicePageItems(_filteredComics, _currentPage, _comicCommentsPageSize);
+
+  bool _matchesComic(_ComicCommentsGroup comic, String keyword) {
+    if (comic.displayName.toLowerCase().contains(keyword) ||
+        comic.comicId.toLowerCase().contains(keyword) ||
+        comic.sourceKey.toLowerCase().contains(keyword)) {
+      return true;
+    }
+    return comic.chapters.any((chapter) =>
+        chapter.displayTitle.toLowerCase().contains(keyword) ||
+        chapter.epId.toLowerCase().contains(keyword));
+  }
+
+  void _rebuildComicView({bool resetPage = false}) {
+    var keyword = _searchController.text.trim().toLowerCase();
+    _filteredComics = keyword.isEmpty
+        ? List<_ComicCommentsGroup>.from(_comics)
+        : _comics.where((comic) => _matchesComic(comic, keyword)).toList();
+
+    if (_filteredComics.isEmpty) {
+      _currentPage = 1;
+      return;
+    }
+
+    _currentPage = resetPage ? 1 : _normalizePage(_currentPage, _maxPage);
+  }
+
+  void _onSearchChanged(String _) {
+    setState(() {
+      _rebuildComicView(resetPage: true);
+    });
+  }
+
+  void _nextPage() {
+    if (_currentPage >= _maxPage) {
+      showToast(message: "已经是最后一页了".tl);
+      return;
+    }
+    setState(() {
+      _currentPage++;
+    });
+  }
+
+  void _prevPage() {
+    if (_currentPage <= 1) {
+      showToast(message: "已经是第一页了".tl);
+      return;
+    }
+    setState(() {
+      _currentPage--;
+    });
+  }
+
+  Future<void> _selectPage() async {
+    await _selectManagerPage(
+      context: context,
+      maxPage: _maxPage,
+      onSelected: (page) {
+        setState(() {
+          _currentPage = page;
+        });
+      },
+    );
   }
 
   String _formatSize(int bytes) {
@@ -208,6 +440,9 @@ class _ChapterCommentsManagerPageState extends State<ChapterCommentsManagerPage>
 
   @override
   Widget build(BuildContext context) {
+    var pageComics = _pageComics;
+    var hasKeyword = _searchController.text.trim().isNotEmpty;
+
     return Scaffold(
       appBar: Appbar(
         title: Text("已保存的章节评论".tl),
@@ -250,7 +485,10 @@ class _ChapterCommentsManagerPageState extends State<ChapterCommentsManagerPage>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text("共 ${_comics.length} 个漫画, $_totalFiles 个章节".tl),
+                                Text(
+                                  "共 ${_filteredComics.length} / ${_comics.length} 个漫画, $_filteredFiles / $_totalFiles 个章节"
+                                      .tl,
+                                ),
                                 Text("占用空间: ${_formatSize(_totalSize)}".tl,
                                     style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline)),
                               ],
@@ -259,56 +497,103 @@ class _ChapterCommentsManagerPageState extends State<ChapterCommentsManagerPage>
                         ],
                       ),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                      child: _buildManagerSearchBox(
+                        context: context,
+                        controller: _searchController,
+                        hintText: "搜索漫画名、章节名、ID",
+                        onChanged: _onSearchChanged,
+                      ),
+                    ),
+                    if (_filteredComics.isNotEmpty)
+                      _buildManagerPageSelector(
+                        context: context,
+                        currentPage: _currentPage,
+                        totalPages: _maxPage,
+                        onPrevPage: _prevPage,
+                        onNextPage: _nextPage,
+                        onSelectPage: _selectPage,
+                      ),
                     Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        itemCount: _comics.length,
-                        itemBuilder: (context, index) {
-                          var comic = _comics[index];
-                          var subtitle = comic.comicName != null 
-                            ? "${comic.sourceKey} · ${comic.chapters.length}个章节".tl
-                            : "来源: ${comic.sourceKey} · ${comic.chapters.length}个章节".tl;
-
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                child: Text(
-                                  comic.displayName.isNotEmpty ? comic.displayName.substring(0, 1).toUpperCase() : "?",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                comic.displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(subtitle),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
+                      child: _filteredComics.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  IconButton(
-                                    onPressed: () => _openComicChapters(comic),
-                                    icon: const Icon(Icons.folder_open),
-                                    tooltip: "查看章节".tl,
-                                  ),
-                                  IconButton(
-                                    onPressed: () => _deleteComic(comic),
-                                    icon: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
-                                    tooltip: "删除".tl,
+                                  Icon(Icons.search_off,
+                                      size: 64, color: Theme.of(context).colorScheme.outline),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    hasKeyword ? "没有匹配的搜索结果".tl : "暂无已保存的评论".tl,
+                                    style: TextStyle(color: Theme.of(context).colorScheme.outline),
                                   ),
                                 ],
                               ),
-                              onTap: () => _openComicChapters(comic),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              itemCount: pageComics.length,
+                              itemBuilder: (context, index) {
+                                var comic = pageComics[index];
+                                var subtitle = comic.comicName != null
+                                    ? "${comic.sourceKey} · ${comic.chapters.length}个章节".tl
+                                    : "来源: ${comic.sourceKey} · ${comic.chapters.length}个章节".tl;
+
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 4),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                      child: Text(
+                                        comic.displayName.isNotEmpty
+                                            ? comic.displayName.substring(0, 1).toUpperCase()
+                                            : "?",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      comic.displayName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    subtitle: Text(subtitle),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          onPressed: () => _openComicChapters(comic),
+                                          icon: const Icon(Icons.folder_open),
+                                          tooltip: "查看章节".tl,
+                                        ),
+                                        IconButton(
+                                          onPressed: () => _deleteComic(comic),
+                                          icon: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
+                                          tooltip: "删除".tl,
+                                        ),
+                                      ],
+                                    ),
+                                    onTap: () => _openComicChapters(comic),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
+                    if (_filteredComics.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _buildManagerPageSelector(
+                          context: context,
+                          currentPage: _currentPage,
+                          totalPages: _maxPage,
+                          onPrevPage: _prevPage,
+                          onNextPage: _nextPage,
+                          onSelectPage: _selectPage,
+                        ),
+                      ),
                   ],
                 ),
     );
@@ -325,14 +610,87 @@ class _ChapterCommentsListPage extends StatefulWidget {
 }
 
 class _ChapterCommentsListPageState extends State<_ChapterCommentsListPage> {
-  late List<_ChapterCommentsInfo> _chapters;
+  late List<_ChapterCommentsInfo> _allChapters;
+  List<_ChapterCommentsInfo> _filteredChapters = [];
+  final TextEditingController _searchController = TextEditingController();
+  int _currentPage = 1;
 
   @override
   void initState() {
     super.initState();
-    _chapters = List.from(widget.comic.chapters);
+    _allChapters = List.from(widget.comic.chapters);
     // 按保存时间排序，最新的在前
-    _chapters.sort((a, b) => (b.savedAt ?? DateTime(0)).compareTo(a.savedAt ?? DateTime(0)));
+    _allChapters.sort((a, b) => (b.savedAt ?? DateTime(0)).compareTo(a.savedAt ?? DateTime(0)));
+    _rebuildChapterView();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  int get _maxPage => _calculatePageCount(_filteredChapters.length, _chapterCommentsPageSize);
+
+  List<_ChapterCommentsInfo> get _pageChapters =>
+      _slicePageItems(_filteredChapters, _currentPage, _chapterCommentsPageSize);
+
+  bool _matchesChapter(_ChapterCommentsInfo chapter, String keyword) {
+    return chapter.displayTitle.toLowerCase().contains(keyword) ||
+        chapter.epId.toLowerCase().contains(keyword) ||
+        _formatDate(chapter.savedAt).toLowerCase().contains(keyword);
+  }
+
+  void _rebuildChapterView({bool resetPage = false}) {
+    var keyword = _searchController.text.trim().toLowerCase();
+    _filteredChapters = keyword.isEmpty
+        ? List<_ChapterCommentsInfo>.from(_allChapters)
+        : _allChapters.where((chapter) => _matchesChapter(chapter, keyword)).toList();
+
+    if (_filteredChapters.isEmpty) {
+      _currentPage = 1;
+      return;
+    }
+
+    _currentPage = resetPage ? 1 : _normalizePage(_currentPage, _maxPage);
+  }
+
+  void _onSearchChanged(String _) {
+    setState(() {
+      _rebuildChapterView(resetPage: true);
+    });
+  }
+
+  void _nextPage() {
+    if (_currentPage >= _maxPage) {
+      showToast(message: "已经是最后一页了".tl);
+      return;
+    }
+    setState(() {
+      _currentPage++;
+    });
+  }
+
+  void _prevPage() {
+    if (_currentPage <= 1) {
+      showToast(message: "已经是第一页了".tl);
+      return;
+    }
+    setState(() {
+      _currentPage--;
+    });
+  }
+
+  Future<void> _selectPage() async {
+    await _selectManagerPage(
+      context: context,
+      maxPage: _maxPage,
+      onSelected: (page) {
+        setState(() {
+          _currentPage = page;
+        });
+      },
+    );
   }
 
   Future<void> _toggleLock(_ChapterCommentsInfo chapter) async {
@@ -389,7 +747,8 @@ class _ChapterCommentsListPageState extends State<_ChapterCommentsListPage> {
       );
       if (success) {
         setState(() {
-          _chapters.remove(chapter);
+          _allChapters.remove(chapter);
+          _rebuildChapterView();
         });
         if (mounted) {
           context.showMessage(message: "删除成功".tl);
@@ -434,6 +793,9 @@ class _ChapterCommentsListPageState extends State<_ChapterCommentsListPage> {
 
   @override
   Widget build(BuildContext context) {
+    var pageChapters = _pageChapters;
+    var hasKeyword = _searchController.text.trim().isNotEmpty;
+
     return Scaffold(
       appBar: Appbar(
         title: Column(
@@ -445,7 +807,7 @@ class _ChapterCommentsListPageState extends State<_ChapterCommentsListPage> {
           ],
         ),
       ),
-      body: _chapters.isEmpty
+      body: _allChapters.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -456,45 +818,128 @@ class _ChapterCommentsListPageState extends State<_ChapterCommentsListPage> {
                 ],
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              itemCount: _chapters.length,
-              itemBuilder: (context, index) {
-                var chapter = _chapters[index];
-                
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  child: ListTile(
-                    leading: const Icon(Icons.comment, color: Colors.blue),
-                    title: Text(chapter.displayTitle),
-                    subtitle: Text("${chapter.comments.length}条评论 · ${_formatSize(chapter.fileSize)} · ${_formatDate(chapter.savedAt)}".tl),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          onPressed: () => _toggleLock(chapter),
-                          icon: Icon(
-                            chapter.isLocked ? Icons.lock : Icons.lock_open,
-                            color: chapter.isLocked ? Colors.orange : Colors.green,
-                          ),
-                          tooltip: chapter.isLocked ? "已锁定，点击解锁".tl : "未锁定，点击锁定".tl,
-                        ),
-                        IconButton(
-                          onPressed: () => _viewChapter(chapter),
-                          icon: const Icon(Icons.visibility),
-                          tooltip: "查看评论".tl,
-                        ),
-                        IconButton(
-                          onPressed: () => _deleteChapter(chapter),
-                          icon: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
-                          tooltip: "删除".tl,
-                        ),
-                      ],
-                    ),
-                    onTap: () => _viewChapter(chapter),
+          : Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-              },
+                  child: Row(
+                    children: [
+                      Icon(Icons.comment, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("共 ${_filteredChapters.length} / ${_allChapters.length} 个章节".tl),
+                            Text(
+                              "占用空间: ${_formatSize(_filteredChapters.fold(0, (sum, chapter) => sum + chapter.fileSize))}"
+                                  .tl,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: _buildManagerSearchBox(
+                    context: context,
+                    controller: _searchController,
+                    hintText: "搜索章节名或章节 ID",
+                    onChanged: _onSearchChanged,
+                  ),
+                ),
+                if (_filteredChapters.isNotEmpty)
+                  _buildManagerPageSelector(
+                    context: context,
+                    currentPage: _currentPage,
+                    totalPages: _maxPage,
+                    onPrevPage: _prevPage,
+                    onNextPage: _nextPage,
+                    onSelectPage: _selectPage,
+                  ),
+                Expanded(
+                  child: _filteredChapters.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.search_off,
+                                  size: 64, color: Theme.of(context).colorScheme.outline),
+                              const SizedBox(height: 16),
+                              Text(
+                                hasKeyword ? "没有匹配的章节".tl : "暂无评论文件".tl,
+                                style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          itemCount: pageChapters.length,
+                          itemBuilder: (context, index) {
+                            var chapter = pageChapters[index];
+
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              child: ListTile(
+                                leading: const Icon(Icons.comment, color: Colors.blue),
+                                title: Text(chapter.displayTitle),
+                                subtitle: Text(
+                                    "${chapter.comments.length}条评论 · ${_formatSize(chapter.fileSize)} · ${_formatDate(chapter.savedAt)}"
+                                        .tl),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      onPressed: () => _toggleLock(chapter),
+                                      icon: Icon(
+                                        chapter.isLocked ? Icons.lock : Icons.lock_open,
+                                        color: chapter.isLocked ? Colors.orange : Colors.green,
+                                      ),
+                                      tooltip: chapter.isLocked ? "已锁定，点击解锁".tl : "未锁定，点击锁定".tl,
+                                    ),
+                                    IconButton(
+                                      onPressed: () => _viewChapter(chapter),
+                                      icon: const Icon(Icons.visibility),
+                                      tooltip: "查看评论".tl,
+                                    ),
+                                    IconButton(
+                                      onPressed: () => _deleteChapter(chapter),
+                                      icon: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
+                                      tooltip: "删除".tl,
+                                    ),
+                                  ],
+                                ),
+                                onTap: () => _viewChapter(chapter),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                if (_filteredChapters.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildManagerPageSelector(
+                      context: context,
+                      currentPage: _currentPage,
+                      totalPages: _maxPage,
+                      onPrevPage: _prevPage,
+                      onNextPage: _nextPage,
+                      onSelectPage: _selectPage,
+                    ),
+                  ),
+              ],
             ),
     );
   }

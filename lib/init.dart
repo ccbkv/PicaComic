@@ -148,6 +148,11 @@ Future<void> _checkOldData() async {
       appdata.settings[58] = '0'; // 强制关闭DNS覆写，用户之后可以自行打开开关
       appdata.writeData(); // 保存设置以确保持久化
     }
+    // 禁用iOS原生底部导航栏（设置项90），已移除该开关
+    if (appdata.settings.length > 90 && appdata.settings[90] == "1") {
+      appdata.settings[90] = "0";
+      appdata.writeData();
+    }
     appdata.blockingKeyword.removeWhere((value) => value.isEmpty);
 
     if (io.Directory("${App.dataPath}/comic_source/cookies/").existsSync() ||

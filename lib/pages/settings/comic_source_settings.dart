@@ -771,7 +771,7 @@ class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
     return ListTile(
       title: Text(
           ComicSource.builtIn.firstWhere((e) => e.key == key).name.tl),
-      trailing: Switch(
+      trailing: AdaptiveSwitch(
         value: appdata.appSettings.isComicSourceEnabled(key),
         onChanged: (v) async {
           if (isLoading) return;
@@ -1036,7 +1036,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
             SliverToBoxAdapter(
               child: ListTile(
                 title: Text(title),
-                trailing: Switch(
+                trailing: AdaptiveSwitch(
                   value: currentValue is bool ? currentValue : false,
                   onChanged: (value) {
                     source.data['settings'][key] = value;

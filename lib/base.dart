@@ -131,6 +131,9 @@ class Appdata {
     "0", //98 在阅读器中显示时间和电量信息
     "0", //99 章节末尾显示评论
     "", //100 webdav disableSyncFields
+    "0", //101
+    "0", //102 下载时保存章节评论
+    "0", //103 液态玻璃底部导航栏
 
   ];
 
@@ -1012,6 +1015,8 @@ class _Settings {
     }
     appdata.settings[96] = value == 1 ? "1" : "0";
   }
+
+
 
   bool get enableClockAndBatteryInfoInReader {
     while (appdata.settings.length <= 98) {

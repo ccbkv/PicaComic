@@ -3,6 +3,95 @@ part of 'comic_reading_page.dart';
 extension ToolBar on ComicReadingPage {
   bool get isReversed => appdata.settings[9] == "2" || appdata.settings[9] == "6";
 
+  Widget _buildToolIconButton({
+    required BuildContext context,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback onPressed,
+    double iconSize = 24,
+  }) {
+    final button = enableLiquidGlassUi
+        ? GlassIconActionButton(
+            icon: icon,
+            tooltip: tooltip,
+            onTap: onPressed,
+            size: 40,
+          )
+        : IconButton(
+            iconSize: iconSize,
+            icon: Icon(icon),
+            onPressed: onPressed,
+          );
+    return Tooltip(
+      message: tooltip,
+      child: button,
+    );
+  }
+
+  Widget _buildToolbarJumpButton({
+    required BuildContext context,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    if (enableLiquidGlassUi) {
+      return GlassIconActionButton(
+        icon: icon,
+        tooltip: "",
+        onTap: onPressed,
+        size: 40,
+      );
+    }
+    return IconButton.filledTonal(
+      onPressed: onPressed,
+      icon: Icon(icon),
+    );
+  }
+
+  Widget _buildToolbarSurface({
+    required BuildContext context,
+    required Widget child,
+    required EdgeInsetsGeometry padding,
+    required bool top,
+  }) {
+    if (enableLiquidGlassUi) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          8 + MediaQuery.of(context).padding.left,
+          top ? 8 : 0,
+          8 + MediaQuery.of(context).padding.right,
+          top ? 0 : 8,
+        ),
+        child: GlassSurface(
+          borderRadius: 26,
+          padding: padding,
+          useOwnLayer: false,
+          child: child,
+        ),
+      );
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: top
+              ? BorderSide.none
+              : BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 0.6,
+                ),
+          bottom: top
+              ? BorderSide(
+                  color: Colors.grey.toOpacity(0.5),
+                  width: 0.5,
+                )
+              : BorderSide.none,
+        ),
+      ),
+      padding: padding,
+      child: child,
+    );
+  }
+
   ///构建底部工具栏
   Widget buildBottomToolBar(
       ComicReadingPageLogic logic, BuildContext context, bool showEps) {
@@ -30,19 +119,23 @@ extension ToolBar on ComicReadingPage {
                     const SizedBox(
                       width: 8,
                     ),
-                    IconButton.filledTonal(
-                        onPressed: () => !isReversed
-                            ? logic.jumpToLastChapter()
-                            : logic.jumpToNextChapter(),
-                        icon: const Icon(Icons.first_page)),
+                    _buildToolbarJumpButton(
+                      context: context,
+                      icon: Icons.first_page,
+                      onPressed: () => !isReversed
+                          ? logic.jumpToLastChapter()
+                          : logic.jumpToNextChapter(),
+                    ),
                     Expanded(
                       child: buildSlider(logic),
                     ),
-                    IconButton.filledTonal(
-                        onPressed: () => !isReversed
-                            ? logic.jumpToNextChapter()
-                            : logic.jumpToLastChapter(),
-                        icon: const Icon(Icons.last_page)),
+                    _buildToolbarJumpButton(
+                      context: context,
+                      icon: Icons.last_page,
+                      onPressed: () => !isReversed
+                          ? logic.jumpToNextChapter()
+                          : logic.jumpToLastChapter(),
+                    ),
                     const SizedBox(
                       width: 8,
                     ),
@@ -51,174 +144,188 @@ extension ToolBar on ComicReadingPage {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final buttons = <Widget>[
-                      Tooltip(
-                        message: "收藏图片".tl,
-                        child: IconButton(
-                          icon: const Icon(Icons.favorite_outline),
-                          onPressed: () async {
-                            try {
-                              final id =
-                                  "${logic.data.sourceKey}-${logic.data.id}";
-                              var image = await _persistentCurrentImage();
-                              if (image != null) {
-                                image = image.split("/").last;
-                                var otherInfo = <String, dynamic>{};
-                                if (logic.data.type == ReadingType.ehentai) {
-                                  otherInfo["gallery"] =
-                                      (logic.data as EhReadingData)
-                                          .gallery
-                                          .toJson();
-                                } else if (logic.data.type ==
-                                    ReadingType.hitomi) {
-                                  otherInfo["hitomi"] =
-                                      (readingData as HitomiReadingData)
-                                          .images
-                                          .map((e) => e.toMap())
-                                          .toList();
-                                  otherInfo["galleryId"] = readingData.id;
-                                } else if (logic.data.type == ReadingType.jm) {
-                                  otherInfo["jmEpNames"] =
-                                      readingData.eps!.values.toList();
-                                  otherInfo["epsId"] = readingData.eps!.keys
-                                      .elementAt(logic.index - 1);
-                                  otherInfo["bookId"] = readingData.id;
-                                }
-                                if (logic.data.type != ComicType.other) {
-                                  otherInfo["eps"] =
-                                      readingData.eps?.keys.toList() ?? [];
-                                } else {
-                                  otherInfo["eps"] = readingData.eps;
-                                }
-                                otherInfo["url"] = logic.urls[logic.index - 1];
-                                otherInfo["epTotalPages"] = logic.urls.length;
-                                var favorite = ImageFavorite(
-                                    id,
-                                    image,
-                                    readingData.title,
-                                    logic.order,
-                                    logic.index,
-                                    otherInfo);
-                                if (!ImageFavoriteManager.exist(id, logic.order, logic.index)) {
-                                  ImageFavoriteManager.add(favorite);
-                                  showToast(message: "已添加至图片收藏".tl);
-                                } else {
-                                  ImageFavoriteManager.delete(favorite);
-                                  showToast(message: "已取消图片收藏".tl);
-                                }
+                      _buildToolIconButton(
+                        context: context,
+                        tooltip: "收藏图片".tl,
+                        icon: Icons.favorite_outline,
+                        onPressed: () async {
+                          try {
+                            final id =
+                                "${logic.data.sourceKey}-${logic.data.id}";
+                            var image = await _persistentCurrentImage();
+                            if (image != null) {
+                              image = image.split("/").last;
+                              var otherInfo = <String, dynamic>{};
+                              if (logic.data.type == ReadingType.ehentai) {
+                                otherInfo["gallery"] =
+                                    (logic.data as EhReadingData)
+                                        .gallery
+                                        .toJson();
+                              } else if (logic.data.type ==
+                                  ReadingType.hitomi) {
+                                otherInfo["hitomi"] =
+                                    (readingData as HitomiReadingData)
+                                        .images
+                                        .map((e) => e.toMap())
+                                        .toList();
+                                otherInfo["galleryId"] = readingData.id;
+                              } else if (logic.data.type == ReadingType.jm) {
+                                otherInfo["jmEpNames"] =
+                                    readingData.eps!.values.toList();
+                                otherInfo["epsId"] = readingData.eps!.keys
+                                        .elementAtOrNull(logic.order - 1) ??
+                                    readingData.id;
+                                otherInfo["bookId"] = readingData.id;
                               }
-                            } catch (e) {
-                              showToast(message: e.toString());
+                              if (logic.data.type != ComicType.other) {
+                                otherInfo["eps"] =
+                                    readingData.eps?.keys.toList() ?? [];
+                              } else {
+                                otherInfo["eps"] = readingData.eps;
+                              }
+                              otherInfo["url"] = logic.urls[logic.index - 1];
+                              otherInfo["epTotalPages"] = logic.urls.length;
+                              var favorite = ImageFavorite(
+                                  id,
+                                  image,
+                                  readingData.title,
+                                  logic.order,
+                                  logic.index,
+                                  otherInfo);
+                              if (!ImageFavoriteManager.exist(
+                                  id, logic.order, logic.index)) {
+                                ImageFavoriteManager.add(favorite);
+                                showToast(message: "已添加至图片收藏".tl);
+                              } else {
+                                ImageFavoriteManager.delete(favorite);
+                                showToast(message: "已取消图片收藏".tl);
+                              }
+                            }
+                          } catch (e) {
+                            showToast(message: e.toString());
+                          }
+                        },
+                      ),
+                      if (App.isWindows)
+                        _buildToolIconButton(
+                          context: context,
+                          tooltip: "${"全屏".tl}(F12)",
+                          icon: Icons.fullscreen,
+                          onPressed: () {
+                            logic.fullscreen();
+                          },
+                        ),
+                      if (App.isAndroid && appdata.settings[76] == "0")
+                        _buildToolIconButton(
+                          context: context,
+                          tooltip: "屏幕方向".tl,
+                          icon: logic.rotation == null
+                              ? Icons.screen_rotation_alt
+                              : logic.rotation == false
+                                  ? Icons.screen_lock_portrait
+                                  : Icons.screen_lock_landscape,
+                          onPressed: () {
+                            if (logic.rotation == null) {
+                              logic.rotation = false;
+                              logic.update();
+                              SystemChrome.setPreferredOrientations([
+                                DeviceOrientation.portraitUp,
+                                DeviceOrientation.portraitDown,
+                              ]);
+                            } else if (logic.rotation == false) {
+                              logic.rotation = true;
+                              logic.update();
+                              SystemChrome.setPreferredOrientations([
+                                DeviceOrientation.landscapeLeft,
+                                DeviceOrientation.landscapeRight
+                              ]);
+                            } else {
+                              logic.rotation = null;
+                              logic.update();
+                              SystemChrome.setPreferredOrientations(
+                                  DeviceOrientation.values);
                             }
                           },
                         ),
-                      ),
-                      if (App.isWindows)
-                        Tooltip(
-                          message: "${"全屏".tl}(F12)",
-                          child: IconButton(
-                            icon: const Icon(Icons.fullscreen),
-                            onPressed: () {
-                              logic.fullscreen();
-                            },
-                          ),
-                        ),
-                      if (App.isAndroid && appdata.settings[76] == "0")
-                        Tooltip(
-                          message: "屏幕方向".tl,
-                          child: IconButton(
-                            icon: () {
-                              if (logic.rotation == null) {
-                                return const Icon(Icons.screen_rotation_alt);
-                              } else if (logic.rotation == false) {
-                                return const Icon(Icons.screen_lock_portrait);
-                              } else {
-                                return const Icon(Icons.screen_lock_landscape);
-                              }
-                            }.call(),
-                            onPressed: () {
-                              if (logic.rotation == null) {
-                                logic.rotation = false;
-                                logic.update();
-                                SystemChrome.setPreferredOrientations([
-                                  DeviceOrientation.portraitUp,
-                                  DeviceOrientation.portraitDown,
-                                ]);
-                              } else if (logic.rotation == false) {
-                                logic.rotation = true;
-                                logic.update();
-                                SystemChrome.setPreferredOrientations([
-                                  DeviceOrientation.landscapeLeft,
-                                  DeviceOrientation.landscapeRight
-                                ]);
-                              } else {
-                                logic.rotation = null;
-                                logic.update();
-                                SystemChrome.setPreferredOrientations(
-                                    DeviceOrientation.values);
-                              }
-                            },
-                          ),
-                        ),
-                      Tooltip(
-                        message: "自动翻页".tl,
-                        child: IconButton(
-                          icon: logic.runningAutoPageTurning
-                              ? const Icon(Icons.timer)
-                              : const Icon(Icons.timer_sharp),
-                          onPressed: () {
-                            logic.runningAutoPageTurning =
-                                !logic.runningAutoPageTurning;
-                            logic.update();
-                            logic.autoPageTurning();
-                          },
-                        ),
+                      _buildToolIconButton(
+                        context: context,
+                        tooltip: "自动翻页".tl,
+                        icon: logic.runningAutoPageTurning
+                            ? Icons.timer
+                            : Icons.timer_sharp,
+                        onPressed: () {
+                          logic.runningAutoPageTurning =
+                              !logic.runningAutoPageTurning;
+                          logic.update();
+                          logic.autoPageTurning();
+                        },
                       ),
                       if (showEps)
-                        Tooltip(
-                          message: "章节".tl,
-                          child: IconButton(
-                            icon: const Icon(Icons.library_books),
-                            onPressed: openEpsDrawer,
-                          ),
+                        _buildToolIconButton(
+                          context: context,
+                          tooltip: "章节".tl,
+                          icon: Icons.library_books,
+                          onPressed: openEpsDrawer,
                         ),
-                      Tooltip(
-                        message: "保存图片".tl,
-                        child: IconButton(
-                          icon: const Icon(Icons.download),
-                          onPressed: saveCurrentImage,
-                        ),
+                      _buildToolIconButton(
+                        context: context,
+                        tooltip: "保存图片".tl,
+                        icon: Icons.download,
+                        onPressed: saveCurrentImage,
                       ),
-                      Tooltip(
-                        message: "分享".tl,
-                        child: IconButton(
-                          icon: const Icon(Icons.share),
-                          onPressed: share,
-                        ),
+                      _buildToolIconButton(
+                        context: context,
+                        tooltip: "分享".tl,
+                        icon: Icons.share,
+                        onPressed: share,
                       ),
                     ];
 
-                    final small = (constraints.maxWidth - buttons.length * 50) < 120;
-
-                    return Row(
-                      children: [
-                        if (!small)
-                          Container(
+                    final small =
+                        (constraints.maxWidth - buttons.length * 50) < 120;
+                    final pageTag = enableLiquidGlassUi
+                        ? GlassChipTag(label: text)
+                        : Container(
                             height: 24,
                             padding: const EdgeInsets.fromLTRB(6, 2, 6, 0),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.tertiaryContainer,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .tertiaryContainer,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Center(child: Text(text)),
-                          ).paddingLeft(16),
+                          );
+
+                    if (enableLiquidGlassUi && small) {
+                      return Row(
+                        children: [
+                          const SizedBox(width: 8),
+                          Flexible(
+                            fit: FlexFit.loose,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 84),
+                              child: pageTag,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          for (var button in buttons)
+                            button.paddingHorizontal(2),
+                          const SizedBox(width: 4),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        if (!small) pageTag.paddingLeft(16),
                         const Spacer(),
                         for (var button in buttons)
                           if (!small)
                             button.paddingHorizontal(4)
                           else
                             ...[button, const Spacer()],
-                        if (!small)
-                          const SizedBox(width: 4),
+                        if (!small) const SizedBox(width: 4),
                       ],
                     );
                   },
@@ -227,16 +334,9 @@ extension ToolBar on ComicReadingPage {
             ),
           );
 
-          child = Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                  width: 0.6,
-                ),
-              ),
-            ),
+          child = _buildToolbarSurface(
+            context: context,
+            top: false,
             padding: EdgeInsets.only(
               left: MediaQuery.of(context).padding.left,
               right: MediaQuery.of(context).padding.right,
@@ -350,9 +450,10 @@ extension ToolBar on ComicReadingPage {
       yield Positioned(
         left: 4,
         top: 4 + MediaQuery.of(context).padding.top,
-        child: IconButton(
-          iconSize: 24,
-          icon: const Icon(Icons.close),
+        child: _buildToolIconButton(
+          context: context,
+          tooltip: "关闭".tl,
+          icon: Icons.close,
           onPressed: () => App.globalBack(),
         ),
       );
@@ -371,16 +472,9 @@ extension ToolBar on ComicReadingPage {
           reverseDuration: const Duration(milliseconds: 150),
           switchInCurve: Curves.fastOutSlowIn,
           child: comicReadingPageLogic.tools
-              ? Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    border: Border(
-                    bottom: BorderSide(
-                     color: Colors.grey.toOpacity(0.5),
-                     width: 0.5,
-            ),
-                    ),
-                  ),
+              ? _buildToolbarSurface(
+                  context: context,
+                  top: true,
                   padding: EdgeInsets.only(
                     left: MediaQuery.of(context).padding.left,
                     right: MediaQuery.of(context).padding.right,
@@ -393,13 +487,12 @@ extension ToolBar on ComicReadingPage {
                       children: [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
-                          child: Tooltip(
-                            message: "返回".tl,
-                            child: IconButton(
-                              iconSize: 25,
-                              icon: const Icon(Icons.arrow_back_outlined),
-                              onPressed: () => App.globalBack(),
-                            ),
+                          child: _buildToolIconButton(
+                            context: context,
+                            tooltip: "返回".tl,
+                            icon: Icons.arrow_back_outlined,
+                            onPressed: () => App.globalBack(),
+                            iconSize: 25,
                           ),
                         ),
                         Expanded(
@@ -445,24 +538,22 @@ extension ToolBar on ComicReadingPage {
                         if (_shouldShowChapterComments())
                           Padding(
                             padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
-                            child: Tooltip(
-                              message: "章节评论".tl,
-                              child: IconButton(
-                                iconSize: 25,
-                                icon: const Icon(Icons.comment),
-                                onPressed: () => _openChapterComments(context),
-                              ),
+                            child: _buildToolIconButton(
+                              context: context,
+                              tooltip: "章节评论".tl,
+                              icon: Icons.comment,
+                              onPressed: () => _openChapterComments(context),
+                              iconSize: 25,
                             ),
                           ),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
-                          child: Tooltip(
-                            message: "阅读设置".tl,
-                            child: IconButton(
-                              iconSize: 25,
-                              icon: const Icon(Icons.settings),
-                              onPressed: () => showSettings(context),
-                            ),
+                          child: _buildToolIconButton(
+                            context: context,
+                            tooltip: "阅读设置".tl,
+                            icon: Icons.settings,
+                            onPressed: () => showSettings(context),
+                            iconSize: 25,
                           ),
                         ),
                       ],

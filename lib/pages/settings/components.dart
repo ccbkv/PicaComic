@@ -43,7 +43,7 @@ class _SwitchSettingState extends State<SwitchSetting> {
       title: Text(widget.title),
       subtitle: widget.subTitle == null ? null : Text(widget.subTitle!),
       leading: widget.icon,
-      trailing: Switch(
+      trailing: AdaptiveSwitch(
         value: appdata.settings[widget.settingsIndex] == '1',
         onChanged: (value) {
           setState(() {

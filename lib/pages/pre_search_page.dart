@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
@@ -114,6 +115,101 @@ class _FloatingSearchBarState extends State<_FloatingSearchBar> {
   }
 }
 
+class _GlassFloatingSearchBar extends StatelessWidget {
+  const _GlassFloatingSearchBar({
+    required this.supportingText,
+    required this.onFinish,
+    required this.controller,
+    this.onChanged,
+    this.focusNode,
+  });
+
+  final void Function(String) onFinish;
+  final String supportingText;
+  final TextEditingController controller;
+  final void Function(String)? onChanged;
+  final FocusNode? focusNode;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final hasText = controller.text.isNotEmpty;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12) +
+              const EdgeInsets.only(top: 8),
+          child: GlassSearchableBottomBar(
+            tabs: const [
+              GlassBottomBarTab(
+                label: '',
+                icon: Icon(Icons.arrow_back),
+                activeIcon: Icon(Icons.arrow_back),
+              ),
+            ],
+            selectedIndex: 0,
+            isSearchActive: true,
+            onTabSelected: (_) => context.pop(),
+            searchConfig: GlassSearchBarConfig(
+              onSearchToggle: (active) {
+                if (!active) {
+                  context.pop();
+                }
+              },
+              hintText: supportingText,
+              controller: controller,
+              focusNode: focusNode,
+              onChanged: onChanged,
+              onSubmitted: onFinish,
+              textInputAction: TextInputAction.search,
+              autoFocusOnExpand: false,
+              expandWhenActive: true,
+              showsCancelButton: false,
+              hintStyle: textTheme.bodyLarge?.apply(
+                color: colorScheme.onSurfaceVariant,
+              ),
+              trailingBuilder: (_) => IconButton(
+                icon: Icon(hasText ? Icons.clear_rounded : Icons.search),
+                iconSize: hasText ? 18 : 22,
+                onPressed: () {
+                  if (hasText) {
+                    controller.clear();
+                    onChanged?.call('');
+                  } else {
+                    onFinish(controller.text);
+                  }
+                },
+              ),
+            ),
+            showIndicator: false,
+            barHeight: 48,
+            searchBarHeight: 48,
+            tabWidth: 48,
+            horizontalPadding: 0,
+            verticalPadding: 0,
+            spacing: 8,
+            tabPadding: EdgeInsets.zero,
+            iconSize: 24,
+            settings: LiquidGlassSettings(
+              blur: 10,
+              glassColor: colorScheme.primaryContainer.withValues(alpha: 0.16),
+              thickness: 12,
+              lightIntensity: 0.8,
+              ambientStrength: theme.brightness == Brightness.dark ? 0.22 : 0.34,
+              chromaticAberration: 0,
+              specularSharpness: GlassSpecularSharpness.soft,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class PreSearchController extends StateController {
   String target = '';
 
@@ -128,7 +224,7 @@ class PreSearchController extends StateController {
 
   bool limitHistory = true;
 
-  int aggregatedSearchMode = 0; // 0: disabled, 1: separate, 2: merged
+    int aggregatedSearchMode = 0; // 0: disabled, 1: separate, 2: merged
 
   Timer? _suggestionsDebounce;
 
@@ -168,12 +264,13 @@ class PreSearchController extends StateController {
     updateOptions();
   }
 
+
   @override
   void dispose() {
     _suggestionsDebounce?.cancel();
     super.dispose();
   }
-}
+  }
 
 class PreSearchPage extends StatelessWidget {
   PreSearchPage({String initialValue = "", super.key})
@@ -207,7 +304,7 @@ class PreSearchPage extends StatelessWidget {
     if (searchController.aggregatedSearchMode != 0) {
       // 聚合搜索
       context.to(
-        () => AggregatedSearchPage(
+                () => AggregatedSearchPage(
           keyword: keyword,
           displayMode: searchController.aggregatedSearchMode,
         ),
@@ -317,29 +414,49 @@ class PreSearchPage extends StatelessWidget {
       );
     }
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: search,
-        child: const Icon(Icons.search),
-      ),
+      floatingActionButton: enableLiquidGlassUi
+          ? GlassIconActionButton(
+              icon: Icons.search,
+              tooltip: '搜索'.tl,
+              onTap: search,
+              size: 56,
+            )
+          : FloatingActionButton(
+              onPressed: search,
+              child: const Icon(Icons.search),
+            ),
       body: Column(
         children: [
           SizedBox(
             height: MediaQuery.of(context).padding.top,
           ),
           Builder(
-            builder: (context) => _FloatingSearchBar(
-              supportingText: '${'搜索'.tl} / ${'链接'.tl} / ID',
-              onFinish: (s) {
-                // if (s == "") return;
-                search();
-              },
-              controller: controller,
-              onChanged: (s) {
-                findSuggestions();
-                searchController.update([1, 100]);
-              },
-              focusNode: _focusNode,
-            ),
+            builder: (context) => enableLiquidGlassUi
+                ? _GlassFloatingSearchBar(
+                    supportingText: '${'搜索'.tl} / ${'链接'.tl} / ID',
+                    onFinish: (s) {
+                      search();
+                    },
+                    controller: controller,
+                    onChanged: (s) {
+                      findSuggestions();
+                      searchController.update([1, 100]);
+                    },
+                    focusNode: _focusNode,
+                  )
+                : _FloatingSearchBar(
+                    supportingText: '${'搜索'.tl} / ${'链接'.tl} / ID',
+                    onFinish: (s) {
+                      // if (s == "") return;
+                      search();
+                    },
+                    controller: controller,
+                    onChanged: (s) {
+                      findSuggestions();
+                      searchController.update([1, 100]);
+                    },
+                    focusNode: _focusNode,
+                  ),
           ),
           const SizedBox(
             height: 8,
@@ -687,7 +804,7 @@ class PreSearchPage extends StatelessWidget {
       id: "mode",
       builder: (logic) {
         // 聚合搜索時隱藏搜索選項
-        if (logic.aggregatedSearchMode != 0) {
+         if (logic.aggregatedSearchMode != 0) {
           return const SizedBox();
         }
 

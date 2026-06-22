@@ -361,3 +361,4 @@ class NhentaiGalleryV2 {
     return null;
   }
 }
+

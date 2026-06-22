@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/network/nhentai_network/tags.dart';
+import 'package:pica_comic/utils/tags_translation.dart';
 import 'package:pica_comic/utils/translations.dart';
 
 class NhentaiCategoryFilterDialog extends StatefulWidget {
@@ -91,48 +92,61 @@ class _NhentaiCategoryFilterDialogState
     return merged;
   }
 
-  List<NhentaiFilterTerm> _findLocalSuggestionTerms(
-    String namespace,
-    Iterable<String> values,
-    String query,
-  ) {
-    final matches = <NhentaiFilterTerm>[];
-    final seen = <String>{};
-    for (final value in values) {
-      if (!value.toLowerCase().contains(query)) {
-        continue;
-      }
-      final term = NhentaiFilterTerm(namespace: namespace, value: value);
-      if (seen.add(term.displayValue.trim().toLowerCase()) &&
-          !_terms.contains(term)) {
-        matches.add(term);
-      }
-      if (matches.length >= 10) {
-        break;
-      }
+  NhentaiFilterTerm? _resolveInputToKnownTerm(String value) {
+    final match = findNhentaiLocalTag(value);
+    if (match == null) {
+      return null;
     }
-    return matches;
+    return NhentaiFilterTerm(namespace: match.namespace, value: match.value);
   }
 
   List<NhentaiFilterTerm> _buildLocalSuggestions(String query) {
-    query = query.trim().toLowerCase();
-    if (query.isEmpty) {
-      return const [];
+    return _mergeSuggestionTerms(
+      searchNhentaiLocalTags(query)
+          .map(
+            (entry) =>
+                NhentaiFilterTerm(namespace: entry.namespace, value: entry.value),
+          )
+          .toList(),
+      const [],
+    );
+  }
+
+  String _displayTermLabel(NhentaiFilterTerm term) {
+    if (App.locale.languageCode != 'zh' || term.isRawQuery) {
+      return term.displayValue;
     }
-    return _mergeSuggestionTerms([
-      ..._findLocalSuggestionTerms('tag', nhentaiTags.values, query),
-      ..._findLocalSuggestionTerms(
-        'character',
-        nhentaiCharacterTags.values,
-        query,
-      ),
-      ..._findLocalSuggestionTerms('parody', nhentaiParodyTags.values, query),
-      ..._findLocalSuggestionTerms(
-        'language',
-        const ['chinese', 'japanese', 'english'],
-        query,
-      ),
-    ], const []);
+    return TagsTranslation.translationTagWithNamespace(
+      term.value,
+      term.namespace,
+    );
+  }
+
+  String _displayTagLabel(String value, {String namespace = 'tag'}) {
+    if (App.locale.languageCode != 'zh') {
+      return value;
+    }
+    return TagsTranslation.translationTagWithNamespace(value, namespace);
+  }
+
+  void _addSearchValue(String value) {
+    value = value.trim();
+    if (value.isEmpty) {
+      return;
+    }
+    final term =
+        _resolveInputToKnownTerm(value) ??
+        NhentaiFilterTerm(
+          namespace: nhentaiCategoryFilterRawQueryNamespace,
+          value: value,
+        );
+    if (_terms.contains(term)) {
+      return;
+    }
+    setState(() {
+      _terms = [..._terms, term];
+      _resetSuggestionState();
+    });
   }
 
   void _resetSuggestionState() {
@@ -150,7 +164,8 @@ class _NhentaiCategoryFilterDialogState
     _remoteSearchCancelToken?.cancel();
 
     final query = value.trim();
-    if (query.length < 2) {
+    final remoteQuery = findNhentaiLocalTag(query)?.value ?? query;
+    if (remoteQuery.length < 2) {
       _remoteSearchCancelToken = null;
       return;
     }
@@ -160,7 +175,7 @@ class _NhentaiCategoryFilterDialogState
       final cancelToken = CancelToken();
       _remoteSearchCancelToken = cancelToken;
       final response = await NhentaiNetwork().autocompleteTagsByTypes(
-        query,
+        remoteQuery,
         types: const ['tag', 'character', 'parody', 'artist', 'group'],
         limit: 10,
         cancelToken: cancelToken,
@@ -262,6 +277,7 @@ class _NhentaiCategoryFilterDialogState
       _remoteSuggestions,
     );
     final searching = _searchText.trim().isNotEmpty;
+    final canConfirm = _searchController.text.trim().isEmpty;
     final isCompact = MediaQuery.sizeOf(context).width < 480;
     final dialogWidth = (MediaQuery.sizeOf(context).width - 48)
         .clamp(320.0, 560.0)
@@ -401,23 +417,7 @@ class _NhentaiCategoryFilterDialogState
                 key: const ValueKey('search-add-button'),
                 onPressed: _searchText.trim().isEmpty
                     ? null
-                    : () {
-                        final value = _searchController.text.trim();
-                        if (value.isEmpty) {
-                          return;
-                        }
-                        final term = NhentaiFilterTerm(
-                          namespace: nhentaiCategoryFilterRawQueryNamespace,
-                          value: value,
-                        );
-                        if (_terms.contains(term)) {
-                          return;
-                        }
-                        setState(() {
-                          _terms = [..._terms, term];
-                          _resetSuggestionState();
-                        });
-                      },
+                    : () => _addSearchValue(_searchController.text),
                       child: Text('添加搜索'.tl),
                     ),
                   ),
@@ -431,21 +431,7 @@ class _NhentaiCategoryFilterDialogState
                   _scheduleRemoteSuggestions(value);
                 },
                 onSubmitted: (value) {
-                  value = value.trim();
-                  if (value.isEmpty) {
-                    return;
-                  }
-                  final term = NhentaiFilterTerm(
-                    namespace: nhentaiCategoryFilterRawQueryNamespace,
-                    value: value,
-                  );
-                  if (_terms.contains(term)) {
-                    return;
-                  }
-                  setState(() {
-                    _terms = [..._terms, term];
-                    _resetSuggestionState();
-                  });
+                  _addSearchValue(value);
                 },
               ),
               const SizedBox(height: 4),
@@ -461,7 +447,7 @@ class _NhentaiCategoryFilterDialogState
                     ? suggestions
                         .map(
                           (term) => ActionChip(
-                            label: Text(term.displayValue),
+                            label: Text(_displayTermLabel(term)),
                             onPressed: () {
                               if (_terms.contains(term)) {
                                 return;
@@ -478,7 +464,7 @@ class _NhentaiCategoryFilterDialogState
                         .take(10)
                         .map(
                           (value) => ActionChip(
-                            label: Text(value),
+                            label: Text(_displayTagLabel(value)),
                             onPressed: () {
                               value = value.trim();
                               if (value.isEmpty) {
@@ -903,17 +889,19 @@ class _NhentaiCategoryFilterDialogState
           ),
           fluent.FilledButton(
             key: const ValueKey('confirm-button'),
-            onPressed: () {
-              widget.onConfirm(
-                NhentaiCategoryFilter(
-                  terms: _terms,
-                  pages: _pages,
-                  favorites: _favorites,
-                  uploadedDays: _uploadedDays,
-                ).toParam(),
-              );
-              Navigator.of(context).pop();
-            },
+            onPressed: canConfirm
+                ? () {
+                    widget.onConfirm(
+                      NhentaiCategoryFilter(
+                        terms: _terms,
+                        pages: _pages,
+                        favorites: _favorites,
+                        uploadedDays: _uploadedDays,
+                      ).toParam(),
+                    );
+                    Navigator.of(context).pop();
+                  }
+                : null,
             child: Text('确定'.tl),
           ),
         ],
@@ -930,17 +918,19 @@ class _NhentaiCategoryFilterDialogState
         ),
         FilledButton(
           key: const ValueKey('confirm-button'),
-          onPressed: () {
-            widget.onConfirm(
-              NhentaiCategoryFilter(
-                terms: _terms,
-                pages: _pages,
-                favorites: _favorites,
-                uploadedDays: _uploadedDays,
-              ).toParam(),
-            );
-            Navigator.of(context).pop();
-          },
+          onPressed: canConfirm
+              ? () {
+                  widget.onConfirm(
+                    NhentaiCategoryFilter(
+                      terms: _terms,
+                      pages: _pages,
+                      favorites: _favorites,
+                      uploadedDays: _uploadedDays,
+                    ).toParam(),
+                  );
+                  Navigator.of(context).pop();
+                }
+              : null,
           child: Text('确定'.tl),
         ),
       ],

@@ -507,7 +507,7 @@ class _ComicSourceState extends State<_ComicSource>
               return ListTile(
                 title: Text(
                     ComicSource.builtIn.firstWhere((e) => e.key == key).name),
-                trailing: Switch(
+                trailing: AdaptiveSwitch(
                   value: appdata.appSettings.isComicSourceEnabled(key),
                   onChanged: (v) {
                     appdata.appSettings.setComicSourceEnabled(key, v);

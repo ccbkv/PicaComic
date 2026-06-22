@@ -24,6 +24,42 @@ import '../../network/nhentai_network/nhentai_main_network.dart';
 import '../../network/picacg_network/methods.dart';
 import '../../utils/io_tools.dart';
 
+Widget _buildFavoritesDialogField({
+  required Widget child,
+  double? width,
+}) {
+  if (!enableLiquidGlassUi) {
+    return child;
+  }
+  Widget content = child;
+  if (width != null) {
+    content = SizedBox(width: width, child: content);
+  }
+  return GlassSurface(
+    borderRadius: 18,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    child: content,
+  );
+}
+
+Widget _buildFavoritesDialogTextAction({
+  required String text,
+  required VoidCallback onTap,
+}) {
+  if (!enableLiquidGlassUi) {
+    return TextButton(
+      onPressed: onTap,
+      child: Text(text),
+    );
+  }
+  return GlassSurface(
+    borderRadius: 16,
+    onTap: onTap,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    child: Text(text),
+  );
+}
+
 extension LocalFavoritesExt on FavoriteItem {
   void addDownload() {
     if (DownloadManager().isExists(toDownloadId())) {
@@ -186,20 +222,24 @@ class CreateFolderDialog extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-          child: TextField(
-            focusNode: focusNode,
-            controller: controller,
-            onEditingComplete: () {
-              try {
-                LocalFavoritesManager().createFolder(controller.text);
-                App.globalBack();
-              } catch (e) {
-                showToast(message: e.toString());
-              }
-            },
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              labelText: "名称".tl,
+          child: _buildFavoritesDialogField(
+            child: TextField(
+              focusNode: focusNode,
+              controller: controller,
+              onEditingComplete: () {
+                try {
+                  LocalFavoritesManager().createFolder(controller.text);
+                  App.globalBack();
+                } catch (e) {
+                  showToast(message: e.toString());
+                }
+              },
+              decoration: InputDecoration(
+                border: enableLiquidGlassUi
+                    ? InputBorder.none
+                    : const OutlineInputBorder(),
+                labelText: "名称".tl,
+              ),
             ),
           ),
         ),
@@ -211,9 +251,9 @@ class CreateFolderDialog extends StatelessWidget {
           child: Row(
             children: [
               const Spacer(),
-              TextButton(
-                child: Text("从文件导入".tl),
-                onPressed: () async {
+              _buildFavoritesDialogTextAction(
+                text: "从文件导入".tl,
+                onTap: () async {
                   context.pop();
                   var data = await getDataFromUserSelectedFile(["json"]);
                   if (data == null) {
@@ -229,9 +269,9 @@ class CreateFolderDialog extends StatelessWidget {
                 },
               ),
               const Spacer(),
-              TextButton(
-                child: Text("从网络导入".tl),
-                onPressed: () async {
+              _buildFavoritesDialogTextAction(
+                text: "从网络导入".tl,
+                onTap: () async {
                   App.globalBack();
                   await Future.delayed(const Duration(milliseconds: 200));
                   networkToLocal();
@@ -280,20 +320,24 @@ class RenameFolderDialog extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-          child: TextField(
-            controller: controller,
-            focusNode: focusNode,
-            onEditingComplete: () {
-              try {
-                LocalFavoritesManager().rename(before, controller.text);
-                context.pop();
-              } catch (e) {
-                showToast(message: e.toString());
-              }
-            },
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              labelText: "名称".tl,
+          child: _buildFavoritesDialogField(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              onEditingComplete: () {
+                try {
+                  LocalFavoritesManager().rename(before, controller.text);
+                  context.pop();
+                } catch (e) {
+                  showToast(message: e.toString());
+                }
+              },
+              decoration: InputDecoration(
+                border: enableLiquidGlassUi
+                    ? InputBorder.none
+                    : const OutlineInputBorder(),
+                labelText: "名称".tl,
+              ),
             ),
           ),
         ),
@@ -304,16 +348,17 @@ class RenameFolderDialog extends StatelessWidget {
         SizedBox(
             height: 35,
             child: Center(
-              child: TextButton(
-                  onPressed: () {
-                    try {
-                      LocalFavoritesManager().rename(before, controller.text);
-                      context.pop();
-                    } catch (e) {
-                      showToast(message: e.toString());
-                    }
-                  },
-                  child: Text("提交".tl)),
+              child: _buildFavoritesDialogTextAction(
+                text: "提交".tl,
+                onTap: () {
+                  try {
+                    LocalFavoritesManager().rename(before, controller.text);
+                    context.pop();
+                  } catch (e) {
+                    showToast(message: e.toString());
+                  }
+                },
+              ),
             ))
       ],
     );
@@ -900,29 +945,46 @@ class LocalFavoriteTile extends ComicTile {
                             ),
                             SizedBox(
                               height: 56,
-                              child: TextField(
-                                controller: controller,
-                                decoration: InputDecoration(
-                                  border: const UnderlineInputBorder(),
-                                  suffix: IconButton(
-                                    icon: const Icon(Icons.add),
-                                    onPressed: () {
-                                      var value = controller.text;
-                                      if (value.isNotEmpty) {
-                                        controller.clear();
-                                        tags.add(value);
-                                        setState(() {});
-                                      }
-                                    },
-                                  ).paddingTop(8),
+                              child: _buildFavoritesDialogField(
+                                child: TextField(
+                                  controller: controller,
+                                  decoration: InputDecoration(
+                                    border: enableLiquidGlassUi
+                                        ? InputBorder.none
+                                        : const UnderlineInputBorder(),
+                                    suffix: enableLiquidGlassUi
+                                        ? GlassIconActionButton(
+                                            icon: Icons.add,
+                                            tooltip: "添加".tl,
+                                            onTap: () {
+                                              var value = controller.text;
+                                              if (value.isNotEmpty) {
+                                                controller.clear();
+                                                tags.add(value);
+                                                setState(() {});
+                                              }
+                                            },
+                                          )
+                                        : IconButton(
+                                            icon: const Icon(Icons.add),
+                                            onPressed: () {
+                                              var value = controller.text;
+                                              if (value.isNotEmpty) {
+                                                controller.clear();
+                                                tags.add(value);
+                                                setState(() {});
+                                              }
+                                            },
+                                          ).paddingTop(8),
+                                  ),
+                                  onSubmitted: (value) {
+                                    if (value.isNotEmpty) {
+                                      tags.add(value);
+                                      controller.clear();
+                                      setState(() {});
+                                    }
+                                  },
                                 ),
-                                onSubmitted: (value) {
-                                  if (value.isNotEmpty) {
-                                    tags.add(value);
-                                    controller.clear();
-                                    setState(() {});
-                                  }
-                                },
                               ),
                             ).paddingHorizontal(36),
                             const SizedBox(
@@ -1057,7 +1119,15 @@ class _LocalFavoritesFolderState extends State<LocalFavoritesFolder> {
               key: Key(comics[index].target),
             ));
     return Scaffold(
-      appBar: AppBar(title: Text(widget.name)),
+      appBar: AppBar(
+        title: enableLiquidGlassUi
+            ? GlassSurface(
+                borderRadius: 18,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Text(widget.name),
+              )
+            : Text(widget.name),
+      ),
       body: Column(
         children: [
           Expanded(

@@ -98,6 +98,71 @@ class _DownloadingPageState extends State<DownloadingPage> {
             String displayText = downloadManager.error
                 ? "下载出错".tl
                 : downloadTaskText + downloadStatus;
+            final headerChild = Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                ),
+                downloadManager.isDownloading
+                    ? const Icon(
+                        Icons.downloading,
+                        color: Colors.blue,
+                      )
+                    : const Icon(
+                        Icons.pause_circle_outline_outlined,
+                        color: Colors.red,
+                      ),
+                const SizedBox(
+                  width: 12,
+                ),
+                Text(displayText),
+                const Spacer(),
+                if (downloadManager.downloading.isNotEmpty)
+                  (enableLiquidGlassUi
+                      ? GlassSurface(
+                          borderRadius: 16,
+                          onTap: () {
+                            downloadManager.isDownloading
+                                ? downloadManager.pause()
+                                : downloadManager.start();
+                            setState(() {});
+                          },
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          child: Text(
+                            downloadManager.isDownloading
+                                ? "暂停".tl
+                                : (downloadManager.error ? "重试".tl : "继续".tl),
+                          ),
+                        )
+                      : TextButton(
+                          onPressed: () {
+                            downloadManager.isDownloading
+                                ? downloadManager.pause()
+                                : downloadManager.start();
+                            setState(() {});
+                          },
+                          child: downloadManager.isDownloading
+                              ? Text("暂停".tl)
+                              : (downloadManager.error
+                                  ? Text("重试".tl)
+                                  : Text("继续".tl)),
+                        )),
+                const SizedBox(
+                  width: 16,
+                ),
+              ],
+            );
+            if (enableLiquidGlassUi) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                child: GlassSurface(
+                  borderRadius: 18,
+                  height: 56,
+                  child: headerChild,
+                ),
+              );
+            }
             return Container(
                 decoration: BoxDecoration(
                   border: Border(
@@ -107,44 +172,7 @@ class _DownloadingPageState extends State<DownloadingPage> {
                   ),
                 ),
                 height: 48,
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                    ),
-                    downloadManager.isDownloading
-                        ? const Icon(
-                            Icons.downloading,
-                            color: Colors.blue,
-                          )
-                        : const Icon(
-                            Icons.pause_circle_outline_outlined,
-                            color: Colors.red,
-                          ),
-                    const SizedBox(
-                      width: 12,
-                    ),
-                    Text(displayText),
-                    const Spacer(),
-                    if (downloadManager.downloading.isNotEmpty)
-                      TextButton(
-                        onPressed: () {
-                          downloadManager.isDownloading
-                              ? downloadManager.pause()
-                              : downloadManager.start();
-                          setState(() {});
-                        },
-                        child: downloadManager.isDownloading
-                            ? Text("暂停".tl)
-                            : (downloadManager.error
-                                ? Text("重试".tl)
-                                : Text("继续".tl)),
-                      ),
-                    const SizedBox(
-                      width: 16,
-                    ),
-                  ],
-                ));
+                child: headerChild);
           } else {
             return widgets[index - 1];
           }
@@ -224,7 +252,7 @@ class _DownloadingTileState extends State<_DownloadingTile> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final tileContent = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       child: SizedBox(
         height: 114,
@@ -276,18 +304,33 @@ class _DownloadingTileState extends State<_DownloadingTile> {
               child: Column(
                 children: [
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: widget.cancel,
-                  ),
+                  enableLiquidGlassUi
+                      ? GlassIconActionButton(
+                          icon: Icons.close,
+                          tooltip: "取消".tl,
+                          onTap: widget.cancel,
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: widget.cancel,
+                        ),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.vertical_align_top),
-                    onPressed: () {
-                      DownloadManager().moveToFirst(comic);
-                      widget.onComicPositionChange();
-                    },
-                  ),
+                  enableLiquidGlassUi
+                      ? GlassIconActionButton(
+                          icon: Icons.vertical_align_top,
+                          tooltip: "置顶".tl,
+                          onTap: () {
+                            DownloadManager().moveToFirst(comic);
+                            widget.onComicPositionChange();
+                          },
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.vertical_align_top),
+                          onPressed: () {
+                            DownloadManager().moveToFirst(comic);
+                            widget.onComicPositionChange();
+                          },
+                        ),
                   const Spacer(),
                 ],
               ),
@@ -296,6 +339,14 @@ class _DownloadingTileState extends State<_DownloadingTile> {
         ),
       ),
     );
+    if (enableLiquidGlassUi) {
+      return GlassSurface(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        borderRadius: 20,
+        child: tileContent,
+      );
+    }
+    return tileContent;
   }
 
   String _bytesToSize(int bytes) {

@@ -1,3 +1,5 @@
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:liquid_glass_widgets/widgets/shared/adaptive_liquid_glass_layer.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
@@ -338,42 +340,58 @@ class CategoryPage extends StatelessWidget {
         );
       }
     }
-    return SingleChildScrollView(
+    final content = SingleChildScrollView(
+      padding: EdgeInsets.only(bottom: bottomOverlayInsetOf(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
       ),
+    );
+    return AdaptiveLiquidGlassLayer(
+      settings: LiquidGlassSettings(blur: 0),
+      child: content,
     );
   }
 
   Widget buildTitle(String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 5, 10),
-      child: Text(title.tl,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500)),
+      child: Text(
+        title.tl,
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+      ),
     );
   }
 
   Widget buildTitleWithRefresh(String title, void Function() onRefresh) {
+    final row = Row(
+      children: [
+        Text(
+          title.tl,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const Spacer(),
+        App.isFluent
+            ? fluent.IconButton(
+                icon: const Icon(fluent.FluentIcons.refresh),
+                onPressed: onRefresh)
+            : enableLiquidGlassUi
+                ? GlassIconActionButton(
+                    icon: Icons.refresh,
+                    tooltip: "刷新".tl,
+                    useOwnLayer: false,
+                    blur: 0,
+                    onTap: onRefresh,
+                  )
+                : IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh))
+      ],
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 5, 10),
-      child: Row(
-        children: [
-          Text(
-            title.tl,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Spacer(),
-          App.isFluent
-              ? fluent.IconButton(
-                  icon: const Icon(fluent.FluentIcons.refresh),
-                  onPressed: onRefresh)
-              : IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh))
-        ],
-      ),
+      child: row,
     );
   }
 

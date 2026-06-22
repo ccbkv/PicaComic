@@ -1,5 +1,6 @@
 library pica_reader;
 
+import 'package:liquid_glass_widgets/widgets/shared/adaptive_liquid_glass_layer.dart';
 import 'package:pica_comic/utils/show_delayed_dialog.dart';
 import 'dart:async';
 import 'dart:io';
@@ -183,7 +184,7 @@ class ComicReadingPage extends StatelessWidget {
       } else {
         if (logic.order == readingData.eps?.length &&
             logic.index == logic.length) {
-          history?.ep = 0;
+          history?.ep = logic.order;
           history?.page = logic.length;
         } else {
           history?.ep = logic.order;

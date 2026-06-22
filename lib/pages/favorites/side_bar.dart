@@ -61,6 +61,65 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
 
   @override
   Widget build(BuildContext context) {
+    final content = Column(
+      children: [
+        if (widget.withAppbar)
+          SizedBox(
+            height: 56,
+            child: Row(
+              children: [
+                const SizedBox(width: 8),
+                const CloseButton(),
+                const SizedBox(width: 8),
+                Text(
+                  "文件夹".tl,
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ],
+            ),
+          ).paddingTop(MediaQuery.of(context).padding.top),
+        Expanded(
+          child: ListView.builder(
+            padding: widget.withAppbar
+                ? EdgeInsets.zero
+                : EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+            itemCount: folders.length + networkFolders.length + 3,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return buildLocalTitle();
+              }
+              index--;
+              if (index == 0) {
+                return buildLocalFolder(_localAllFolderLabel);
+              }
+              index--;
+              if (index < folders.length) {
+                return buildLocalFolder(folders[index]);
+              }
+              index -= folders.length;
+              if (index == 0) {
+                return buildNetworkTitle();
+              }
+              index--;
+              return buildNetworkFolder(networkFolders[index]);
+            },
+          ),
+        )
+      ],
+    );
+
+    if (enableLiquidGlassUi) {
+      return Padding(
+        padding: const EdgeInsets.all(8),
+        child: GlassSurface(
+          width: double.infinity,
+          height: double.infinity,
+          borderRadius: 24,
+          child: content,
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -72,52 +131,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
           ),
         ),
       ),
-      child: Column(
-        children: [
-          if (widget.withAppbar)
-            SizedBox(
-              height: 56,
-              child: Row(
-                children: [
-                  const SizedBox(width: 8),
-                  const CloseButton(),
-                  const SizedBox(width: 8),
-                  Text(
-                    "文件夹".tl,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ],
-              ),
-            ).paddingTop(MediaQuery.of(context).padding.top),
-          Expanded(
-            child: ListView.builder(
-              padding: widget.withAppbar
-                  ? EdgeInsets.zero
-                  : EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-              itemCount: folders.length + networkFolders.length + 3,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return buildLocalTitle();
-                }
-                index--;
-                if (index == 0) {
-                  return buildLocalFolder(_localAllFolderLabel);
-                }
-                index--;
-                if (index < folders.length) {
-                  return buildLocalFolder(folders[index]);
-                }
-                index -= folders.length;
-                if (index == 0) {
-                  return buildNetworkTitle();
-                }
-                index--;
-                return buildNetworkFolder(networkFolders[index]);
-              },
-            ),
-          )
-        ],
-      ),
+      child: content,
     );
   }
 
@@ -187,16 +201,28 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
           const SizedBox(width: 12),
           Text("网络".tl),
           const Spacer(),
-          IconButton(
-            icon: Icon(Icons.settings, color: Colors.grey[700]),
-            onPressed: () {
-              showPopUpWidget(
-                App.globalContext!,
-                MultiPagesFilter("网络收藏页面".tl, 68, networkFavorites(),
-                    onChange: update, helpContent: "重新排序\n长按并拖动以重新排序。".tl),
-              );
-            },
-          ),
+          enableLiquidGlassUi
+              ? GlassIconActionButton(
+                  icon: Icons.settings,
+                  tooltip: "设置".tl,
+                  onTap: () {
+                    showPopUpWidget(
+                      App.globalContext!,
+                      MultiPagesFilter("网络收藏页面".tl, 68, networkFavorites(),
+                          onChange: update, helpContent: "重新排序\n长按并拖动以重新排序。".tl),
+                    );
+                  },
+                )
+              : IconButton(
+                  icon: Icon(Icons.settings, color: Colors.grey[700]),
+                  onPressed: () {
+                    showPopUpWidget(
+                      App.globalContext!,
+                      MultiPagesFilter("网络收藏页面".tl, 68, networkFavorites(),
+                          onChange: update, helpContent: "重新排序\n长按并拖动以重新排序。".tl),
+                    );
+                  },
+                ),
         ],
       ).paddingHorizontal(16),
     );
@@ -213,6 +239,51 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
     var folderName = name == _localAllFolderLabel
         ? "全部".tl
         : getFavoriteDataOrNull(name)?.title ?? name;
+    final row = Container(
+      height: 42,
+      alignment: Alignment.centerLeft,
+      decoration: BoxDecoration(
+        color: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.36)
+            : null,
+        border: Border(
+          left: BorderSide(
+            color:
+                isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.only(left: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(folderName),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 2,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(count.toString()),
+          ),
+        ],
+      ),
+    );
+    final itemChild = enableLiquidGlassUi && isSelected
+        ? Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: GlassSurface(
+              borderRadius: 18,
+              child: row,
+            ),
+          )
+        : row;
     return InkWell(
       onTap: () {
         if (isSelected) {
@@ -239,42 +310,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
           _showMenu(name, details.globalPosition);
         }
       },
-      child: Container(
-        height: 42,
-        alignment: Alignment.centerLeft,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.36)
-              : null,
-          border: Border(
-            left: BorderSide(
-              color:
-                  isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        padding: const EdgeInsets.only(left: 16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(folderName),
-            ),
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 2,
-              ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(count.toString()),
-            ),
-          ],
-        ),
-      ),
+      child: itemChild,
     );
   }
 
@@ -284,6 +320,33 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
       return const SizedBox();
     }
     bool isSelected = key == favPage.folder && favPage.isNetwork;
+    final row = Container(
+      height: 42,
+      alignment: Alignment.centerLeft,
+      decoration: BoxDecoration(
+        color: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.36)
+            : null,
+        border: Border(
+          left: BorderSide(
+            color:
+                isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.only(left: 16),
+      child: Text(data.title),
+    );
+    final itemChild = enableLiquidGlassUi && isSelected
+        ? Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: GlassSurface(
+              borderRadius: 18,
+              child: row,
+            ),
+          )
+        : row;
     return InkWell(
       onTap: () {
         if (isSelected) {
@@ -292,24 +355,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
         favPage.setFolder(true, key);
         widget.onSelected?.call();
       },
-      child: Container(
-        height: 42,
-        alignment: Alignment.centerLeft,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.36)
-              : null,
-          border: Border(
-            left: BorderSide(
-              color:
-                  isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        padding: const EdgeInsets.only(left: 16),
-        child: Text(data.title),
-      ),
+      child: itemChild,
     );
   }
 

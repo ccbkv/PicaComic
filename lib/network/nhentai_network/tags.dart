@@ -1,3 +1,5 @@
+import 'package:pica_comic/utils/tags_translation.dart';
+
 const Map<String, String> nhentaiTags = {
   "2937": "big breasts",
   "35762": "sole female",
@@ -2167,3 +2169,94 @@ const Map<String, String> nhentaiParodyTags = {
   "929": "puzzle and dragons",
 };
 
+class NhentaiTagSearchEntry {
+  const NhentaiTagSearchEntry({
+    required this.namespace,
+    required this.value,
+  });
+
+  final String namespace;
+  final String value;
+
+  String get uniqueKey => '$namespace:$value';
+}
+
+String _translateNhentaiTagValue(String namespace, String value) {
+  return switch (namespace) {
+    'tag' => value.translateTagsToCN,
+    'character' || 'parody' || 'language' =>
+      TagsTranslation.translationTagWithNamespace(value, namespace),
+    _ => value,
+  };
+}
+
+Iterable<NhentaiTagSearchEntry> _iterateNhentaiTagSearchEntries() sync* {
+  for (final value in nhentaiTags.values) {
+    yield NhentaiTagSearchEntry(namespace: 'tag', value: value);
+  }
+  for (final value in nhentaiCharacterTags.values) {
+    yield NhentaiTagSearchEntry(namespace: 'character', value: value);
+  }
+  for (final value in nhentaiParodyTags.values) {
+    yield NhentaiTagSearchEntry(namespace: 'parody', value: value);
+  }
+  for (final value in const ['chinese', 'japanese', 'english']) {
+    yield NhentaiTagSearchEntry(namespace: 'language', value: value);
+  }
+}
+
+List<NhentaiTagSearchEntry> searchNhentaiLocalTags(
+  String query, {
+  int limit = 10,
+}) {
+  final normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.isEmpty) {
+    return const [];
+  }
+
+  final matches = <NhentaiTagSearchEntry>[];
+  final seen = <String>{};
+  for (final entry in _iterateNhentaiTagSearchEntries()) {
+    final english = entry.value.toLowerCase();
+    final translated = _translateNhentaiTagValue(
+      entry.namespace,
+      entry.value,
+    ).toLowerCase();
+    if (!english.contains(normalizedQuery) &&
+        !translated.contains(normalizedQuery)) {
+      continue;
+    }
+    if (seen.add(entry.uniqueKey)) {
+      matches.add(entry);
+    }
+    if (matches.length >= limit) {
+      break;
+    }
+  }
+  return matches;
+}
+
+NhentaiTagSearchEntry? findNhentaiLocalTag(String query) {
+  final normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.isEmpty) {
+    return null;
+  }
+
+  for (final entry in _iterateNhentaiTagSearchEntries()) {
+    if (entry.value.toLowerCase() == normalizedQuery) {
+      return entry;
+    }
+  }
+
+  for (final entry in _iterateNhentaiTagSearchEntries()) {
+    final translated = _translateNhentaiTagValue(
+      entry.namespace,
+      entry.value,
+    ).toLowerCase();
+    if (translated == normalizedQuery) {
+      return entry;
+    }
+  }
+
+  return null;
+}

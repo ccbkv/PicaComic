@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/base.dart';
 import 'package:file_picker/file_picker.dart';
@@ -90,6 +91,9 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   ColorScheme get colors => Theme.of(context).colorScheme;
 
   bool get enableTwoViews => !UiMode.m1(context);
+
+  bool get enableLiquidGlassSettingsUi =>
+      appdata.settings.length > 103 && appdata.settings[103] == "1";
 
   final categories = <String>[
     "浏览",
@@ -499,6 +503,9 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   }
 
   Widget buildBody() {
+    if (enableLiquidGlassSettingsUi) {
+      return buildGlassBody();
+    }
     if (enableTwoViews) {
       return Row(
         children: [
@@ -590,6 +597,226 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     }
   }
 
+  Widget buildGlassBody() {
+    if (enableTwoViews) {
+      return Stack(
+        children: [
+          Positioned.fill(child: _buildGlassBackground()),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 304,
+                  child: buildLeft(),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: currentPage == -1
+                        ? _buildGlassPlaceholderPane()
+                        : buildRight(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Stack(
+      children: [
+        Positioned.fill(child: _buildGlassBackground()),
+        Positioned.fill(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: buildLeft(),
+          ),
+        ),
+        Positioned(
+          left: offset,
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Listener(
+              onPointerDown: handlePointerDown,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                reverseDuration: const Duration(milliseconds: 300),
+                switchInCurve: Curves.fastOutSlowIn,
+                switchOutCurve: Curves.fastOutSlowIn,
+                transitionBuilder: (child, animation) {
+                  var tween = Tween<Offset>(
+                      begin: const Offset(1, 0), end: const Offset(0, 0));
+
+                  return SlideTransition(
+                    position: tween.animate(animation),
+                    child: child,
+                  );
+                },
+                child: currentPage == -1
+                    ? const SizedBox(
+                        key: Key("glass-left"),
+                      )
+                    : buildRight(),
+              ),
+            ),
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _buildGlassBackground() {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+      ),
+    );
+  }
+
+  Widget _buildGlassPane({
+    required Widget child,
+    Key? key,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return GlassContainer(
+      key: key,
+      width: double.infinity,
+      height: double.infinity,
+      useOwnLayer: false,
+      quality: GlassQuality.minimal,
+      shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+      settings: LiquidGlassSettings(
+        blur: 0,
+        glassColor: isDark
+            ? const Color.fromRGBO(24, 24, 28, 0.52)
+            : const Color.fromRGBO(255, 255, 255, 0.18),
+        ambientStrength: isDark ? 0.34 : 0.52,
+        saturation: 1.16,
+        thickness: 8,
+      ),
+      child: Material(
+        color: isDark
+            ? const Color.fromRGBO(24, 24, 28, 0.92)
+            : const Color.fromRGBO(255, 255, 255, 0.92),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildGlassHeader({
+    required String title,
+    required VoidCallback onBack,
+    bool showBack = true,
+  }) {
+    final titleStyle = Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+        );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: Row(
+        children: [
+          if (showBack) ...[
+            _buildGlassIconButton(
+              icon: Icons.arrow_back,
+              tooltip: "Back",
+              onPressed: onBack,
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Text(
+              title,
+              style: titleStyle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassIconButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    String? tooltip,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final button = GlassContainer(
+      width: 40,
+      height: 40,
+      useOwnLayer: true,
+      quality: GlassQuality.minimal,
+      shape: const LiquidRoundedSuperellipse(borderRadius: 18),
+      settings: LiquidGlassSettings(
+        blur: 12,
+        glassColor: isDark
+            ? scheme.surfaceContainerHighest.withValues(alpha: 0.32)
+            : Colors.white.withValues(alpha: 0.22),
+        ambientStrength: isDark ? 0.36 : 0.48,
+        saturation: 1.12,
+        thickness: 22,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onPressed,
+          child: Icon(icon),
+        ),
+      ),
+    );
+    if (tooltip == null) {
+      return button;
+    }
+    return Tooltip(message: tooltip, child: button);
+  }
+
+  Widget _buildGlassPlaceholderPane() {
+    final scheme = Theme.of(context).colorScheme;
+    return _buildGlassPane(
+      key: const ValueKey("glass-placeholder"),
+      child: Column(
+        children: [
+          SizedBox(height: MediaQuery.of(context).padding.top + 16),
+          _buildGlassHeader(
+            title: "设置".tl,
+            showBack: false,
+            onBack: () {},
+          ),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.tune,
+                    size: 48,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "选择左侧分类查看详细设置".tl,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void handlePointerDown(PointerDownEvent event) {
     if (event.position.dx < 20) {
       gestureRecognizer.addPointer(event);
@@ -597,6 +824,36 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   }
 
   Widget buildLeft() {
+    if (enableLiquidGlassSettingsUi) {
+      return _buildGlassPane(
+        key: const ValueKey("glass-left-pane"),
+        child: Column(
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).padding.top + 8,
+            ),
+            _buildGlassHeader(
+              title: "设置".tl,
+              onBack: () {
+                if (currentPage != -1 && !enableTwoViews) {
+                  setState(() => currentPage = -1);
+                } else if (currentPage == -1 && !enableTwoViews) {
+                  widget.onPop?.call();
+                  Navigator.of(context).pop();
+                } else {
+                  setState(() => currentPage = -1);
+                  widget.onPop?.call();
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+            Expanded(
+              child: buildCategories(),
+            ),
+          ],
+        ),
+      );
+    }
     return Material(
       child: Column(
         children: [
@@ -652,6 +909,23 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   }
 
   Widget buildCategories() {
+    if (enableLiquidGlassSettingsUi) {
+      return ListView.builder(
+        padding: EdgeInsets.fromLTRB(
+          8,
+          4,
+          8,
+          MediaQuery.of(context).padding.bottom + 12,
+        ),
+        itemCount: categories.length,
+        itemBuilder: (context, index) => _GlassSettingsCategoryItem(
+          selected: index == currentPage,
+          icon: icons[index],
+          label: categories[index].tl,
+          onTap: () => setState(() => currentPage = index),
+        ),
+      );
+    }
     Widget buildItem(String name, int id) {
       final bool selected = id == currentPage;
 
@@ -823,12 +1097,33 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           title: const Text("Fluent UI"),
           subtitle: Text("实验性功能,注目前这ui比较多bug，而且对手机不太友好".tl),
           trailing: fluent.ToggleSwitch(
-            checked: appdata.settings.length > 91 ? appdata.settings[91] == "1" : false,
-            onChanged: (b) {
-              while (appdata.settings.length <= 91) {
+            checked: (() {
+              while (appdata.settings.length <= 103) {
                 appdata.settings.add("0");
               }
-              appdata.settings[91] = b ? "1" : "0";
+              final fluentEnabled = appdata.settings[91] == "1";
+              if (fluentEnabled && appdata.settings[103] == "1") {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  setState(() {
+                    appdata.settings[103] = "0";
+                  });
+                  appdata.updateSettings();
+                  MyApp.updater?.call();
+                });
+              }
+              return fluentEnabled;
+            })(),
+            onChanged: (b) {
+              setState(() {
+                while (appdata.settings.length <= 103) {
+                  appdata.settings.add("0");
+                }
+                appdata.settings[91] = b ? "1" : "0";
+                if (b) {
+                  appdata.settings[103] = "0";
+                }
+              });
               appdata.updateSettings();
               MyApp.updater?.call();
             },
@@ -960,22 +1255,74 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
             leading: const Icon(Icons.window),
             title: const Text("Fluent UI"),
             subtitle: Text("实验性功能,注目前这ui比较多bug，而且对手机不太友好".tl),
-            trailing: Switch(
+            trailing: AdaptiveSwitch(
               value: appdata.settings.length > 91 ? appdata.settings[91] == "1" : false,
               onChanged: (b) {
-                while (appdata.settings.length <= 91) {
-                  appdata.settings.add("0");
-                }
-                appdata.settings[91] = b ? "1" : "0";
+                setState(() {
+                  while (appdata.settings.length <= 91) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[91] = b ? "1" : "0";
+                  if (b) {
+                    while (appdata.settings.length <= 103) {
+                      appdata.settings.add("0");
+                    }
+                    appdata.settings[103] = "0";
+                  }
+                });
                 appdata.updateSettings();
                 MyApp.updater?.call();
               },
             ),
           ),
+          //if (PlatformUtils.isOhos)
+            ListTile(
+              leading: const Icon(Icons.water_drop_outlined),
+              title: Text("液态玻璃效果和导航栏".tl),
+              subtitle: Text("实验性功能,可能存在性能或点击区域问题".tl),
+              trailing: AdaptiveSwitch(
+                      value: (() {
+                        while (appdata.settings.length <= 103) {
+                          appdata.settings.add("0");
+                        }
+                        final fluentEnabled =
+                            appdata.settings.length > 91 &&
+                                appdata.settings[91] == "1";
+                        if (fluentEnabled && appdata.settings[103] == "1") {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            setState(() {
+                              appdata.settings[103] = "0";
+                            });
+                            appdata.updateSettings();
+                            MyApp.updater?.call();
+                          });
+                          return false;
+                        }
+                        return appdata.settings[103] == "1";
+                      })(),
+                      onChanged: (b) {
+                        setState(() {
+                          while (appdata.settings.length <= 103) {
+                            appdata.settings.add("0");
+                          }
+                          if (b &&
+                              appdata.settings.length > 91 &&
+                              appdata.settings[91] == "1") {
+                            appdata.settings[103] = "0";
+                          } else {
+                            appdata.settings[103] = b ? "1" : "0";
+                          }
+                        });
+                        appdata.updateSettings();
+                        MyApp.updater?.call();
+                      },
+                    ),
+            ),
           ListTile(
             leading: const Icon(Icons.comment),
             title: Text("显示章节评论".tl),
-            trailing: Switch(
+            trailing: AdaptiveSwitch(
               value: appdata.settings.length > 92 ? appdata.settings[92] == "1" : true,
               onChanged: (b) {
                 setState(() {
@@ -992,7 +1339,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
             leading: const Icon(Icons.save),
             title: Text("下载时保存章节评论".tl),
             subtitle: Text("断网时也可查看已保存的章节评论".tl),
-            trailing: Switch(
+            trailing: AdaptiveSwitch(
               value: appdata.settings.length > 102 ? appdata.settings[102] == "1" : false,
               onChanged: (b) {
                 setState(() {
@@ -1005,33 +1352,11 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               },
             ),
           ),
-          if (App.isIOS)
-            ListTile(
-              leading: const Icon(Icons.tab),
-              title: Text("启用iOS原生底部导航栏,iOS26或以上有液態玻璃".tl),
-              subtitle: Text("使用原生UITabBar效果".tl),
-              trailing: Switch(
-                value: (() {
-                  while (appdata.settings.length <= 90) {
-                    appdata.settings.add("0");
-                  }
-                  return appdata.settings[90] == "1";
-                })(),
-                onChanged: (b) {
-                  while (appdata.settings.length <= 90) {
-                    appdata.settings.add("0");
-                  }
-                  appdata.settings[90] = b ? "1" : "0";
-                  appdata.updateSettings();
-                  MyApp.updater?.call();
-                },
-              ),
-            ),
           if (appdata.settings[32] == "0" || appdata.settings[32] == "2")
             ListTile(
               leading: const Icon(Icons.remove_red_eye),
               title: Text("纯黑色模式".tl),
-              trailing: Switch(
+              trailing: AdaptiveSwitch(
                 value: appdata.settings[84] == "1",
                 onChanged: (i) {
                   setState(() {
@@ -1063,7 +1388,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
                   )
                 ],
               ),
-              trailing: Switch(
+              trailing: AdaptiveSwitch(
                 value: appdata.settings[38] == "1",
                 onChanged: (b) {
                   setState(() {
@@ -1201,7 +1526,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
             //  leading: const Icon(Icons.screenshot),
             title: Text("阻止屏幕截图".tl),
             subtitle: Text("需要重启App以应用更改".tl),
-            trailing: Switch(
+            trailing: AdaptiveSwitch(
               value: appdata.settings[12] == "1",
               onChanged: (b) {
                 b ? appdata.settings[12] = "1" : appdata.settings[12] = "0";
@@ -1360,6 +1685,37 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       _ => throw UnimplementedError()
     };
 
+    if (enableLiquidGlassSettingsUi && currentPage != -1) {
+      return _buildGlassPane(
+        key: ValueKey("glass-right-$currentPage"),
+        child: Column(
+          children: [
+            SizedBox(height: MediaQuery.of(context).padding.top + 8),
+            _buildGlassHeader(
+              title: categories[currentPage].tl,
+              showBack: !enableTwoViews,
+              onBack: () => setState(() => currentPage = -1),
+            ),
+            Expanded(
+              child: CustomScrollView(
+                primary: false,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: body,
+                  ),
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).padding.bottom + 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (currentPage != -1) {
       return Material(
         child: CustomScrollView(
@@ -1422,5 +1778,119 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       // 调用onPop回调
       widget.onPop?.call();
     }
+  }
+}
+
+class _GlassSettingsCategoryItem extends StatefulWidget {
+  const _GlassSettingsCategoryItem({
+    required this.selected,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_GlassSettingsCategoryItem> createState() =>
+      _GlassSettingsCategoryItemState();
+}
+
+class _GlassSettingsCategoryItemState extends State<_GlassSettingsCategoryItem> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool active = widget.selected || _pressed;
+    final Color activeColor = scheme.primary;
+    final Color restingColor = scheme.onSurface.withValues(alpha: 0.82);
+
+    final content = Row(
+      children: [
+        Icon(
+          widget.icon,
+          color: active ? activeColor : restingColor,
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+              color: active ? activeColor : null,
+            ),
+          ),
+        ),
+        Icon(
+          Icons.arrow_right,
+          color: active ? activeColor : restingColor.withValues(alpha: 0.7),
+        ),
+      ],
+    );
+
+    final child = AnimatedScale(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
+      scale: _pressed ? 1.02 : 1.0,
+      child: active
+          ? DecoratedBox(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? activeColor.withValues(alpha: 0.26)
+                    : activeColor.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.25),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: content,
+                ),
+              ),
+            )
+          : AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: double.infinity,
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: isDark ? 0.02 : 0.08),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: content,
+            ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          widget.onTap();
+        },
+        child: child,
+      ),
+    );
   }
 }

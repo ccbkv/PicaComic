@@ -191,48 +191,60 @@ class _ButtonState extends State<Button> {
     if (width != null || height != null) {
       child = child.toCenter();
     }
+    void handlePressed() {
+      if (widget.disabled) {
+        return;
+      }
+      if (isLoading) return;
+      widget.onPressed();
+      if (widget.onPressedAt != null) {
+        var renderBox = context.findRenderObject() as RenderBox;
+        var offset = renderBox.localToGlobal(Offset.zero);
+        widget.onPressedAt!(offset);
+      }
+    }
+
+    Widget buildButtonBody() {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: padding,
+        decoration: BoxDecoration(
+          color: enableLiquidGlassUi ? glassOverlayColor : buttonColor,
+          borderRadius: BorderRadius.circular(16),
+          border: widget.type == ButtonType.outlined
+              ? Border.all(
+                  color: widget.color ?? Theme.of(context).colorScheme.outlineVariant,
+                  width: 0.6,
+                )
+              : null,
+        ),
+        child: fixed
+            ? SizedBox(
+                width: width,
+                height: height,
+                child: child,
+              )
+            : AnimatedSize(
+                duration: _fastAnimationDuration,
+                child: child,
+              ),
+      );
+    }
+
     return MouseRegion(
       onEnter: (_) => setState(() => isHover = true),
       onExit: (_) => setState(() => isHover = false),
       cursor: !widget.disabled ? SystemMouseCursors.click : MouseCursor.defer,
-      child: GestureDetector(
-        onTap: () {
-          if (widget.disabled) {
-            return;
-          }
-          if (isLoading) return;
-          widget.onPressed();
-          if (widget.onPressedAt != null) {
-            var renderBox = context.findRenderObject() as RenderBox;
-            var offset = renderBox.localToGlobal(Offset.zero);
-            widget.onPressedAt!(offset);
-          }
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: padding,
-          decoration: BoxDecoration(
-            color: buttonColor,
-            borderRadius: BorderRadius.circular(16),
-            border: widget.type == ButtonType.outlined
-                ? Border.all(
-                    color: widget.color ??
-                        Theme.of(context).colorScheme.outlineVariant,
-                    width: 0.6)
-                : null,
-          ),
-          child: fixed
-              ? SizedBox(
-                  width: width,
-                  height: height,
-                  child: child,
-                )
-              : AnimatedSize(
-                  duration: _fastAnimationDuration,
-                  child: child,
-                ),
-        ),
-      ),
+      child: enableLiquidGlassUi
+          ? GlassSurface(
+              borderRadius: 16,
+              onTap: handlePressed,
+              child: buildButtonBody(),
+            )
+          : GestureDetector(
+              onTap: handlePressed,
+              child: buildButtonBody(),
+            ),
     );
   }
 
@@ -266,6 +278,18 @@ class _ButtonState extends State<Button> {
         : (widget.type == ButtonType.text
             ? widget.color ?? context.colorScheme.primary
             : context.colorScheme.onSurface);
+  }
+
+  Color get glassOverlayColor {
+    if (widget.type == ButtonType.filled) {
+      final color = widget.color ?? context.colorScheme.primary;
+      return color.withValues(
+        alpha: widget.disabled ? 0.28 : (isHover ? 0.70 : 0.99),
+      );
+    }
+
+ 
+    return context.colorScheme.outline.withValues(alpha: isHover ? 0.14 : 0.08);
   }
 }
 
@@ -334,33 +358,112 @@ class _IconButtonState extends State<_IconButton> {
         strokeWidth: 1.5,
       ).paddingAll(2).fixWidth(iconSize).fixHeight(iconSize);
     }
+    final glassChild = Tooltip(
+      message: widget.tooltip ?? "",
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          color: (widget.color ?? context.colorScheme.primary).withValues(
+            alpha: isHover ? 0.16 : 0.10,
+          ),
+          borderRadius: BorderRadius.circular((iconSize + 12) / 2),
+        ),
+        padding: const EdgeInsets.all(6),
+        child: icon,
+      ),
+    );
     return MouseRegion(
       onEnter: (_) => setState(() => isHover = true),
       onExit: (_) => setState(() => isHover = false),
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: widget.behavior,
-        onTap: () {
-          if (widget.isLoading) return;
-          widget.onPressed();
-        },
-        child: Tooltip(
-          message: widget.tooltip ?? "",
-          child: Container(
-            decoration: BoxDecoration(
-              color: isHover
-                  ? Theme.of(context)
-                      .colorScheme
-                      .outlineVariant
-                      .withOpacity(0.4)
-                  : null,
-              borderRadius: BorderRadius.circular((iconSize + 12) / 2),
+      child: enableLiquidGlassUi
+          ? DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55)
+                    : Colors.white.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular((iconSize + 12) / 2),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.25),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                        alpha: Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular((iconSize + 12) / 2),
+                  onTap: () {
+                    if (widget.isLoading) return;
+                    widget.onPressed();
+                  },
+                  child: glassChild,
+                ),
+              ),
+            )
+          : GestureDetector(
+              behavior: widget.behavior,
+              onTap: () {
+                if (widget.isLoading) return;
+                widget.onPressed();
+              },
+              child: Tooltip(
+                message: widget.tooltip ?? "",
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isHover
+                        ? Theme.of(context)
+                            .colorScheme
+                            .outlineVariant
+                            .withOpacity(0.4)
+                        : null,
+                    borderRadius: BorderRadius.circular((iconSize + 12) / 2),
+                  ),
+                  padding: const EdgeInsets.all(6),
+                  child: icon,
+                ),
+              ),
             ),
-            padding: const EdgeInsets.all(6),
-            child: icon,
-          ),
-        ),
-      ),
+    );
+  }
+}
+
+class AdaptiveSwitch extends StatelessWidget {
+  const AdaptiveSwitch({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (App.isFluent) {
+      return fluent.ToggleSwitch(
+        checked: value,
+        onChanged: onChanged,
+      );
+    }
+    if (enableLiquidGlassUi) {
+      return GlassSwitch(
+        value: value,
+        onChanged: onChanged,
+      );
+    }
+    return Switch(
+      value: value,
+      onChanged: onChanged,
     );
   }
 }
@@ -399,6 +502,17 @@ class _StatefulSwitchState extends State<StatefulSwitch> {
         },
       );
     }
+    if (enableLiquidGlassUi) {
+      return GlassSwitch(
+        value: value,
+        onChanged: (b) {
+          setState(() {
+            value = b;
+            widget.onChanged(b);
+          });
+        },
+      );
+    }
     return Switch(
         value: value,
         onChanged: (b) {
@@ -423,6 +537,40 @@ class MenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (enableLiquidGlassUi) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final scheme = Theme.of(context).colorScheme;
+      return GlassMenu(
+        autoAdjustToScreen: true,
+        menuWidth: 220,
+        settings: LiquidGlassSettings(
+          blur: 18,
+          glassColor: isDark
+              ? scheme.surfaceContainerHighest.withValues(alpha: 0.24)
+              : Colors.white.withValues(alpha: 0.16),
+          ambientStrength: isDark ? 0.34 : 0.48,
+          saturation: 1.14,
+          thickness: 18,
+        ),
+        items: entries
+            .map((e) => GlassMenuItem(
+                  title: e.text,
+                  icon: e.icon != null ? Icon(e.icon) : null,
+                  onTap: e.onClick,
+                  titleStyle:
+                      e.color != null ? TextStyle(color: e.color) : null,
+                  iconColor: e.color,
+                ))
+            .toList(),
+        triggerBuilder: (ctx, toggle) => Tooltip(
+          message: "更多".tl,
+          child: Button.icon(
+            icon: icon ?? const Icon(Icons.more_horiz),
+            onPressed: toggle,
+          ),
+        ),
+      );
+    }
     return Tooltip(
       message: "更多".tl,
       child: Button.icon(

@@ -339,7 +339,6 @@ class NhentaiNetwork {
       item.id.toString(),
       lang,
       tags,
-      pages: item.pages,
     );
   }
 
@@ -551,7 +550,6 @@ class NhentaiNetwork {
         thumbnails,
         recommendations,
         '',
-        pages: gallery.numPages,
       ));
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
@@ -565,14 +563,47 @@ class NhentaiNetwork {
       return Res.fromErrorRes(res);
     }
     try {
-      // res.data 已经是 List<dynamic> 类型，直接使用
+      final rawData = res.data;
+      late final Iterable<dynamic> rawComments;
+      if (rawData is List) {
+        rawComments = rawData;
+      } else if (rawData is Map<String, dynamic>) {
+        final nestedComments =
+            rawData["comments"] ?? rawData["result"] ?? rawData["items"];
+        if (nestedComments == null) {
+          rawComments = const [];
+        } else if (nestedComments is List) {
+          rawComments = nestedComments;
+        } else {
+          throw FormatException(
+            "Invalid comments response: expected a list, got ${nestedComments.runtimeType}",
+          );
+        }
+      } else {
+        throw FormatException(
+          "Invalid comments response: expected List or Map, got ${rawData.runtimeType}",
+        );
+      }
+
       var comments = <NhentaiComment>[];
-      for (var c in res.data) {
+      for (var item in rawComments) {
+        if (item is! Map) {
+          continue;
+        }
+        final c = Map<String, dynamic>.from(item);
+        final poster = c["poster"] is Map
+            ? Map<String, dynamic>.from(c["poster"])
+            : const <String, dynamic>{};
+        final avatarUrl = poster["avatar_url"]?.toString() ?? "";
         comments.add(NhentaiComment(
-            c["poster"]["username"],
-            "https://i3.nhentai.net/${c["poster"]["avatar_url"]}",
-            c["body"],
-            c["post_date"]));
+            poster["username"]?.toString() ?? "",
+            avatarUrl.isEmpty
+                ? ""
+                : avatarUrl.startsWith("http")
+                    ? avatarUrl
+                    : "https://i3.nhentai.net/$avatarUrl",
+            c["body"]?.toString() ?? "",
+            (c["post_date"] as num?)?.toInt() ?? 0));
       }
       return Res(comments);
     } catch (e, s) {

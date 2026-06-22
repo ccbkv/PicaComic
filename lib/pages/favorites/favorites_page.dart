@@ -153,6 +153,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Widget buildBody() {
+    final bottomInset = bottomOverlayInsetOf(context);
     if (folder == null) {
       return CustomScrollView(
         slivers: [
@@ -173,6 +174,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
                   : null,
               child: Text("未选择".tl),
             ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(height: bottomInset),
           ),
         ],
       );

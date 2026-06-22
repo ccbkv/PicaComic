@@ -73,7 +73,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     super.initState();
   }
 
-  bool get _isNhentai => source.key == "nhentai";
+bool get _isNhentai => source.key == "nhentai";
 
   Future<void> _openFilterDialog() async {
     if (_isNhentai) {
@@ -133,12 +133,73 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     );
   }
 
+  Widget _buildFilterAction(BuildContext context, List<String> categories) {
+    final onTap = () {
+      Future.delayed(Duration.zero, () {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => GestureDetector(
+              onTap: () {
+                Navigator.of(context).pop();
+              },
+              child: Material(
+                color: Colors.transparent,
+                child: GestureDetector(
+                  onTap: () {},
+                  child: CategorySelectorDialog(
+                    categories: categories,
+                    initialSelectedCategories: selectedCategories,
+                    onCategoriesSelected: (newSelectedCategories) {
+                      setState(() {
+                        selectedCategories = newSelectedCategories;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      });
+    };
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
+      ),
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        child: const Text("分类过滤"),
+      ),
+    );
+  }
+
+  Widget _buildSelectedCategoryChip(String category) {
+    final onDelete = () {
+      setState(() {
+        selectedCategories.remove(category);
+      });
+    };
+    return Chip(
+      label: Text(category),
+      onDeleted: onDelete,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 获取分类列表
     final source = ComicSource.sources
         .firstWhere((e) => e.categoryData?.key == widget.categoryKey);
-
+   // final categories = _getCategories(source);
+    
     if (App.isFluent) {
       return fluent.ScaffoldPage(
         header: fluent.PageHeader(
@@ -160,7 +221,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
         ),
         content: Column(
           children: [
-            if (!_isNhentai && selectedCategories.length > 1) ...[
+             if (!_isNhentai && selectedCategories.length > 1) ...[
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Wrap(
@@ -210,7 +271,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
       );
     }
 
-    return Scaffold(
+   return Scaffold(
       backgroundColor: Colors.white,
       appBar: Appbar(
         scrolledUnderElevation: 0,
@@ -242,21 +303,14 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
       body: Column(
         children: [
           // 显示已选分类
-          if (!_isNhentai && selectedCategories.length > 1) ...[
+             if (!_isNhentai && selectedCategories.length > 1) ...[
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: selectedCategories.map((category) {
-                  return Chip(
-                    label: Text(category),
-                    onDeleted: () {
-                      setState(() {
-                        selectedCategories.remove(category);
-                      });
-                    },
-                  );
+                  return _buildSelectedCategoryChip(category);
                 }).toList(),
               ),
             ),
@@ -265,7 +319,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
           Expanded(
             child: _CategoryComicsList(
               key: ValueKey(
-                  "${selectedCategories.join(',')} with $optionsValue and $currentParam"),
+              "${selectedCategories.join(',')} with $optionsValue and $currentParam"),
               loader: data.load,
               category: selectedCategories.join(','),
               options: optionsValue,
@@ -379,10 +433,12 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     }
     return SliverToBoxAdapter(
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [...children, const Divider()],
-      ).paddingLeft(8).paddingRight(8),
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [...children, const Divider()],
+                )
+          .paddingLeft(8)
+          .paddingRight(8),
     );
   }
 }

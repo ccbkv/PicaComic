@@ -57,7 +57,7 @@ class _ReadingSettingsState extends State<ReadingSettings> {
         ListTile(
           leading: const Icon(Icons.comment),
           title: Text("显示章节评论".tl),
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: appdata.settings.length > 92 ? appdata.settings[92] == "1" : true,
             onChanged: (b) {
               setState(() {
@@ -80,7 +80,7 @@ class _ReadingSettingsState extends State<ReadingSettings> {
           ListTile(
             leading: const Icon(Icons.comment_bank),
             title: Text("章节末尾显示评论".tl),
-            trailing: Switch(
+            trailing: AdaptiveSwitch(
               value: appdata.settings.length > 99 ? appdata.settings[99] == "1" : false,
               onChanged: (b) {
                 setState(() {
@@ -98,7 +98,7 @@ class _ReadingSettingsState extends State<ReadingSettings> {
             leading: const Icon(Icons.save),
             title: Text("下载时保存章节评论".tl),
             subtitle: Text("断网时也可查看已保存的章节评论".tl),
-            trailing: Switch(
+            trailing: AdaptiveSwitch(
               value: appdata.settings.length > 102 ? appdata.settings[102] == "1" : false,
               onChanged: (b) {
                 setState(() {
@@ -196,7 +196,7 @@ class _ReadingSettingsState extends State<ReadingSettings> {
           ListTile(
             leading: const Icon(Icons.signal_cellular_alt),
             title: Text("始终显示状态栏".tl),
-            trailing: Switch(
+            trailing: AdaptiveSwitch(
               value: appdata.settings.length > 95 && appdata.settings[95] == "1",
               onChanged: (b) {
                 setState(() {

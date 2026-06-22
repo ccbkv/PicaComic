@@ -77,7 +77,7 @@ class _HistoryPageState extends State<HistoryPage> {
       focusNode.requestFocus();
       bool focus = searchInit;
       searchInit = false;
-      return TextField(
+      final searchField = TextField(
         focusNode: focus ? focusNode : null,
         decoration:
         InputDecoration(border: InputBorder.none, hintText: "搜索".tl),
@@ -87,6 +87,15 @@ class _HistoryPageState extends State<HistoryPage> {
           });
         },
       );
+      if (enableLiquidGlassUi) {
+        return GlassSurface(
+          height: 42,
+          borderRadius: 20,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Center(child: searchField),
+        );
+      }
+      return searchField;
     } else {
       return null;
     }
@@ -226,28 +235,50 @@ class _HistoryPageState extends State<HistoryPage> {
                       ],
                     );
                   },
-                  child: IconButton(
-                    icon: const Icon(Icons.delete_forever),
-                    onPressed: () {
-                      controller.show();
-                    },
-                  ),
+                  child: enableLiquidGlassUi
+                      ? GlassIconActionButton(
+                          icon: Icons.delete_forever,
+                          tooltip: '清除'.tl,
+                          onTap: () {
+                            controller.show();
+                          },
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.delete_forever),
+                          onPressed: () {
+                            controller.show();
+                          },
+                        ),
                 ),
               ),
               Tooltip(
                 message: "搜索".tl,
-                child: IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: () {
-                    setState(() {
-                      searchMode = !searchMode;
-                      searchInit = true;
-                      if (!searchMode) {
-                        keyword = "";
-                      }
-                    });
-                  },
-                ),
+                child: enableLiquidGlassUi
+                    ? GlassIconActionButton(
+                        icon: Icons.search,
+                        tooltip: "搜索".tl,
+                        onTap: () {
+                          setState(() {
+                            searchMode = !searchMode;
+                            searchInit = true;
+                            if (!searchMode) {
+                              keyword = "";
+                            }
+                          });
+                        },
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: () {
+                          setState(() {
+                            searchMode = !searchMode;
+                            searchInit = true;
+                            if (!searchMode) {
+                              keyword = "";
+                            }
+                          });
+                        },
+                      ),
               )
             ],
           ),

@@ -115,8 +115,8 @@ class HiNetwork {
       }
       var time = comicDiv.querySelector("div.dj-content > p")!.text;
       return Res(
-          HitomiComicBrief(name, type, lang, tags, time, artist, link, cover,
-              pages: null));
+         HitomiComicBrief(name, type, lang, tags, time, artist, link, cover,
+             pages: null));
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analysis", "$e\n$s");
       return Res(null, errorMessage: e.toString());

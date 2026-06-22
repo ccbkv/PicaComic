@@ -232,7 +232,7 @@ class RandomCategoryPartWithRuntimeData extends BaseCategoryPart {
   }
 
   @override
-  List<String> get categories {
+    List<String> get categories {
     _lastCategories = _categories();
     return _lastCategories;
   }
@@ -247,7 +247,7 @@ class RandomCategoryPartWithRuntimeData extends BaseCategoryPart {
   }
 
   /// A [BaseCategoryPart] that show random tags on category page.
-  RandomCategoryPartWithRuntimeData(this.title, this.loadTags,
+    RandomCategoryPartWithRuntimeData(this.title, this.loadTags,
       this.randomNumber, this.categoryType,
       {this.buildParam});
 }

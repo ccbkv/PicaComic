@@ -60,7 +60,7 @@ class _NetworkSettingsState extends State<NetworkSettings> {
         ListTile(
           leading: const Icon(Icons.dns),
           title: Text("启用".tl),
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: appdata.settings[58] == "1",
             onChanged: (value){
               setState(() {

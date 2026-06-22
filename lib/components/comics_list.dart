@@ -143,6 +143,12 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
 
   @override
   Widget build(context) {
+    final overlayInset = bottomOverlayInsetOf(context);
+    final listBottomInset = math.max(
+      MediaQuery.of(context).padding.bottom,
+      overlayInset + 16,
+    );
+
     Widget? removeSliver(Widget? widget) {
       if (widget == null) return null;
 
@@ -278,9 +284,9 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
                       child: ListLoadingIndicator(),
                     )
                   else
-                    const SliverToBoxAdapter(
+                    SliverToBoxAdapter(
                       child: SizedBox(
-                        height: 80,
+                        height: listBottomInset,
                       ),
                     )
                 ],
@@ -341,8 +347,8 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
                       logic.maxPage != 1)
                     buildPageSelector(context, logic),
                   SliverPadding(
-                      padding: EdgeInsets.only(
-                          bottom: MediaQuery.of(context).padding.bottom))
+                    padding: EdgeInsets.only(bottom: listBottomInset),
+                  )
                 ],
               );
 
@@ -399,12 +405,21 @@ abstract class ComicsPage<T extends BaseComic> extends StatelessWidget {
 
     if (withRefreshFloatingButton) {
       return Scaffold(
-        floatingActionButton: FloatingActionButton(
-          child: const Icon(Icons.refresh),
-          onPressed: () {
-            refresh();
-          },
-        ),
+        floatingActionButton: enableLiquidGlassUi
+            ? GlassIconActionButton(
+                icon: Icons.refresh,
+                tooltip: "刷新".tl,
+                onTap: () {
+                  refresh();
+                },
+                size: 56,
+              )
+            : FloatingActionButton(
+                child: const Icon(Icons.refresh),
+                onPressed: () {
+                  refresh();
+                },
+              ),
         body: body,
       );
     } else {

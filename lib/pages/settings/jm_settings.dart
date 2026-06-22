@@ -97,7 +97,7 @@ class _JmSettingsState extends State<JmSettings> {
           leading: const Icon(Icons.track_changes),
           title: Text("自动选择域名".tl),
           subtitle: Text("登录时自动选择API域名".tl),
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: autoSelectStream,
             onChanged: (b){
               b ? appdata.settings[15] = "1" : appdata.settings[15] = "0";
@@ -171,7 +171,7 @@ class _JmSettingsState extends State<JmSettings> {
           title: Text("每日自动签到".tl),
           subtitle: Text("勾选启用, 点击测试".tl),
           onTap: () => JmSettings.daily(true),
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: autoCheckIn,
             onChanged: (b){
               b ? appdata.settings[88] = "1" : appdata.settings[88] = "0";

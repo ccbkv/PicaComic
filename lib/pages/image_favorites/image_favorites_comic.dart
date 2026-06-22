@@ -31,10 +31,19 @@ class ImageFavoritesComic {
           .map((f) => _getFavoriteTime(f))
           .reduce((a, b) => a.isAfter(b) ? a : b);
       
+      // 按页数排序
+      var sortedImages = List<ImageFavorite>.from(entry.value)
+        ..sort((a, b) {
+          // 先按 ep 排序，再按 page 排序
+          var epCompare = a.ep.compareTo(b.ep);
+          if (epCompare != 0) return epCompare;
+          return a.page.compareTo(b.page);
+        });
+      
       return ImageFavoritesComic(
         id: entry.key,
         title: entry.value.first.title,
-        images: entry.value,
+        images: sortedImages,
         time: latestTime,
       );
     }).toList();

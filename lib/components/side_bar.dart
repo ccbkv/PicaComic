@@ -283,7 +283,6 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
     var folders = appdata.appSettings.networkFavorites
         .map((e) => getFavoriteDataOrNull(e));
     folders = folders.whereType<FavoriteData>();
-    
     for (var data in folders) {
       if (data != null && !networkFolders.contains(data.key)) {
         networkFolders.add(data.key);
@@ -307,6 +306,61 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
 
   @override
   Widget build(BuildContext context) {
+    final content = Column(
+      children: [
+        if (widget.withAppbar)
+          SizedBox(
+            height: 56,
+            child: Row(
+              children: [
+                const SizedBox(width: 8),
+                const CloseButton(),
+                const SizedBox(width: 8),
+                Text(
+                  "文件夹".tl,
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ],
+            ),
+          ).paddingTop(MediaQuery.of(context).padding.top),
+        Expanded(
+          child: ListView.builder(
+            padding: widget.withAppbar
+                ? EdgeInsets.zero
+                : EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+            itemCount: folders.length + networkFolders.length + 2,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return buildLocalTitle();
+              }
+              index--;
+              if (index < folders.length) {
+                return buildLocalFolder(folders[index]);
+              }
+              index -= folders.length;
+              if (index == 0) {
+                return buildNetworkTitle();
+              }
+              index--;
+              return buildNetworkFolder(networkFolders[index]);
+            },
+          ),
+        )
+      ],
+    );
+
+    if (enableLiquidGlassUi) {
+      return Padding(
+        padding: const EdgeInsets.all(8),
+        child: GlassSurface(
+          width: double.infinity,
+          height: double.infinity,
+          borderRadius: 24,
+          child: content,
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -318,48 +372,7 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
           ),
         ),
       ),
-      child: Column(
-        children: [
-          if (widget.withAppbar)
-            SizedBox(
-              height: 56,
-              child: Row(
-                children: [
-                  const SizedBox(width: 8),
-                  const CloseButton(),
-                  const SizedBox(width: 8),
-                  Text(
-                    "文件夹".tl,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ],
-              ),
-            ).paddingTop(MediaQuery.of(context).padding.top),
-          Expanded(
-            child: ListView.builder(
-              padding: widget.withAppbar
-                  ? EdgeInsets.zero
-                  : EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-              itemCount: folders.length + networkFolders.length + 2,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return buildLocalTitle();
-                }
-                index--;
-                if (index < folders.length) {
-                  return buildLocalFolder(folders[index]);
-                }
-                index -= folders.length;
-                if (index == 0) {
-                  return buildNetworkTitle();
-                }
-                index--;
-                return buildNetworkFolder(networkFolders[index]);
-              },
-            ),
-          )
-        ],
-      ),
+      child: content,
     );
   }
 
@@ -427,12 +440,20 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
           const SizedBox(width: 12),
           Text("网络".tl),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              // 空实现，保持兼容性
-            },
-          ),
+          enableLiquidGlassUi
+              ? GlassIconActionButton(
+                  icon: Icons.settings,
+                  tooltip: "设置".tl,
+                  onTap: () {
+                    // 空实现，保持兼容性
+                  },
+                )
+              : IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    // 空实现，保持兼容性
+                  },
+                ),
         ],
       ).paddingHorizontal(16),
     );
@@ -442,6 +463,42 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
     bool isSelected = name == selectedFolder && !selectedIsNetwork;
     int count = LocalFavoritesManager().folderComics(name);
     var folderName = getFavoriteDataOrNull(name)?.title ?? name;
+    final row = Container(
+      height: 42,
+      alignment: Alignment.centerLeft,
+      decoration: BoxDecoration(
+        color: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.36)
+            : null,
+        border: Border(
+          left: BorderSide(
+            color:
+                isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.only(left: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(folderName),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 2,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(count.toString()),
+          ),
+        ],
+      ),
+    );
     return InkWell(
       onTap: () {
         if (isSelected) {
@@ -455,42 +512,15 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
         widget.onFolderSelected?.call(name, false);
         widget.onSelected?.call();
       },
-      child: Container(
-        height: 42,
-        alignment: Alignment.centerLeft,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.36)
-              : null,
-          border: Border(
-            left: BorderSide(
-              color:
-                  isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        padding: const EdgeInsets.only(left: 16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(folderName),
-            ),
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 2,
+      child: enableLiquidGlassUi && isSelected
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: GlassSurface(
+                borderRadius: 18,
+                child: row,
               ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(count.toString()),
-            ),
-          ],
-        ),
-      ),
+            )
+          : row,
     );
   }
 
@@ -500,6 +530,24 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
       return const SizedBox();
     }
     bool isSelected = key == selectedFolder && selectedIsNetwork;
+    final row = Container(
+      height: 42,
+      alignment: Alignment.centerLeft,
+      decoration: BoxDecoration(
+        color: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.36)
+            : null,
+        border: Border(
+          left: BorderSide(
+            color:
+                isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.only(left: 16),
+      child: Text(data.title),
+    );
     return InkWell(
       onTap: () {
         if (isSelected) {
@@ -513,24 +561,15 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
         widget.onFolderSelected?.call(key, true);
         widget.onSelected?.call();
       },
-      child: Container(
-        height: 42,
-        alignment: Alignment.centerLeft,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.36)
-              : null,
-          border: Border(
-            left: BorderSide(
-              color:
-                  isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        padding: const EdgeInsets.only(left: 16),
-        child: Text(data.title),
-      ),
+      child: enableLiquidGlassUi && isSelected
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: GlassSurface(
+                borderRadius: 18,
+                child: row,
+              ),
+            )
+          : row,
     );
   }
 

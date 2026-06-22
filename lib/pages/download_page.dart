@@ -33,7 +33,9 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/network/eh_network/eh_download_model.dart';
 import 'package:pica_comic/network/jm_network/jm_download.dart';
+import 'package:pica_comic/network/jm_network/jm_network.dart';
 import 'package:pica_comic/network/picacg_network/picacg_download_model.dart';
+import 'package:pica_comic/network/picacg_network/methods.dart';
 import 'dart:io';
 import 'package:pica_comic/utils/show_delayed_dialog.dart';
 import 'package:pica_comic/utils/translations.dart';
@@ -1676,38 +1678,48 @@ class _DownloadPageState extends State<DownloadPage> {
     }
   }
 
-  Widget buildFAB(BuildContext context, DownloadPageLogic logic) =>
-      FloatingActionButton(
-        enableFeedback: true,
-        onPressed: () {
-          if (!logic.selecting) {
-            logic.selecting = true;
-            logic.update();
-          } else {
-            if (logic.selectedNum == 0) return;
-            showConfirmDialog(
-              context: context,
-              title: "删除".tl,
-              content: "要删除已选择的项目吗? 此操作无法撤销".tl,
-              btnColor: context.colorScheme.error,
-              onConfirm: () async {
-                var comics = <String>[];
-                for (int i = 0; i < logic.selected.length; i++) {
-                  if (logic.selected[i]) {
-                    comics.add(logic.comics[i].id);
-                  }
-                }
-                await downloadManager.delete(comics);
-                logic.refresh();
-                StateController.findOrNull(tag: "me_page_downloads")?.update();
-              },
-            );
-          }
-        },
-        child: logic.selecting
-            ? const Icon(Icons.delete_forever_outlined)
-            : const Icon(Icons.checklist_outlined),
+  Widget buildFAB(BuildContext context, DownloadPageLogic logic) {
+    final icon = logic.selecting
+        ? Icons.delete_forever_outlined
+        : Icons.checklist_outlined;
+    final onPressed = () {
+      if (!logic.selecting) {
+        logic.selecting = true;
+        logic.update();
+      } else {
+        if (logic.selectedNum == 0) return;
+        showConfirmDialog(
+          context: context,
+          title: "删除".tl,
+          content: "要删除已选择的项目吗? 此操作无法撤销".tl,
+          btnColor: context.colorScheme.error,
+          onConfirm: () async {
+            var comics = <String>[];
+            for (int i = 0; i < logic.selected.length; i++) {
+              if (logic.selected[i]) {
+                comics.add(logic.comics[i].id);
+              }
+            }
+            await downloadManager.delete(comics);
+            logic.refresh();
+            StateController.findOrNull(tag: "me_page_downloads")?.update();
+          },
+        );
+      }
+    };
+    if (enableLiquidGlassUi) {
+      return GlassIconActionButton(
+        icon: icon,
+        onTap: onPressed,
+        size: 56,
       );
+    }
+    return FloatingActionButton(
+      enableFeedback: true,
+      onPressed: onPressed,
+      child: Icon(icon),
+    );
+  }
 
   Widget buildTitle(BuildContext context, DownloadPageLogic logic) {
     if ((logic.searchMode || logic.tagSearchMode || logic.categorySearchMode) &&
@@ -1769,7 +1781,7 @@ class _DownloadPageState extends State<DownloadPage> {
         );
       }
 
-      return TextField(
+      final searchField = TextField(
         focusNode: logic.searchFocusNode,
         decoration: InputDecoration(
           border: InputBorder.none,
@@ -1808,6 +1820,15 @@ class _DownloadPageState extends State<DownloadPage> {
           }
         },
       );
+      if (enableLiquidGlassUi) {
+        return GlassSurface(
+          height: 42,
+          borderRadius: 20,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Center(child: searchField),
+        );
+      }
+      return searchField;
     } else {
       return logic.selecting
           ? Text("已选择 @num 个项目".tlParams({"num": logic.selectedNum.toString()}))
@@ -1822,19 +1843,38 @@ class _DownloadPageState extends State<DownloadPage> {
           ? Theme.of(context).colorScheme.primaryContainer
           : null,
       leading: logic.selecting
-          ? IconButton(
-              onPressed: () {
-                logic.selecting = false;
-                logic.selectedNum = 0;
-                for (int i = 0; i < logic.selected.length; i++) {
-                  logic.selected[i] = false;
-                }
-                logic.update();
-              },
-              icon: const Icon(Icons.close))
-          : IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back)),
+          ? enableLiquidGlassUi
+              ? GlassIconActionButton(
+                  icon: Icons.close,
+                  tooltip: "关闭".tl,
+                  onTap: () {
+                    logic.selecting = false;
+                    logic.selectedNum = 0;
+                    for (int i = 0; i < logic.selected.length; i++) {
+                      logic.selected[i] = false;
+                    }
+                    logic.update();
+                  },
+                )
+              : IconButton(
+                  onPressed: () {
+                    logic.selecting = false;
+                    logic.selectedNum = 0;
+                    for (int i = 0; i < logic.selected.length; i++) {
+                      logic.selected[i] = false;
+                    }
+                    logic.update();
+                  },
+                  icon: const Icon(Icons.close))
+          : enableLiquidGlassUi
+              ? GlassIconActionButton(
+                  icon: Icons.arrow_back,
+                  tooltip: "返回".tl,
+                  onTap: () => Navigator.pop(context),
+                )
+              : IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back)),
       title: buildTitle(context, logic),
       actions: buildActions(context, logic),
     );
@@ -1843,14 +1883,36 @@ class _DownloadPageState extends State<DownloadPage> {
   List<Widget> buildActions(BuildContext context, DownloadPageLogic logic) {
     List<Widget> actions = [];
 
+    Widget buildActionIcon({
+      required String tooltip,
+      required IconData icon,
+      required VoidCallback onTap,
+    }) {
+      return Tooltip(
+        message: tooltip,
+        child: enableLiquidGlassUi
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: GlassIconActionButton(
+                  icon: icon,
+                  tooltip: tooltip,
+                  onTap: onTap,
+                ),
+              )
+            : IconButton(
+                icon: Icon(icon),
+                onPressed: onTap,
+              ),
+      );
+    }
+
     // 添加排序和下载管理器按钮
     if (!logic.selecting && !logic.searchMode) {
       actions.add(
-        Tooltip(
-          message: "排序".tl,
-          child: IconButton(
-            icon: const Icon(Icons.sort),
-            onPressed: () async {
+        buildActionIcon(
+            tooltip: "排序".tl,
+            icon: Icons.sort,
+            onTap: () async {
               bool changed = false;
               var sortType = DownloadSortType.values[int.parse(appdata.settings[26][0])];
               await showDialog(
@@ -1923,32 +1985,26 @@ class _DownloadPageState extends State<DownloadPage> {
                   });
                 },
               );
-            },
-          ),
-        ),
+            }),
       );
       actions.add(
-        Tooltip(
-          message: "下载管理器".tl,
-          child: IconButton(
-            icon: const Icon(Icons.download_for_offline),
-            onPressed: () {
+        buildActionIcon(
+            tooltip: "下载管理器".tl,
+            icon: Icons.download_for_offline,
+            onTap: () {
               showPopUpWidget(
                 App.globalContext!,
                 const DownloadingPage(),
               );
-            },
-          ),
-        ),
+            }),
       );
     } else if (logic.selecting) {
       // 添加选择状态下的更多按钮
       actions.add(
-        Tooltip(
-          message: "更多".tl,
-          child: IconButton(
-            icon: const Icon(Icons.more_horiz),
-            onPressed: () {
+        buildActionIcon(
+            tooltip: "更多".tl,
+            icon: Icons.more_horiz,
+            onTap: () {
               showMenuX(
                 context,
                 Offset(
@@ -1999,9 +2055,7 @@ class _DownloadPageState extends State<DownloadPage> {
                   ),
                 ],
               );
-            },
-          ),
-        ),
+            }),
       );
     }
 
@@ -2011,15 +2065,26 @@ class _DownloadPageState extends State<DownloadPage> {
         Builder(
           builder: (buttonContext) => Tooltip(
             message: "漫画源筛选".tl,
-            child: IconButton(
-              icon: const Icon(Icons.filter_list),
-              onPressed: () {
-                showDownloadTypeFilterMenu(
-                  buttonContext: buttonContext,
-                  logic: logic,
-                );
-              },
-            ),
+            child: enableLiquidGlassUi
+                ? GlassIconActionButton(
+                    icon: Icons.filter_list,
+                    tooltip: "漫画源筛选".tl,
+                    onTap: () {
+                      showDownloadTypeFilterMenu(
+                        buttonContext: buttonContext,
+                        logic: logic,
+                      );
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.filter_list),
+                    onPressed: () {
+                      showDownloadTypeFilterMenu(
+                        buttonContext: buttonContext,
+                        logic: logic,
+                      );
+                    },
+                  ),
           ),
         ),
       );
@@ -2028,11 +2093,10 @@ class _DownloadPageState extends State<DownloadPage> {
     // 添加标签搜索和普通搜索按钮
     if (!logic.selecting) {
       actions.add(
-        Tooltip(
-          message: "标签搜索".tl,
-          child: IconButton(
-            icon: const Icon(Icons.tag_rounded),
-            onPressed: () {
+        buildActionIcon(
+            tooltip: "标签搜索".tl,
+            icon: Icons.tag_rounded,
+            onTap: () {
               if (!logic.tagSearchMode) {
                 // 切换到标签搜索模式
                 logic.tagSearchMode = true;
@@ -2059,16 +2123,13 @@ class _DownloadPageState extends State<DownloadPage> {
                 // 只更新UI而不重置分页信息
                 logic.update();
               }
-            },
-          ),
-        ),
+            }),
       );
       actions.add(
-        Tooltip(
-          message: "分类搜索".tl,
-          child: IconButton(
-            icon: const Icon(Icons.category),
-            onPressed: () {
+        buildActionIcon(
+            tooltip: "分类搜索".tl,
+            icon: Icons.category,
+            onTap: () {
               if (!logic.categorySearchMode) {
                 // 切换到分类搜索模式
                 logic.categorySearchMode = true;
@@ -2097,19 +2158,16 @@ class _DownloadPageState extends State<DownloadPage> {
                 // 只更新UI而不重置分页信息
                 logic.update();
               }
-            },
-          ),
-        ),
+            }),
       );
       // 始终显示搜索按钮，根据模式执行不同的搜索逻辑
       actions.add(
-        Tooltip(
-          message: logic.categorySearchMode
-              ? "分类搜索".tl
-              : (logic.tagSearchMode ? "标签搜索".tl : "搜索".tl),
-          child: IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
+        buildActionIcon(
+            tooltip: logic.categorySearchMode
+                ? "分类搜索".tl
+                : (logic.tagSearchMode ? "标签搜索".tl : "搜索".tl),
+            icon: Icons.search,
+            onTap: () {
               if (logic.categorySearchMode) {
                 // 从分类搜索模式切换到普通搜索模式
                 logic.categorySearchMode = false;
@@ -2166,9 +2224,7 @@ class _DownloadPageState extends State<DownloadPage> {
               }
               // 所有分支中已包含UI更新，无需重复调用
               // logic.update();
-            },
-          ),
-        ),
+            }),
       );
     }
 
@@ -2341,22 +2397,129 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
   ComicChapters? _chapters;
   int _selectedGroupIndex = 0;
   TabController? _tabController;
+  bool _loadingEps = false;
 
   bool get _isGrouped => _chapters != null && _chapters!.isGrouped;
 
   @override
   void initState() {
     super.initState();
+    _initFromStored();
+    _fetchLatestEps();
+  }
+
+  /// 从已存储的下载项初始化章节信息
+  void _initFromStored() {
+    name = comic.name;
+    eps = comic.eps;
+    downloadedEps = comic.downloadedEps;
     if (comic is CustomDownloadedItem) {
       _chapters = (comic as CustomDownloadedItem).chapters;
     }
+    _buildTabController();
+  }
+
+  void _buildTabController() {
+    _tabController?.dispose();
+    _selectedGroupIndex = 0;
     if (_isGrouped) {
       _tabController = TabController(
         length: _chapters!.groupCount,
         initialIndex: 0,
         vsync: this,
       );
+    } else {
+      _tabController = null;
     }
+  }
+
+  /// 从网络获取最新的章节列表，使新发布的章节能够显示
+  ///
+  /// 当网络获取的章节与已存储的不同时，会更新已存储的章节列表，
+  /// 这样在无网时也能看到最新的章节列表。
+  Future<void> _fetchLatestEps() async {
+    setState(() => _loadingEps = true);
+    try {
+      if (comic is DownloadedComic) {
+        var c = comic as DownloadedComic;
+        var res = await network.getEps(c.id);
+        if (!res.error && res.data.isNotEmpty) {
+          var newEps = res.data;
+          var oldEps = c.eps;
+          setState(() {
+            eps = newEps;
+            _loadingEps = false;
+          });
+          if (!_listEquals(newEps, oldEps)) {
+            c.chapters = newEps;
+            _persistComic(c);
+          }
+          return;
+        }
+      } else if (comic is DownloadedJmComic) {
+        var c = comic as DownloadedJmComic;
+        var res = await jmNetwork.getComicInfo(c.comic.id);
+        if (!res.error) {
+          var info = res.data;
+          var newEps = info.epNames.isEmpty
+              ? List<String>.generate(
+                  info.series.isEmpty ? 1 : info.series.length,
+                  (index) => "第${index + 1}章")
+              : info.epNames;
+          var oldEps = c.eps;
+          setState(() {
+            eps = newEps;
+            _loadingEps = false;
+          });
+          if (!_listEquals(newEps, oldEps)) {
+            c.comic.epNames = info.epNames;
+            c.comic.series = info.series;
+            _persistComic(c);
+          }
+          return;
+        }
+      } else if (comic is CustomDownloadedItem) {
+        var c = comic as CustomDownloadedItem;
+        var source = ComicSource.find(c.sourceKey);
+        if (source?.loadComicInfo != null) {
+          var res = await source!.loadComicInfo!(c.comicId);
+          if (!res.error && res.data!.chapters != null) {
+            var newChapters = res.data!.chapters;
+            var newEps = newChapters!.titles.toList();
+            var oldEps = c.eps;
+            setState(() {
+              _chapters = newChapters;
+              eps = newEps;
+              _buildTabController();
+              _loadingEps = false;
+            });
+            if (!_listEquals(newEps, oldEps)) {
+              var json = c.toJson();
+              json["chapters"] = newChapters.toJson();
+              _persistComic(CustomDownloadedItem.fromJson(json));
+            }
+            return;
+          }
+        }
+      }
+    } catch (_) {}
+    setState(() => _loadingEps = false);
+  }
+
+  /// 比较两个章节列表是否相同
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  /// 将更新后的下载项持久化到数据库
+  void _persistComic(DownloadedItem item) {
+    try {
+      DownloadManager().updateComic(item);
+    } catch (_) {}
   }
 
   @override
@@ -2580,7 +2743,6 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
 
   void getInfo() {
     name = comic.name;
-    eps = comic.eps;
     downloadedEps = comic.downloadedEps;
   }
 

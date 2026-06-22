@@ -90,6 +90,31 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
   final controller = StateController.putIfNotExists<FavoritesPageController>(
       FavoritesPageController());
 
+  Widget _buildTopBarAction({
+    required BuildContext context,
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    if (!enableLiquidGlassUi) {
+      return Tooltip(
+        message: tooltip,
+        child: IconButton(
+          icon: Icon(icon),
+          onPressed: onTap,
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: GlassIconActionButton(
+        icon: icon,
+        tooltip: tooltip,
+        onTap: onTap,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StateBuilder<FavoritesPageController>(builder: (controller) {
@@ -240,124 +265,141 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
     final isSmallScreen = screenWidth < 1024;
 
     if (controller.isSelectingComics) {
-      return Material(
-        elevation: 1,
-        color: Theme.of(context).colorScheme.surface,
-        child: SizedBox(
-          height: _kSecondaryTopBarHeight,
-          child: Row(children: [
-            if (controller.isSidebarHidden) ...[
-              // 在侧边栏隐藏后才显示菜单按钮
-              IconButton(
-                icon: const Icon(Icons.reorder),
-                onPressed: () {
-                  _showFoldersDrawer(context);
-                },
-              ),
-            ] else ...[
-              // 在大屏幕上保持原有左边距
-              const SizedBox(width: 16),
-            ],
-            Icon(
-              Icons.rule_folder,
-              color: iconColor,
-            ),
-            const SizedBox(
-              width: 8,
-            ),
-            Expanded(
-              child: Text(
-                "已选择 @num 个项目".tlParams(
-                    {"num": controller.selectedComics.length.toString()}),
-                style: const TextStyle(fontSize: 16),
-              ).paddingBottom(3),
-            ),
-            Tooltip(
-              message: "全选".tl,
-              child: IconButton(
-                icon: const Icon(Icons.select_all),
-                onPressed: () {
-                  controller.selectedComics = LocalFavoritesManager()
-                      .getAllComics(controller.current!)
-                      .toList();
-                  controller.update();
-                },
-              ),
-            ),
-            Tooltip(
-              message: "取消".tl,
-              child: IconButton(
-                icon: const Icon(Icons.deselect),
-                onPressed: () {
-                  controller.selectedComics.clear();
-                  controller.update();
-                },
-              ),
-            ),
-            Tooltip(
-              message: "菜单".tl,
-              child: IconButton(
-                icon: const Icon(Icons.more_horiz),
-                onPressed: () {
-                  if (controller.selectedComics.length == 1) {
-                    controller.openComicMenuFuncs[controller.selectedComics[0]]
-                        ?.call();
-                  } else {
-                    multiSelectedMenu();
-                  }
-                },
-              ),
-            ),
-          ]),
-        ),
-      );
-    }
-
-    return Material(
-      elevation: 1,
-      color: Theme.of(context).colorScheme.surface,
-      child: SizedBox(
+      final content = SizedBox(
         height: _kSecondaryTopBarHeight,
         child: Row(children: [
           if (controller.isSidebarHidden) ...[
-            // 在侧边栏隐藏后才显示菜单按钮
-            IconButton(
-              icon: const Icon(Icons.reorder),
-              onPressed: () {
+            _buildTopBarAction(
+              context: context,
+              icon: Icons.reorder,
+              tooltip: "菜单".tl,
+              onTap: () {
                 _showFoldersDrawer(context);
               },
             ),
           ] else ...[
-            // 在大屏幕上保持原有左边距
             const SizedBox(width: 16),
           ],
-          if (controller.isNetwork == null)
-            Icon(
-              Icons.folder_outlined,
-              color: iconColor,
-            )
-          else if (controller.isNetwork!)
-            Icon(
-              Icons.folder_special,
-              color: iconColor,
-            )
-          else
-            Icon(
-              Icons.folder,
-              color: iconColor,
-            ),
+          Icon(
+            Icons.rule_folder,
+            color: iconColor,
+          ),
           const SizedBox(
             width: 8,
           ),
           Expanded(
             child: Text(
-              controller.current != null ? controller.current!.tl : "未选择".tl,
+              "已选择 @num 个项目".tlParams(
+                  {"num": controller.selectedComics.length.toString()}),
               style: const TextStyle(fontSize: 16),
             ).paddingBottom(3),
           ),
+          _buildTopBarAction(
+            context: context,
+            icon: Icons.select_all,
+            tooltip: "全选".tl,
+            onTap: () {
+              controller.selectedComics = LocalFavoritesManager()
+                  .getAllComics(controller.current!)
+                  .toList();
+              controller.update();
+            },
+          ),
+          _buildTopBarAction(
+            context: context,
+            icon: Icons.deselect,
+            tooltip: "取消".tl,
+            onTap: () {
+              controller.selectedComics.clear();
+              controller.update();
+            },
+          ),
+          _buildTopBarAction(
+            context: context,
+            icon: Icons.more_horiz,
+            tooltip: "菜单".tl,
+            onTap: () {
+              if (controller.selectedComics.length == 1) {
+                controller.openComicMenuFuncs[controller.selectedComics[0]]
+                    ?.call();
+              } else {
+                multiSelectedMenu();
+              }
+            },
+          ),
         ]),
-      ),
+      );
+      return enableLiquidGlassUi
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: GlassSurface(
+                borderRadius: 20,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: content,
+              ),
+            )
+          : Material(
+              elevation: 1,
+              color: Theme.of(context).colorScheme.surface,
+              child: content,
+            );
+    }
+
+    final content = SizedBox(
+      height: _kSecondaryTopBarHeight,
+      child: Row(children: [
+        if (controller.isSidebarHidden) ...[
+          _buildTopBarAction(
+            context: context,
+            icon: Icons.reorder,
+            tooltip: "菜单".tl,
+            onTap: () {
+              _showFoldersDrawer(context);
+            },
+          ),
+        ] else ...[
+          const SizedBox(width: 16),
+        ],
+        if (controller.isNetwork == null)
+          Icon(
+            Icons.folder_outlined,
+            color: iconColor,
+          )
+        else if (controller.isNetwork!)
+          Icon(
+            Icons.folder_special,
+            color: iconColor,
+          )
+        else
+          Icon(
+            Icons.folder,
+            color: iconColor,
+          ),
+        const SizedBox(
+          width: 8,
+        ),
+        Expanded(
+          child: Text(
+            controller.current != null ? controller.current!.tl : "未选择".tl,
+            style: const TextStyle(fontSize: 16),
+          ).paddingBottom(3),
+        ),
+      ]),
     );
+    return enableLiquidGlassUi
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: GlassSurface(
+              borderRadius: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: content,
+            ),
+          )
+        : Material(
+            elevation: 1,
+            color: Theme.of(context).colorScheme.surface,
+            child: content,
+          );
   }
 
   // 在小屏幕上显示文件夹抽屉
@@ -974,14 +1016,30 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => App.to(context, () => const LocalSearchPage()),
-              icon: const Icon(Icons.search, size: 18),
-              label: Text("搜索".tl),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-              ),
-            ),
+            child: enableLiquidGlassUi
+                ? GlassSurface(
+                    borderRadius: 18,
+                    onTap: () =>
+                        App.to(context, () => const LocalSearchPage()),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.search, size: 18),
+                        const SizedBox(width: 8),
+                        Text("搜索".tl),
+                      ],
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    onPressed: () =>
+                        App.to(context, () => const LocalSearchPage()),
+                    icon: const Icon(Icons.search, size: 18),
+                    label: Text("搜索".tl),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
           ),
           const SizedBox(height: 8),
           // 排序按钮
@@ -1370,11 +1428,18 @@ class _ComicsPageViewState extends StateWithController<ComicsPageView> {
 
   Widget buildFAB() => Material(
         color: Colors.transparent,
-        child: FloatingActionButton(
-          key: const Key("FAB"),
-          onPressed: () => onRefresh(context),
-          child: const Icon(Icons.refresh),
-        ),
+        child: enableLiquidGlassUi
+            ? GlassIconActionButton(
+                icon: Icons.refresh,
+                tooltip: "刷新".tl,
+                onTap: () => onRefresh(context),
+                size: 56,
+              )
+            : FloatingActionButton(
+                key: const Key("FAB"),
+                onPressed: () => onRefresh(context),
+                child: const Icon(Icons.refresh),
+              ),
       );
 
   Widget buildEmptyView() {

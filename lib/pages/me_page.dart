@@ -92,10 +92,11 @@ class MePage extends StatelessWidget {
     return SizedBox.expand(
       child: LayoutBuilder(
         builder: (context, constrains) {
+          final bottomInset = bottomOverlayInsetOf(context);
           final width = constrains.maxWidth;
           bool shouldShowTwoPanel = width > 600;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+          final content = SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
             child: Column(
               children: [
                 SizedBox(
@@ -142,6 +143,7 @@ class MePage extends StatelessWidget {
               ],
             ),
           );
+          return content;
         },
       ),
     );

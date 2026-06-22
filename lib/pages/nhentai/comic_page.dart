@@ -133,7 +133,7 @@ class NhentaiComicPage extends BaseComicPage<NhentaiComic> {
   Future<Res<NhentaiComic>> loadData() => NhentaiNetwork().getComicInfo(_id);
 
   @override
-  int? get pages => data?.pages != null && data!.pages > 0 ? data!.pages : null;
+  int? get pages => int.tryParse(data?.tags["Pages"]?.elementAtOrNull(0) ?? "");
 
   @override
   String? get subTitle => data?.subTitle;

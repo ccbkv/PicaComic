@@ -79,7 +79,7 @@ class _PicacgSettingsState extends State<PicacgSettings> {
         ListTile(
           leading: const Icon(Icons.circle_outlined),
           title: Text("显示头像框".tl),
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: showFrame,
             onChanged: (b) {
               b ? appdata.settings[5] = "1" : appdata.settings[5] = "0";
@@ -97,7 +97,7 @@ class _PicacgSettingsState extends State<PicacgSettings> {
           subtitle:
               App.isMobile ? Text("APP启动或是距离上次打卡间隔一天时执行".tl) : Text("启动时执行".tl),
           onTap: () {},
-          trailing: Switch(
+          trailing: AdaptiveSwitch(
             value: punchIn,
             onChanged: (b) {
               b ? appdata.settings[6] = "1" : appdata.settings[6] = "0";

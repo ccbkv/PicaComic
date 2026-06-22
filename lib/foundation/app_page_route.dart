@@ -2,12 +2,33 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/app.dart';
 
 const double _kBackGestureWidth = 20.0;
 const int _kMaxDroppedSwipePageForwardAnimationTime = 800;
 const int _kMaxPageBackAnimationTime = 300;
 const double _kMinFlingVelocity = 1.0;
+
+class RouteDisplayInsets extends InheritedWidget {
+  const RouteDisplayInsets({
+    required this.padding,
+    required super.child,
+    super.key,
+  });
+
+  final EdgeInsets padding;
+
+  static RouteDisplayInsets? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<RouteDisplayInsets>();
+  }
+
+  @override
+  bool updateShouldNotify(RouteDisplayInsets oldWidget) {
+    return oldWidget.padding != padding;
+  }
+}
 
 class AppPageRoute<T> extends PageRoute<T> with _AppRouteTransitionMixin{
   /// Construct a MaterialPageRoute whose contents are defined by [builder].
@@ -98,11 +119,25 @@ mixin _AppRouteTransitionMixin<T> on PageRoute<T> {
       result = buildContent(context);
     }
 
-    return Semantics(
+    Widget page = Semantics(
       scopesRoute: true,
       explicitChildNodes: true,
       child: result,
     );
+
+    page = GlassBackdropScope(
+      child: page,
+    );
+
+    final routeInsets = RouteDisplayInsets.maybeOf(context)?.padding;
+    if (!isFirst && routeInsets != null && routeInsets.left > 0) {
+      page = _RouteViewportInset(
+        padding: routeInsets,
+        child: page,
+      );
+    }
+
+    return page;
   }
 
   static bool _isPopGestureEnabled<T>(PageRoute<T> route) {
@@ -154,6 +189,37 @@ mixin _AppRouteTransitionMixin<T> on PageRoute<T> {
 
   IOSBackGestureController _startPopGesture(PageRoute<T> route) {
     return IOSBackGestureController(route.controller!, route.navigator!);
+  }
+}
+
+class _RouteViewportInset extends StatelessWidget {
+  const _RouteViewportInset({
+    required this.padding,
+    required this.child,
+  });
+
+  final EdgeInsets padding;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final mediaQuery = MediaQuery.of(context);
+          return MediaQuery(
+            data: mediaQuery.copyWith(
+              size: Size(
+                constraints.maxWidth,
+                constraints.maxHeight,
+              ),
+            ),
+            child: child,
+          );
+        },
+      ),
+    );
   }
 }
 

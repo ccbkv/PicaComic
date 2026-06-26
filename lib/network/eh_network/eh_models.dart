@@ -14,8 +14,10 @@ class EhGalleryBrief extends BaseComic{
   @override
   List<String> tags;
   int? pages;
+  String _subTitle;
 
-  EhGalleryBrief(this.title,this.type,this.time,this.uploader,this.coverPath,this.stars,this.link,this.tags, {this.pages});
+  EhGalleryBrief(this.title,this.type,this.time,this.uploader,this.coverPath,this.stars,this.link,this.tags, {this.pages, String? subTitle})
+      : _subTitle = subTitle ?? uploader;
 
   @override
   String get cover => coverPath;
@@ -27,7 +29,9 @@ class EhGalleryBrief extends BaseComic{
   String get id => link;
 
   @override
-  String get subTitle => uploader;
+  String get subTitle => _subTitle;
+
+  set subTitle(String value) => _subTitle = value;
 
   @override
   bool get enableTagsTranslation => true;
@@ -95,6 +99,7 @@ class Gallery with HistoryMixin{
       stars,
       link,
       _generateTags(),
+      subTitle: subTitle,
   );
 
   Map<String, dynamic> toJson() {

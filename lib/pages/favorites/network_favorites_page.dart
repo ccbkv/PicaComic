@@ -106,16 +106,17 @@ class _NormalFavoritePageState extends State<_NormalFavoritePage> {
         Positioned.fill(
           child: _NormalFavoriteComicsPage(widget.data, showFolders),
         ),
+        // Fix Issue #81: Move random button to left-bottom to avoid overlapping with pagination controls
         if (widget.data.key == 'nhentai')
           Positioned(
-            right: 16,
+            left: 16,
             bottom:
                 MediaQuery.of(context).padding.bottom +
                 bottomOverlayInsetOf(context) +
                 16,
             child: Tooltip(
               message: '随机'.tl,
-              child: FloatingActionButton(
+              child: FloatingActionButton.small(
                 heroTag: 'network_fav_random_${widget.data.key}',
                 onPressed: openRandomFavorite,
                 child: const Icon(Icons.shuffle),
@@ -713,4 +714,4 @@ class _FavoriteFolderComicsPage extends ComicsPage<BaseComic> {
       ),
     );
   }
-} 
+}

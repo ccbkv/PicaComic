@@ -26,12 +26,17 @@ class FavoriteDownloading extends DownloadingItem{
 
   FavoriteItem comic;
 
-  late DownloadingItem downloadLogic;
+  DownloadingItem? downloadLogic;
 
   @override
   void start() async{
-    await onStart();
-    downloadLogic.start();
+    try {
+      await onStart();
+      downloadLogic?.start();
+    } catch (e, s) {
+      Log.error("Download", "Failed to start favorite download: $e$s");
+      onError?.call();
+    }
   }
 
   @override
@@ -87,15 +92,15 @@ class FavoriteDownloading extends DownloadingItem{
     }
     pause();
     DownloadManager().downloading.removeFirst();
-    DownloadManager().downloading.addFirst(downloadLogic);
-    downloadLogic.start();
+    DownloadManager().downloading.addFirst(downloadLogic!);
+    downloadLogic!.start();
   }
 
   @override
   String get cover => comic.coverPath;
 
   @override
-  Future<Map<int, List<String>>> getLinks() => downloadLogic.getLinks();
+  Future<Map<int, List<String>>> getLinks() => downloadLogic?.getLinks() ?? Future.value({});
 
   @override
   String get title => comic.name;
@@ -117,11 +122,19 @@ class FavoriteDownloading extends DownloadingItem{
         super.fromMap(json, whenFinish, whenError, updateInfo);
 
   @override
-  FutureOr<DownloadedItem> toDownloadedItem() =>
-      downloadLogic.toDownloadedItem();
+  FutureOr<DownloadedItem> toDownloadedItem() {
+    if (downloadLogic == null) {
+      throw StateError("Download logic is not initialized. "
+          "This may happen when the download failed to start.");
+    }
+    return downloadLogic!.toDownloadedItem();
+  }
 
   @override
   Future<Stream<DownloadProgress>> downloadImage(String link) async {
-    return downloadLogic.downloadImage(link);
+    if (downloadLogic == null) {
+      throw StateError("Download logic is not initialized");
+    }
+    return downloadLogic!.downloadImage(link);
   }
 }

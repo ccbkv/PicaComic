@@ -1487,7 +1487,9 @@ class _DownloadPageState extends State<DownloadPage> {
           (logic.comics[index] as DownloadedComic).comicItem.categories;
     }
 
+    // Fix Issue #21: Add ValueKey to prevent widget reuse causing incorrect selection display
     return Padding(
+      key: ValueKey('download_item_${logic.comics[index].id}'),
       padding: const EdgeInsets.all(2),
       child: Container(
         decoration: BoxDecoration(

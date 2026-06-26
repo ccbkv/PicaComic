@@ -144,7 +144,9 @@ class FavoriteItem {
       : name = comic.title,
         author = comic.uploader,
         type = FavoriteType.ehentai,
-        tags = comic.tags,
+        tags = comic.subTitle.isNotEmpty
+            ? [comic.subTitle, ...comic.tags]
+            : comic.tags,
         target = comic.link,
         coverPath = comic.coverPath;
 
@@ -648,13 +650,24 @@ class LocalFavoritesManager {
 
   List<FolderSync> get folderSync => _getFolderSyncWithDB();
 
-  /// 获取所有文件夹中的漫画总数
+  /// 获取所有文件夹中的漫画总数（去重统计）
+  /// 
+  /// 使用 Set 来确保同一漫画存在于多个文件夹中时只统计一次
   int get totalComics {
-    int total = 0;
+    var uniqueComics = <String>{};
     for (var folder in folderNames) {
-      total += count(folder);
+      // 检查表是否存在
+      final tables = _getTablesWithDB();
+      if (!tables.contains(folder)) {
+        continue;
+      }
+
+      var comics = _db.select('select target, type from "$folder";');
+      for (var comic in comics) {
+        uniqueComics.add('${comic["target"]}_${comic["type"]}');
+      }
     }
-    return total;
+    return uniqueComics.length;
   }
 
   /// 获取指定文件夹中的漫画数量

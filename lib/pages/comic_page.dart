@@ -1212,7 +1212,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                     children: [
                       SizedBox(
                         width: double.infinity,
-                        child: SelectableText(title?.trim() ?? "",
+                        child: NonScrollableSelectableText(title?.trim() ?? "",
                             style: const TextStyle(fontSize: 18)),
                       ),
                       const SizedBox(
@@ -1221,7 +1221,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                       if (subTitle != null)
                         SizedBox(
                           width: double.infinity,
-                          child: SelectableText(subTitle!,
+                          child: NonScrollableSelectableText(subTitle!,
                               style: const TextStyle(fontSize: 14)),
                         ),
                       if (subTitle != null)
@@ -2067,7 +2067,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-          child: SelectableText(introduction!),
+          child: NonScrollableSelectableText(introduction!),
         ),
       ),
       const SliverPadding(padding: EdgeInsets.all(5)),

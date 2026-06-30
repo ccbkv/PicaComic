@@ -352,10 +352,10 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
     if (enableLiquidGlassUi) {
       return Padding(
         padding: const EdgeInsets.all(8),
-        child: GlassSurface(
+        child: GlassContainerLite(
           width: double.infinity,
           height: double.infinity,
-          borderRadius: 24,
+          shape: const LiquidRoundedSuperellipse(borderRadius: 24),
           child: content,
         ),
       );
@@ -515,8 +515,8 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
       child: enableLiquidGlassUi && isSelected
           ? Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: GlassSurface(
-                borderRadius: 18,
+              child: GlassContainerLite(
+                shape: const LiquidRoundedSuperellipse(borderRadius: 18),
                 child: row,
               ),
             )
@@ -564,8 +564,8 @@ class _FavoritesSideBarState extends State<FavoritesSideBar> {
       child: enableLiquidGlassUi && isSelected
           ? Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: GlassSurface(
-                borderRadius: 18,
+              child: GlassContainerLite(
+                shape: const LiquidRoundedSuperellipse(borderRadius: 18),
                 child: row,
               ),
             )

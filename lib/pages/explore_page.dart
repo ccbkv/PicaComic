@@ -120,23 +120,12 @@ class _ExplorePageState extends State<ExplorePage>
   Widget buildFAB() => Material(
         color: Colors.transparent,
         child: enableLiquidGlassUi
-            ? GlassButton(
+            ? GlassIconActionButton(
                 key: const Key("FAB"),
-                icon: const Icon(Icons.refresh),
+                icon: Icons.refresh,
                 onTap: refresh,
-                settings: LiquidGlassSettings(
-                  blur: 16,
-                  glassColor: Theme.of(context).brightness == Brightness.dark
-                      ? Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.26)
-                      : Colors.white.withValues(alpha: 0.18),
-                  ambientStrength:
-                      Theme.of(context).brightness == Brightness.dark ? 0.34 : 0.48,
-                  saturation: 1.14,
-                  thickness: 18,
-                ),
+                size: 56,
+                blur: 16,
               )
             : FloatingActionButton(
                 key: const Key("FAB"),

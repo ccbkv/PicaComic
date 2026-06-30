@@ -50,6 +50,7 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
   int currentPage = 1;
   int pageSize = 20;
   int maxPage = 1;
+  bool liftRandomButtonForPagination = false;
 
   /// 获取当前显示模式（连续或分页）
   bool get isPaginationMode => appdata.settings[25] == "1";
@@ -59,6 +60,9 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
     currentPage = 1;
     maxPage = 1;
   }
+
+  static const double _randomButtonLiftDistance = 32;
+  static const double _paginationLiftTriggerDistance = 28;
 
   var searchResults = <FavoriteItem>[];
 
@@ -283,6 +287,24 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
     });
   }
 
+  void _updateRandomButtonLift(
+    ScrollMetrics metrics, {
+    required bool showPaginationControls,
+  }) {
+    final shouldLift =
+        showPaginationControls &&
+        metrics.maxScrollExtent > 0 &&
+        metrics.pixels >=
+            (metrics.maxScrollExtent - _paginationLiftTriggerDistance)
+                .clamp(0, double.infinity);
+    if (shouldLift == liftRandomButtonForPagination || !mounted) {
+      return;
+    }
+    setState(() {
+      liftRandomButtonForPagination = shouldLift;
+    });
+  }
+
   bool downloadComic(FavoriteItem c) {
     var source = c.type.comicSource;
     if (source != null) {
@@ -348,13 +370,39 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
 
     var displayComics = searchMode ? searchResults : comics;
     displayComics = filterComics(displayComics);
+    final showPaginationControls =
+        isPaginationMode &&
+        !searchMode &&
+        !multiSelectMode &&
+        displayComics.isNotEmpty;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !scrollController.hasClients) {
+        return;
+      }
+      _updateRandomButtonLift(
+        scrollController.position,
+        showPaginationControls: showPaginationControls,
+      );
+    });
 
     // 应用分页（仅在非搜索模式下）
     var paginatedComics = getPaginatedComics(displayComics);
 
-    Widget body = CustomScrollView(
-      controller: scrollController,
-      slivers: [
+    Widget body = NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.axis != Axis.vertical) {
+          return false;
+        }
+        _updateRandomButtonLift(
+          notification.metrics,
+          showPaginationControls: showPaginationControls,
+        );
+        return false;
+      },
+      child: CustomScrollView(
+        controller: scrollController,
+        slivers: [
         if (!searchMode && !multiSelectMode)
           SliverPersistentHeader(
             pinned: true,
@@ -784,20 +832,29 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
             ),
           ),
         // 底部分页控件
-        if (isPaginationMode && !searchMode && !multiSelectMode && displayComics.isNotEmpty)
+        if (showPaginationControls)
           _buildPaginationSliver(context),
         SliverToBoxAdapter(
           child: SizedBox(height: bottomInset),
         ),
-      ],
+        ],
+      ),
     );
 
     return Stack(
       children: [
         Positioned.fill(child: body),
-        Positioned(
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
           right: 16,
-          bottom: MediaQuery.of(context).padding.bottom + bottomInset + 16,
+          bottom:
+              MediaQuery.of(context).padding.bottom +
+              bottomInset +
+              16 +
+              (showPaginationControls && liftRandomButtonForPagination
+                  ? _randomButtonLiftDistance
+                  : 0),
           child: Tooltip(
             message: '随机'.tl,
             child: enableLiquidGlassUi

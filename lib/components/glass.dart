@@ -3,6 +3,155 @@ part of 'components.dart';
 bool get enableLiquidGlassUi =>
     appdata.settings.length > 103 && appdata.settings[103] == "1";
 
+class GlassContainerLite extends StatelessWidget {
+  const GlassContainerLite({
+    super.key,
+    this.width,
+    this.height,
+    this.padding,
+    this.useOwnLayer = false,
+    this.quality = GlassQuality.minimal,
+    this.shape,
+    this.settings,
+    required this.child,
+  });
+
+  final double? width;
+  final double? height;
+  final EdgeInsetsGeometry? padding;
+  final bool useOwnLayer;
+  final GlassQuality quality;
+  final dynamic shape;
+  final LiquidGlassSettings? settings;
+  final Widget child;
+
+  double get _borderRadius {
+    final currentShape = shape;
+    if (currentShape is LiquidRoundedSuperellipse) {
+      return currentShape.borderRadius;
+    }
+    return 20;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final glassSettings = settings;
+    final effectiveColor = glassSettings?.glassColor ??
+        (isDark
+            ? Colors.white.withValues(alpha: 0.18)
+            : Colors.white.withValues(alpha: 0.28));
+    final ambientStrength = glassSettings?.ambientStrength ?? (isDark ? 0.34 : 0.48);
+    final blur = glassSettings?.blur ?? 0;
+    final borderRadius = _borderRadius;
+    final content = padding == null ? child : Padding(padding: padding!, child: child);
+    final borderOpacity =
+        ((blur == 0 ? 0.14 : 0.12) + ambientStrength * 0.14).clamp(0.14, 0.24);
+    final dividerColor = isDark
+        ? Colors.white.withValues(alpha: borderOpacity)
+        : scheme.outlineVariant.withValues(alpha: 0.26);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: effectiveColor,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: dividerColor,
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
+class GlassContainerLiteSettings extends StatelessWidget {
+  const GlassContainerLiteSettings({
+    super.key,
+    this.width,
+    this.height,
+    this.padding,
+    this.useOwnLayer = false,
+    this.quality = GlassQuality.minimal,
+    this.shape,
+    this.settings,
+    required this.child,
+  });
+
+  final double? width;
+  final double? height;
+  final EdgeInsetsGeometry? padding;
+  final bool useOwnLayer;
+  final GlassQuality quality;
+  final dynamic shape;
+  final LiquidGlassSettings? settings;
+  final Widget child;
+
+  double get _borderRadius {
+    final currentShape = shape;
+    if (currentShape is LiquidRoundedSuperellipse) {
+      return currentShape.borderRadius;
+    }
+    return 20;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final glassSettings = settings;
+    final effectiveColor = glassSettings?.glassColor ??
+        (isDark
+            ? scheme.surfaceContainerHighest.withValues(alpha: 0.24)
+            : Colors.white.withValues(alpha: 0.16));
+    final ambientStrength = glassSettings?.ambientStrength ?? (isDark ? 0.34 : 0.48);
+    final blur = glassSettings?.blur ?? 0;
+    final borderRadius = _borderRadius;
+    final content = padding == null ? child : Padding(padding: padding!, child: child);
+    final highlightOpacity = (0.08 + ambientStrength * 0.18).clamp(0.08, 0.18);
+    final shadowOpacity = (blur == 0 ? 0.08 : 0.05) + (isDark ? 0.16 : 0.03);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: effectiveColor,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: highlightOpacity)
+              : Colors.white.withValues(alpha: highlightOpacity + 0.06),
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: shadowOpacity.clamp(0.08, 0.22)),
+            blurRadius: blur == 0 ? 12 : 8,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
 class GlassSurface extends StatelessWidget {
   const GlassSurface({
     super.key,
@@ -13,7 +162,7 @@ class GlassSurface extends StatelessWidget {
     this.onTap,
     this.height,
     this.width,
-    this.useOwnLayer = true,
+    this.useOwnLayer = false,
     this.quality = GlassQuality.minimal,
     this.blur,
   });
@@ -41,7 +190,7 @@ class GlassSurface extends StatelessWidget {
     if (enableLiquidGlassUi) {
       final scheme = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final effectiveBlur = blur ?? 18;
+      final effectiveBlur = blur ?? 5;
       final effectiveGlassColor = effectiveBlur == 0
           ? (isDark
               ? scheme.surfaceContainerHighest.withValues(alpha: 0.92)
@@ -166,76 +315,110 @@ class GlassChipTag extends StatelessWidget {
 class GlassIconActionButton extends StatelessWidget {
   const GlassIconActionButton({
     super.key,
-    required this.icon,
+    this.icon,
     required this.onTap,
     this.tooltip,
     this.size = 40,
     this.useOwnLayer = false,
     this.blur,
-  });
+    this.content,
+    this.width,
+    this.height,
+    this.borderRadius = 18,
+    this.backgroundColor,
+    this.iconColor,
+  }) : assert(icon != null || content != null);
 
-  final IconData icon;
+  final IconData? icon;
   final VoidCallback onTap;
   final String? tooltip;
   final double size;
   final bool useOwnLayer;
   final double? blur;
+  final Widget? content;
+  final double? width;
+  final double? height;
+  final double borderRadius;
+  final Color? backgroundColor;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
-    Widget child;
+    final effectiveWidth = width ?? size;
+    final effectiveHeight = height ?? size;
+    final buttonContent = SizedBox(
+      width: effectiveWidth,
+      height: effectiveHeight,
+      child: content ?? Center(child: Icon(icon, color: iconColor)),
+    );
+
+    Widget result;
     if (enableLiquidGlassUi) {
       final scheme = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
       final effectiveBlur = blur ?? 12;
-      final effectiveGlassColor = effectiveBlur == 0
-          ? (isDark
-              ? scheme.surfaceContainerHighest.withValues(alpha: 0.92)
-              : scheme.surface.withValues(alpha: 0.95))
-          : (isDark
-              ? scheme.surfaceContainerHighest.withValues(alpha: 0.55)
-              : Colors.white.withValues(alpha: 0.5));
-      // 使用半透明色 + 阴影模拟玻璃质感, 无模糊开销
-      child = DecoratedBox(
+      final effectiveGlassColor = backgroundColor ??
+          (effectiveBlur == 0
+              ? (isDark
+                  ? scheme.surfaceContainerHighest.withValues(alpha: 0.92)
+                  : scheme.surface.withValues(alpha: 0.95))
+              : (isDark
+                  ? scheme.surfaceContainerHighest.withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.5)));
+      result = DecoratedBox(
         decoration: BoxDecoration(
           color: effectiveGlassColor,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
             color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.white.withValues(alpha: 0.25),
-            width: 0.5,
+                ? Colors.white.withValues(alpha: 0.18)
+                : scheme.outline.withValues(alpha: 0.3),
+            width: 0.3,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-              blurRadius: 6,
+              color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.06),
+              blurRadius: 8,
               spreadRadius: 0,
-              offset: const Offset(0, 1),
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Center(child: Icon(icon)),
-        ),
+        child: buttonContent,
       );
-      child = InkWell(
-        borderRadius: BorderRadius.circular(18),
+      result = InkWell(
+        borderRadius: BorderRadius.circular(borderRadius),
         onTap: onTap,
-        child: child,
+        child: result,
       );
     } else {
-      child = IconButton(
-        icon: Icon(icon),
-        onPressed: onTap,
-      );
+      if (content == null &&
+          width == null &&
+          height == null &&
+          backgroundColor == null &&
+          iconColor == null &&
+          borderRadius == 18 &&
+          size == 40) {
+        result = IconButton(
+          icon: Icon(icon),
+          onPressed: onTap,
+        );
+      } else {
+        result = Material(
+          color: backgroundColor ?? Colors.transparent,
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(borderRadius),
+            onTap: onTap,
+            child: buttonContent,
+          ),
+        );
+      }
     }
 
     if (tooltip != null) {
-      return Tooltip(message: tooltip!, child: child);
+      return Tooltip(message: tooltip!, child: result);
     }
-    return child;
+    return result;
   }
 }

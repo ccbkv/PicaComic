@@ -545,13 +545,13 @@ extension AddDownloadExt on DownloadManager {
   }
 
   void addFavoriteDownload(FavoriteItem comic) {
-    var id = switch (comic.type.key) {
-      0 => comic.target,
-      1 => getGalleryId(comic.target),
-      2 => "jm${comic.target}",
-      3 => "hitomi${RegExp(r"\d+(?=\.html)").firstMatch(comic.target)![0]!}",
-      4 => "Ht${comic.target}",
-      6 => "nhentai${comic.target}",
+    var id = switch (comic.type.comicSource.key) {
+      "picacg" => comic.target,
+      "ehentai" => getGalleryId(comic.target),
+      "jm" => "jm${comic.target}",
+      "hitomi" => "hitomi${RegExp(r"\d+(?=\.html)").firstMatch(comic.target)![0]!}",
+      "htmanga" => "Ht${comic.target}",
+      "nhentai" => "nhentai${comic.target}",
       _ => generateId(comic.type.comicSource.key, comic.target)
     };
     downloading.addLast(

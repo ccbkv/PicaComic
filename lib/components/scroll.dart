@@ -98,3 +98,167 @@ class _SmoothScrollProviderState extends State<SmoothScrollProvider> {
     );
   }
 }
+
+/// A [SelectableText] that never scrolls independently, even when content
+/// overflows. It should always be placed inside a parent scrollable widget
+/// (e.g. CustomScrollView / ListView) so the text scrolls with the page.
+class NonScrollableSelectableText extends StatelessWidget {
+  const NonScrollableSelectableText(
+    this.data, {
+    super.key,
+    this.style,
+    this.strutStyle,
+    this.textAlign,
+    this.textDirection,
+    this.showCursor = false,
+    this.autofocus = false,
+    this.cursorWidth = 2.0,
+    this.cursorHeight,
+    this.cursorRadius,
+    this.cursorColor,
+    this.selectionHeightStyle = ui.BoxHeightStyle.tight,
+    this.selectionWidthStyle = ui.BoxWidthStyle.tight,
+    this.dragStartBehavior = DragStartBehavior.start,
+    this.toolbarOptions,
+    this.dataIsRequired = true,
+    this.maxLines,
+    this.semanticsLabel,
+    this.textWidthBasis,
+    this.onSelectionChanged,
+    this.contextMenuBuilder,
+  });
+
+  final String data;
+  final TextStyle? style;
+  final StrutStyle? strutStyle;
+  final TextAlign? textAlign;
+  final TextDirection? textDirection;
+  final bool showCursor;
+  final bool autofocus;
+  final double cursorWidth;
+  final double? cursorHeight;
+  final Radius? cursorRadius;
+  final Color? cursorColor;
+  final ui.BoxHeightStyle selectionHeightStyle;
+  final ui.BoxWidthStyle selectionWidthStyle;
+  final DragStartBehavior dragStartBehavior;
+  final ToolbarOptions? toolbarOptions;
+  final bool dataIsRequired;
+  final int? maxLines;
+  final String? semanticsLabel;
+  final TextWidthBasis? textWidthBasis;
+  final SelectionChangedCallback? onSelectionChanged;
+  final Widget Function(BuildContext, EditableTextState)? contextMenuBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        scrollbars: false,
+        physics: const NeverScrollableScrollPhysics(),
+      ),
+      child: SelectableText(
+        data,
+        style: style,
+        strutStyle: strutStyle,
+        textAlign: textAlign,
+        textDirection: textDirection,
+        showCursor: showCursor,
+        autofocus: autofocus,
+        cursorWidth: cursorWidth,
+        cursorHeight: cursorHeight,
+        cursorRadius: cursorRadius,
+        cursorColor: cursorColor,
+        selectionHeightStyle: selectionHeightStyle,
+        selectionWidthStyle: selectionWidthStyle,
+        dragStartBehavior: dragStartBehavior,
+        toolbarOptions: toolbarOptions,
+        maxLines: maxLines,
+        semanticsLabel: semanticsLabel,
+        textWidthBasis: textWidthBasis,
+        onSelectionChanged: onSelectionChanged,
+        contextMenuBuilder: contextMenuBuilder,
+      ),
+    );
+  }
+}
+
+/// A [SelectableText.rich] that never scrolls independently.
+class NonScrollableSelectableRichText extends StatelessWidget {
+  const NonScrollableSelectableRichText(
+    this.textSpan, {
+    super.key,
+    this.style,
+    this.strutStyle,
+    this.textAlign,
+    this.textDirection,
+    this.showCursor = false,
+    this.autofocus = false,
+    this.cursorWidth = 2.0,
+    this.cursorHeight,
+    this.cursorRadius,
+    this.cursorColor,
+    this.selectionHeightStyle = ui.BoxHeightStyle.tight,
+    this.selectionWidthStyle = ui.BoxWidthStyle.tight,
+    this.dragStartBehavior = DragStartBehavior.start,
+    this.toolbarOptions,
+    this.maxLines,
+    this.semanticsLabel,
+    this.textWidthBasis,
+    this.onSelectionChanged,
+    this.contextMenuBuilder,
+  });
+
+  final TextSpan textSpan;
+  final TextStyle? style;
+  final StrutStyle? strutStyle;
+  final TextAlign? textAlign;
+  final TextDirection? textDirection;
+  final bool showCursor;
+  final bool autofocus;
+  final double cursorWidth;
+  final double? cursorHeight;
+  final Radius? cursorRadius;
+  final Color? cursorColor;
+  final ui.BoxHeightStyle selectionHeightStyle;
+  final ui.BoxWidthStyle selectionWidthStyle;
+  final DragStartBehavior dragStartBehavior;
+  final ToolbarOptions? toolbarOptions;
+  final int? maxLines;
+  final String? semanticsLabel;
+  final TextWidthBasis? textWidthBasis;
+  final SelectionChangedCallback? onSelectionChanged;
+  final Widget Function(BuildContext, EditableTextState)? contextMenuBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        scrollbars: false,
+        physics: const NeverScrollableScrollPhysics(),
+      ),
+      child: SelectableText.rich(
+        textSpan,
+        style: style,
+        strutStyle: strutStyle,
+        textAlign: textAlign,
+        textDirection: textDirection,
+        showCursor: showCursor,
+        autofocus: autofocus,
+        cursorWidth: cursorWidth,
+        cursorHeight: cursorHeight,
+        cursorRadius: cursorRadius,
+        cursorColor: cursorColor,
+        selectionHeightStyle: selectionHeightStyle,
+        selectionWidthStyle: selectionWidthStyle,
+        dragStartBehavior: dragStartBehavior,
+        toolbarOptions: toolbarOptions,
+        maxLines: maxLines,
+        semanticsLabel: semanticsLabel,
+        textWidthBasis: textWidthBasis,
+        onSelectionChanged: onSelectionChanged,
+        contextMenuBuilder: contextMenuBuilder,
+      ),
+    );
+  }
+}

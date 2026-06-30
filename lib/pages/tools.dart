@@ -5,6 +5,7 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/utils/app_links.dart';
 import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
+import 'package:pica_comic/pages/search/image_search_page.dart';
 
 import 'ehentai/subscription.dart';
 import 'jm/jm_comic_page.dart';
@@ -29,6 +30,17 @@ void openTool(BuildContext context) {
                 onTap: () {
                   App.globalBack();
                   App.mainNavigatorKey?.currentContext?.to(() => const SubscriptionPage());
+                },
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: ListTile(
+                leading: const Icon(Icons.image_search_rounded),
+                title: Text("图片搜索".tl),
+                onTap: () {
+                  App.globalBack();
+                  App.mainNavigatorKey?.currentContext
+                      ?.to(() => const ImageSearchPage());
                 },
               ),
             ),

@@ -5,6 +5,7 @@ class Appbar extends StatefulWidget implements PreferredSizeWidget {
       {required this.title,
       this.leading,
       this.actions,
+      this.allowLiquidGlass = true,
       this.backgroundColor,
       this.scrolledUnderElevation,
       super.key});
@@ -14,6 +15,8 @@ class Appbar extends StatefulWidget implements PreferredSizeWidget {
   final Widget? leading;
 
   final List<Widget>? actions;
+
+  final bool allowLiquidGlass;
 
   final Color? backgroundColor;
 
@@ -113,7 +116,9 @@ class _AppbarState extends State<Appbar> {
       ),
     ).paddingTop(context.padding.top);
 
-    if (enableLiquidGlassUi && widget.backgroundColor != Colors.transparent) {
+    if (widget.allowLiquidGlass &&
+        enableLiquidGlassUi &&
+        widget.backgroundColor != Colors.transparent) {
       return GlassContainer(
         useOwnLayer: true,
         quality: GlassQuality.minimal,
@@ -1138,10 +1143,13 @@ class TabActionButton extends StatelessWidget {
       ),
     );
     if (enableLiquidGlassUi) {
-      return GlassSurface(
-        borderRadius: 12,
+      return InkWell(
         onTap: onPressed,
-        child: content,
+        borderRadius: BorderRadius.circular(12),
+        child: GlassContainerLite(
+          shape: const LiquidRoundedSuperellipse(borderRadius: 12),
+          child: content,
+        ),
       );
     }
     return InkWell(

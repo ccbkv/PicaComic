@@ -1,66 +1,7 @@
 part of pica_settings;
 
 void findUpdate(BuildContext context) {
-  context.showMessage(message: "正在检查更新".tl);
-  checkUpdate().then((b) {
-    if (!context.mounted) return;
-    if (b == null) {
-      context.showMessage(message: "网络错误".tl);
-    } else if (b) {
-      getUpdatesInfo().then((s) {
-        if (!context.mounted) return;
-        if (s != null) {
-          if (App.isFluent) {
-            fluent.showDialog(
-              context: context,
-              builder: (context) {
-                return fluent.ContentDialog(
-                  title: Text("有可用更新".tl),
-                  content: Text(s),
-                  actions: [
-                    fluent.Button(
-                        onPressed: () => App.globalBack(),
-                        child: Text("取消".tl)),
-                    fluent.FilledButton(
-                        onPressed: () {
-                          getDownloadUrl().then((s) {
-                            launchUrlString(s,
-                                mode: LaunchMode.externalApplication);
-                          });
-                        },
-                        child: Text("下载".tl))
-                  ],
-                );
-              });
-            return;
-          }
-
-          showDialog(
-              context: context,
-              builder: (context) {
-                return ContentDialog(
-                  title: "有可用更新".tl,
-                  content: Text(s).paddingHorizontal(16).paddingVertical(8),
-                  actions: [
-                    Button.filled(
-                        onPressed: () {
-                          getDownloadUrl().then((s) {
-                            launchUrlString(s,
-                                mode: LaunchMode.externalApplication);
-                          });
-                        },
-                        child: Text("下载".tl))
-                  ],
-                );
-              });
-        } else {
-          context.showMessage(message: "网络错误".tl);
-        }
-      });
-    } else {
-      context.showMessage(message: "已是最新版本".tl);
-    }
-  });
+  AutoUpdater().manualCheckForUpdates();
 }
 
 class ProxyController extends StateController {

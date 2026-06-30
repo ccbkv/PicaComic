@@ -151,9 +151,6 @@ final picacg = ComicSource.named(
           ? "a"
           : (param == "ca" ? "ca" : "c");
       var sort = options[0];
-      if (type == "ca" && sort == "dd") {
-        sort = "ld";
-      }
       return PicacgNetwork().getCategoryComics(
         categories,
         page,

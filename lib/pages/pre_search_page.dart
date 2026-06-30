@@ -144,11 +144,21 @@ class _GlassFloatingSearchBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12) +
               const EdgeInsets.only(top: 8),
           child: GlassSearchableBottomBar(
-            tabs: const [
+            tabs: [
               GlassBottomBarTab(
                 label: '',
-                icon: Icon(Icons.arrow_back),
-                activeIcon: Icon(Icons.arrow_back),
+                icon: Icon(
+                  Icons.arrow_back,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : null,
+                ),
+                activeIcon: Icon(
+                  Icons.arrow_back,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : null,
+                ),
               ),
             ],
             selectedIndex: 0,

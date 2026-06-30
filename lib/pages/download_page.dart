@@ -1502,6 +1502,7 @@ class _DownloadPageState extends State<DownloadPage> {
           type: type,
           tag: logic.comics[index].tags,
           category: categories,
+          downloadTime: logic.comics[index].time,
           onTap: () async {
             // 再次检查边界，防止在异步操作期间数组发生变化
             if (index < 0 ||
@@ -2392,6 +2393,7 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
   String name = "";
   List<String> eps = [];
   List<int> downloadedEps = [];
+  List<int> _visibleEpIndexes = [];
   late final comic = widget.item;
 
   ComicChapters? _chapters;
@@ -2411,11 +2413,13 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
   /// 从已存储的下载项初始化章节信息
   void _initFromStored() {
     name = comic.name;
-    eps = comic.eps;
     downloadedEps = comic.downloadedEps;
-    if (comic is CustomDownloadedItem) {
-      _chapters = (comic as CustomDownloadedItem).chapters;
-    }
+    _refreshVisibleEpisodes(
+      allEps: comic.eps,
+      chapters: comic is CustomDownloadedItem
+          ? (comic as CustomDownloadedItem).chapters
+          : null,
+    );
     _buildTabController();
   }
 
@@ -2447,7 +2451,7 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
           var newEps = res.data;
           var oldEps = c.eps;
           setState(() {
-            eps = newEps;
+            _refreshVisibleEpisodes(allEps: newEps);
             _loadingEps = false;
           });
           if (!_listEquals(newEps, oldEps)) {
@@ -2468,7 +2472,7 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
               : info.epNames;
           var oldEps = c.eps;
           setState(() {
-            eps = newEps;
+            _refreshVisibleEpisodes(allEps: newEps);
             _loadingEps = false;
           });
           if (!_listEquals(newEps, oldEps)) {
@@ -2488,8 +2492,10 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
             var newEps = newChapters!.titles.toList();
             var oldEps = c.eps;
             setState(() {
-              _chapters = newChapters;
-              eps = newEps;
+              _refreshVisibleEpisodes(
+                allEps: newEps,
+                chapters: newChapters,
+              );
               _buildTabController();
               _loadingEps = false;
             });
@@ -2504,6 +2510,15 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
       }
     } catch (_) {}
     setState(() => _loadingEps = false);
+  }
+
+  void _refreshVisibleEpisodes({
+    required List<String> allEps,
+    ComicChapters? chapters,
+  }) {
+    _visibleEpIndexes = List<int>.generate(allEps.length, (index) => index);
+    eps = allEps;
+    _chapters = chapters;
   }
 
   /// 比较两个章节列表是否相同
@@ -2536,7 +2551,16 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
       onConfirm: () async {
         var message = await DownloadManager().deleteEpisode(comic, i);
         if (message == null) {
-          setState(() {});
+          setState(() {
+            downloadedEps = comic.downloadedEps;
+            _refreshVisibleEpisodes(
+              allEps: comic.eps,
+              chapters: comic is CustomDownloadedItem
+                  ? (comic as CustomDownloadedItem).chapters
+                  : null,
+            );
+            _buildTabController();
+          });
         } else {
           showToast(message: message);
         }
@@ -2570,19 +2594,20 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
                     crossAxisSpacing: 8,
                   ),
                   itemBuilder: (BuildContext context, int i) {
+                    var epIndex = _visibleEpIndexes[i];
                     return fluent.Button(
                       child: Row(
                         children: [
                           const SizedBox(width: 16),
                           Expanded(child: Text(eps[i])),
                           const SizedBox(width: 4),
-                          if (downloadedEps.contains(i))
+                          if (downloadedEps.contains(epIndex))
                             const Icon(fluent.FluentIcons.download),
                           const SizedBox(width: 16),
                         ],
                       ),
-                      onPressed: () => readSpecifiedEps(i),
-                      onLongPress: () => deleteEpisode(i),
+                      onPressed: () => readSpecifiedEps(epIndex),
+                      onLongPress: () => deleteEpisode(epIndex),
                     );
                   },
                   itemCount: eps.length,
@@ -2676,7 +2701,8 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
                   childAspectRatio: 4,
                 ),
                 itemBuilder: (BuildContext context, int i) {
-                  var globalIndex = epOffset(i);
+                  var visibleIndex = epOffset(i);
+                  var globalIndex = _visibleEpIndexes[visibleIndex];
                   return Padding(
                     padding: const EdgeInsets.all(4),
                     child: InkWell(
@@ -2763,6 +2789,7 @@ class DownloadedComicTile extends ComicTile {
   final String type;
   final List<String> tag;
   final List<String>? category;
+  final DateTime? downloadTime;
   final void Function() onTap;
   final void Function() onLongTap;
   final void Function(TapDownDetails details) onSecondaryTap;
@@ -2778,7 +2805,25 @@ class DownloadedComicTile extends ComicTile {
       .toList();
 
   @override
-  String get description => "${size}MB";
+  String get description => "";
+
+  @override
+  Widget? buildSubDescription(BuildContext context) {
+    String timeStr = "";
+    if (downloadTime != null) {
+      timeStr =
+          "${downloadTime!.year}/${downloadTime!.month.toString().padLeft(2, '0')}/${downloadTime!.day.toString().padLeft(2, '0')} ${downloadTime!.hour.toString().padLeft(2, '0')}:${downloadTime!.minute.toString().padLeft(2, '0')}";
+    }
+    return Row(
+      children: [
+        Text("大小:${size}MB", style: const TextStyle(fontSize: 12.0)),
+        if (timeStr.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          Text("下载时间:${timeStr}", style: const TextStyle(fontSize: 12.0)),
+        ],
+      ],
+    );
+  }
 
   @override
   Widget get image => Image.file(
@@ -2816,6 +2861,7 @@ class DownloadedComicTile extends ComicTile {
       required this.type,
       required this.tag,
       this.category,
+      this.downloadTime,
       super.key});
 }
 

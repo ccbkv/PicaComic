@@ -6,6 +6,9 @@ import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:liquid_glass_widgets/widgets/overlays/glass_menu.dart';
+import 'package:liquid_glass_widgets/widgets/overlays/glass_menu_item.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
@@ -88,6 +91,8 @@ class AppWebview extends StatefulWidget {
 }
 
 class _AppWebviewState extends State<AppWebview> {
+  static const double _kLocalAppBarHeight = 58;
+
   InAppWebViewController? controller;
 
   String title = "Webview";
@@ -95,6 +100,118 @@ class _AppWebviewState extends State<AppWebview> {
   double _progress = 0;
 
   late var future = _createWebviewEnvironment();
+
+  Future<void> _openInBrowser() async {
+    final url = (await controller?.getUrl())?.toString();
+    if (url != null) {
+      await launchUrlString(url);
+    }
+  }
+
+  Future<void> _copyLink() async {
+    final url = (await controller?.getUrl())?.toString();
+    if (url != null) {
+      await Clipboard.setData(ClipboardData(text: url));
+    }
+  }
+
+  void _showMoreMenu() {
+    showMenuX(
+      context,
+      Offset(context.width, context.padding.top),
+      [
+        MenuEntry(
+          icon: Icons.open_in_browser,
+          text: "在浏览器中打开".tl,
+          onClick: _openInBrowser,
+        ),
+        MenuEntry(
+          icon: Icons.copy,
+          text: "复制链接".tl,
+          onClick: _copyLink,
+        ),
+        MenuEntry(
+          icon: Icons.refresh,
+          text: "重新加载".tl,
+          onClick: () => controller?.reload(),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildGlassMenuItems() {
+    return [
+      GlassMenuItem(
+        title: "在浏览器中打开".tl,
+        icon: const Icon(Icons.open_in_browser),
+        onTap: _openInBrowser,
+      ),
+      GlassMenuItem(
+        title: "复制链接".tl,
+        icon: const Icon(Icons.copy),
+        onTap: _copyLink,
+      ),
+      GlassMenuItem(
+        title: "重新加载".tl,
+        icon: const Icon(Icons.refresh),
+        onTap: () => controller?.reload(),
+      ),
+    ];
+  }
+
+  PreferredSizeWidget _buildAppBar(List<Widget> actions) {
+    final topPadding = context.padding.top;
+    final content = SizedBox(
+      height: _kLocalAppBarHeight + topPadding,
+      child: Padding(
+        padding: EdgeInsets.only(top: topPadding),
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            Tooltip(
+              message: "返回".tl,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: DefaultTextStyle(
+                style: DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            ...actions,
+            const SizedBox(width: 8),
+          ],
+        ),
+      ),
+    );
+
+    final appBarChild = enableLiquidGlassUi
+        ? GlassContainerLite(
+            width: double.infinity,
+            height: _kLocalAppBarHeight + topPadding,
+            shape: LiquidRoundedSuperellipse(borderRadius: 28),
+            child: content,
+          )
+        : Material(
+            color: Theme.of(context).colorScheme.surface,
+            child: content,
+          );
+
+    return PreferredSize(
+      preferredSize: Size.fromHeight(_kLocalAppBarHeight + topPadding),
+      child: appBarChild,
+    );
+  }
 
   Future<bool> _createWebviewEnvironment() async {
     // 获取代理设置 - 使用索引 [8]
@@ -131,38 +248,50 @@ class _AppWebviewState extends State<AppWebview> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     final actions = [
-      Tooltip(
-        message: "更多",
-        child: IconButton(
-          icon: const Icon(Icons.more_horiz),
-          onPressed: () {
-            showMenuX(
-              context,
-              Offset(context.width, context.padding.top),
-              [
-                MenuEntry(
-                  icon: Icons.open_in_browser,
-                  text: "在浏览器中打开".tl,
-                  onClick: () async =>
-                      launchUrlString((await controller?.getUrl())!.toString()),
+      if (enableLiquidGlassUi)
+        Builder(builder: (context) {
+          final view = View.of(context);
+          final actualSize = Size(
+            view.physicalSize.width / view.devicePixelRatio,
+            view.physicalSize.height / view.devicePixelRatio,
+          );
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(size: actualSize),
+            child: GlassMenu(
+              autoAdjustToScreen: true,
+              menuWidth: 220,
+              settings: LiquidGlassSettings(
+                blur: 18,
+                glassColor: isDark
+                    ? scheme.surfaceContainerHighest.withValues(alpha: 0.24)
+                    : Colors.white.withValues(alpha: 0.28),
+                ambientStrength: isDark ? 0.34 : 0.48,
+                saturation: 1.14,
+                thickness: 18,
+              ),
+              items: _buildGlassMenuItems(),
+              triggerBuilder: (ctx, toggle) => Tooltip(
+                message: "更多",
+                child: GlassIconActionButton(
+                  icon: Icons.more_horiz,
+                  tooltip: "更多".tl,
+                  onTap: toggle,
                 ),
-                MenuEntry(
-                  icon: Icons.copy,
-                  text: "复制链接".tl,
-                  onClick: () async => Clipboard.setData(ClipboardData(
-                      text: (await controller?.getUrl())!.toString())),
-                ),
-                MenuEntry(
-                  icon: Icons.refresh,
-                  text: "重新加载".tl,
-                  onClick: () => controller?.reload(),
-                ),
-              ],
-            );
-          },
-        ),
-      )
+              ),
+            ),
+          );
+        })
+      else
+        Tooltip(
+          message: "更多",
+          child: IconButton(
+            icon: const Icon(Icons.more_horiz),
+            onPressed: _showMoreMenu,
+          ),
+        )
     ];
 
     Widget body = FutureBuilder(
@@ -190,14 +319,7 @@ class _AppWebviewState extends State<AppWebview> {
     );
 
     return Scaffold(
-        appBar: Appbar(
-          title: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          actions: actions,
-        ),
+        appBar: _buildAppBar(actions),
         body: Builder(
           builder: (context) {
             final route = ModalRoute.of(context);

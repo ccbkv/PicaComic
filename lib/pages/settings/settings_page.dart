@@ -24,6 +24,7 @@ import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/main.dart';
 import 'package:pica_comic/network/app_dio.dart';
+import 'package:pica_comic/pages/about/about_page.dart';
 import 'package:pica_comic/components/components.dart' as components;
 import 'package:pica_comic/components/components.dart' hide Select;
 import 'package:pica_comic/pages/logs_page.dart';
@@ -42,6 +43,8 @@ import '../../network/http_proxy.dart';
 import '../../network/jm_network/jm_network.dart';
 import '../../network/nhentai_network/nhentai_main_network.dart';
 import '../../network/update.dart';
+import 'package:pica_comic/pages/settings/app_updater.dart';
+import 'package:pica_comic/pages/settings/app_updater_history.dart';
 import '../../network/webdav.dart';
 import '../../utils/background_service.dart';
 import '../../utils/debug.dart';
@@ -86,6 +89,10 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> implements PopEntry {
+  static const int _aboutPageIndex = 6;
+  static const int _appUpdaterHistoryIndex = 7;
+  static const int _debugPageIndex = 8;
+
   int currentPage = -1;
 
   ColorScheme get colors => Theme.of(context).colorScheme;
@@ -103,6 +110,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     "APP",
     "网络",
     "关于",
+    "历史版本",
     "Debug"
   ];
 
@@ -114,6 +122,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     Icons.apps,
     Icons.public,
     Icons.info,
+    Icons.history,
     Icons.bug_report,
   ];
 
@@ -224,11 +233,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
                 leading: Icon(icons[index]),
                 title: Text(categories[index].tl),
                 trailing: const Icon(Icons.arrow_right),
-                onPressed: () {
-                  setState(() {
-                    currentPage = index;
-                  });
-                },
+                onPressed: () => setState(() => currentPage = index),
               );
             },
           ),
@@ -288,9 +293,11 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         return buildFluentAppSettings();
       case 5:
         return const NetworkSettings();
-      case 6:
+      case _aboutPageIndex:
         return buildFluentAbout();
-      case 7:
+      case _appUpdaterHistoryIndex:
+        return const AppUpdaterHistoryPage(embedded: true);
+      case _debugPageIndex:
         return const DebugPage();
       default:
         return const SizedBox();
@@ -688,7 +695,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    return GlassContainer(
+    return GlassContainerLiteSettings(
       key: key,
       width: double.infinity,
       height: double.infinity,
@@ -698,16 +705,16 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       settings: LiquidGlassSettings(
         blur: 0,
         glassColor: isDark
-            ? const Color.fromRGBO(24, 24, 28, 0.52)
-            : const Color.fromRGBO(255, 255, 255, 0.18),
+            ? const Color.fromRGBO(24, 24, 28, 1)
+            : const Color.fromRGBO(255, 255, 255, 1),
         ambientStrength: isDark ? 0.34 : 0.52,
         saturation: 1.16,
         thickness: 8,
       ),
       child: Material(
         color: isDark
-            ? const Color.fromRGBO(24, 24, 28, 0.92)
-            : const Color.fromRGBO(255, 255, 255, 0.92),
+            ? const Color.fromRGBO(24, 24, 28, 1)
+            : const Color.fromRGBO(255, 255, 255, 1),
         child: child,
       ),
     );
@@ -726,10 +733,10 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       child: Row(
         children: [
           if (showBack) ...[
-            _buildGlassIconButton(
+            GlassIconActionButton(
               icon: Icons.arrow_back,
               tooltip: "Back",
-              onPressed: onBack,
+              onTap: onBack,
             ),
             const SizedBox(width: 12),
           ],
@@ -742,43 +749,6 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         ],
       ),
     );
-  }
-
-  Widget _buildGlassIconButton({
-    required IconData icon,
-    required VoidCallback onPressed,
-    String? tooltip,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final button = GlassContainer(
-      width: 40,
-      height: 40,
-      useOwnLayer: true,
-      quality: GlassQuality.minimal,
-      shape: const LiquidRoundedSuperellipse(borderRadius: 18),
-      settings: LiquidGlassSettings(
-        blur: 12,
-        glassColor: isDark
-            ? scheme.surfaceContainerHighest.withValues(alpha: 0.32)
-            : Colors.white.withValues(alpha: 0.22),
-        ambientStrength: isDark ? 0.36 : 0.48,
-        saturation: 1.12,
-        thickness: 22,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onPressed,
-          child: Icon(icon),
-        ),
-      ),
-    );
-    if (tooltip == null) {
-      return button;
-    }
-    return Tooltip(message: tooltip, child: button);
   }
 
   Widget _buildGlassPlaceholderPane() {
@@ -1143,6 +1113,82 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               },
             ),
           ),
+        
+          fluent.ListTile(
+              leading: const Icon(Icons.water_drop_outlined),
+              title: Text("液态玻璃效果和导航栏".tl),
+              subtitle: Text("实验性功能,可能存在性能或点击区域问题".tl),
+              trailing: AdaptiveSwitch(
+                      value: (() {
+                        while (appdata.settings.length <= 103) {
+                          appdata.settings.add("0");
+                        }
+                        final fluentEnabled =
+                            appdata.settings.length > 91 &&
+                                appdata.settings[91] == "1";
+                        if (fluentEnabled && appdata.settings[103] == "1") {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            setState(() {
+                              appdata.settings[103] = "0";
+                            });
+                            appdata.updateSettings();
+                            MyApp.updater?.call();
+                          });
+                          return false;
+                        }
+                        return appdata.settings[103] == "1";
+                      })(),
+                      onChanged: (b) {
+                        setState(() {
+                          while (appdata.settings.length <= 103) {
+                            appdata.settings.add("0");
+                          }
+                          appdata.settings[103] = b ? "1" : "0";
+                          if (b &&
+                              appdata.settings.length > 91 &&
+                              appdata.settings[91] == "1") {
+                            appdata.settings[91] = "0";
+                          }
+                        });
+                        appdata.updateSettings();
+                        MyApp.updater?.call();
+                      },
+                    ),
+            ),
+          fluent.ListTile(
+            leading: const Icon(Icons.comment),
+            title: Text("显示章节评论".tl),
+            trailing: AdaptiveSwitch(
+              value: appdata.settings.length > 92 ? appdata.settings[92] == "1" : true,
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 92) {
+                    appdata.settings.add("1");
+                  }
+                  appdata.settings[92] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
+          ),
+          fluent.ListTile(
+            leading: const Icon(Icons.save),
+            title: Text("下载时保存章节评论".tl),
+            subtitle: Text("断网时也可查看已保存的章节评论".tl),
+            trailing: AdaptiveSwitch(
+              value: appdata.settings.length > 102 ? appdata.settings[102] == "1" : false,
+              onChanged: (b) {
+                setState(() {
+                  while (appdata.settings.length <= 102) {
+                    appdata.settings.add("0");
+                  }
+                  appdata.settings[102] = b ? "1" : "0";
+                });
+                appdata.updateSettings();
+              },
+            ),
+          ), 
       ],
     );
   }
@@ -1306,12 +1352,11 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
                           while (appdata.settings.length <= 103) {
                             appdata.settings.add("0");
                           }
+                          appdata.settings[103] = b ? "1" : "0";
                           if (b &&
                               appdata.settings.length > 91 &&
                               appdata.settings[91] == "1") {
-                            appdata.settings[103] = "0";
-                          } else {
-                            appdata.settings[103] = b ? "1" : "0";
+                            appdata.settings[91] = "0";
                           }
                         });
                         appdata.updateSettings();
@@ -1618,6 +1663,21 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           height: 16,
         ),
         ListTile(
+          leading: const Icon(Icons.description_outlined),
+          title: const Text("开源许可证"),
+          subtitle: const Text("查看所有开源许可证"),
+          onTap: () => App.globalTo(() => const AboutLicensePage()),
+          trailing: const Icon(Icons.arrow_right),
+        ),
+        ListTile(
+          leading: const Icon(Icons.history),
+          title: const Text("历史版本"),
+          subtitle: const Text("查看历史版本更新"),
+          onTap: () =>
+              showPopUpWidget(App.globalContext!, const AppUpdaterHistoryPage()),
+          trailing: const Icon(Icons.arrow_right),
+        ),
+        ListTile(
           title: Text("检查更新".tl),
           trailing: Button.filled(
             child: Text("检查".tl),
@@ -1680,8 +1740,10 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       3 => const LocalFavoritesSettings(),
       4 => buildAppSettings(),
       5 => const NetworkSettings(),
-      6 => buildAbout(),
-      7 => const DebugPage(), // 添加此 case，返回 DebugPage widget
+      _aboutPageIndex => buildAbout(),
+      _appUpdaterHistoryIndex =>
+          const AppUpdaterHistoryPage(embedded: true),
+      _debugPageIndex => const DebugPage(),
       _ => throw UnimplementedError()
     };
 

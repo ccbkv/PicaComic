@@ -107,15 +107,15 @@ class FavoriteItem {
 
   String toDownloadId() {
     try {
-      return switch (type.comicType) {
-        ComicType.picacg => target,
-        ComicType.ehentai => getGalleryId(target),
-        ComicType.jm => "jm$target",
-        ComicType.hitomi => RegExp(r"\d+(?=\.html)").hasMatch(target)
+      return switch (type.comicSource.key) {
+        "picacg" => target,
+        "ehentai" => getGalleryId(target),
+        "jm" => "jm$target",
+        "hitomi" => RegExp(r"\d+(?=\.html)").hasMatch(target)
             ? "hitomi${RegExp(r"\d+(?=\.html)").firstMatch(target)?[0]}"
             : target,
-        ComicType.htManga => "ht$target",
-        ComicType.nhentai => "nhentai$target",
+        "htmanga" => "Ht$target",
+        "nhentai" => "nhentai$target",
         _ => DownloadManager().generateId(type.comicSource.key, target)
       };
     } catch (e) {
@@ -644,17 +644,28 @@ class LocalFavoritesManager {
     """).first["c"];
   }
 
+  String _comicKey(String target, int type) => "$type\u0000$target";
+
   List<String> get folderNames => _getFolderNamesWithDB();
 
   List<FolderSync> get folderSync => _getFolderSyncWithDB();
 
   /// 获取所有文件夹中的漫画总数
   int get totalComics {
-    int total = 0;
+    final uniqueComics = <String>{};
+    final tables = _getTablesWithDB();
     for (var folder in folderNames) {
-      total += count(folder);
+      if (!tables.contains(folder)) {
+        continue;
+      }
+      var rows = _db.select("""
+        select target, type from "$folder"
+      """);
+      for (final row in rows) {
+        uniqueComics.add(_comicKey(row["target"], row["type"]));
+      }
     }
-    return total;
+    return uniqueComics.length;
   }
 
   /// 获取指定文件夹中的漫画数量
@@ -722,6 +733,7 @@ class LocalFavoritesManager {
 
   List<FavoriteItemWithFolderInfo> allComics() {
     var res = <FavoriteItemWithFolderInfo>[];
+    final uniqueComics = <String>{};
     final tables = _getTablesWithDB();
 
     for (final folder in folderNames) {
@@ -733,8 +745,15 @@ class LocalFavoritesManager {
       var comics = _db.select("""
         select * from "$folder";
       """);
-      res.addAll(comics.map((element) =>
-          FavoriteItemWithFolderInfo(FavoriteItem.fromRow(element), folder)));
+      for (final element in comics) {
+        final key = _comicKey(element["target"], element["type"]);
+        if (!uniqueComics.add(key)) {
+          continue;
+        }
+        res.add(
+          FavoriteItemWithFolderInfo(FavoriteItem.fromRow(element), folder),
+        );
+      }
     }
     return res;
   }

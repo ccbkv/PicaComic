@@ -151,7 +151,7 @@ class UserCommentTile extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SelectableText(
+                          NonScrollableSelectableText(
                             user?.name ?? "Unknown",
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
@@ -163,7 +163,7 @@ class UserCommentTile extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          SelectableText(
+                          NonScrollableSelectableText(
                             comment.content,
                             style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
                           ),

@@ -26,59 +26,21 @@ class FavoriteDownloading extends DownloadingItem{
 
   FavoriteItem comic;
 
-  late DownloadingItem downloadLogic;
+  DownloadingItem? downloadLogic;
 
   @override
   void start() async{
+    if (downloadLogic != null) {
+      downloadLogic!.start();
+      return;
+    }
     await onStart();
-    downloadLogic.start();
   }
 
   @override
   Future<void> onStart() async{
     try {
-      switch(comic.type.key){
-        case 0: {
-          var comicItem = await PicacgNetwork().getComicInfo(comic.target);
-          downloadLogic = PicDownloadingItem(
-              comicItem.data, List.generate(comicItem.data.eps.length,
-                  (index) => index), onFinish, onError, updateInfo, id);
-        }
-        case 1: {
-          var gallery = await EhNetwork().getGalleryInfo(comic.target);
-          downloadLogic = EhDownloadingItem(gallery.data,
-              onFinish, onError, updateInfo, id, 0);
-        }
-        case 2: {
-          var jmComic = await JmNetwork().getComicInfo(comic.target);
-          var downloadedEp = List.generate(jmComic.data.epNames.length, (index) => index);
-          if(downloadedEp.isEmpty) {
-            downloadedEp.add(0);
-          }
-          downloadLogic = JmDownloadingItem(jmComic.data, downloadedEp,
-              onFinish, onError, updateInfo, id);
-        }
-        case 3: {
-          var hitomiComic = await HiNetwork().getComicInfo(comic.target);
-          downloadLogic = HitomiDownloadingItem(hitomiComic.data,
-              comic.coverPath, comic.target, onFinish, onError, updateInfo, id);
-        }
-        case 4: {
-          var htComic = await HtmangaNetwork().getComicInfo(comic.target);
-          downloadLogic = DownloadingHtComic(htComic.data, onFinish, onError, updateInfo, id);
-        }
-        case 6: {
-          var nhComic = await NhentaiNetwork().getComicInfo(comic.target);
-          downloadLogic = NhentaiDownloadingItem(nhComic.data, onFinish, onError, updateInfo, id);
-        }
-        default: {
-          var comicSource = comic.type.comicSource;
-          var comicInfoData = await comicSource.loadComicInfo!(comic.target);
-          var downloadedEp = List.generate(comicInfoData.data.chapters?.length ?? 0, (index) => index);
-          downloadLogic = CustomDownloadingItem(comicInfoData.data, downloadedEp,
-              onFinish, onError, updateInfo, id);
-        }
-      }
+      downloadLogic = await _createDownloadLogic();
     }
     catch(e, s) {
       Log.error("Download", "$e$s");
@@ -87,15 +49,58 @@ class FavoriteDownloading extends DownloadingItem{
     }
     pause();
     DownloadManager().downloading.removeFirst();
-    DownloadManager().downloading.addFirst(downloadLogic);
-    downloadLogic.start();
+    DownloadManager().downloading.addFirst(downloadLogic!);
+    downloadLogic!.start();
+  }
+
+  Future<DownloadingItem> _createDownloadLogic() async {
+    switch(comic.type.comicSource.key){
+      case "picacg":
+        var comicItem = await PicacgNetwork().getComicInfo(comic.target);
+        return PicDownloadingItem(
+            comicItem.data, List.generate(comicItem.data.eps.length,
+                (index) => index), onFinish, onError, updateInfo, id);
+      case "ehentai":
+        var gallery = await EhNetwork().getGalleryInfo(comic.target);
+        return EhDownloadingItem(gallery.data,
+            onFinish, onError, updateInfo, id, 0);
+      case "jm":
+        var jmComic = await JmNetwork().getComicInfo(comic.target);
+        var downloadedEp = List.generate(jmComic.data.epNames.length, (index) => index);
+        if(downloadedEp.isEmpty) {
+          downloadedEp.add(0);
+        }
+        return JmDownloadingItem(jmComic.data, downloadedEp,
+            onFinish, onError, updateInfo, id);
+      case "hitomi":
+        var hitomiComic = await HiNetwork().getComicInfo(comic.target);
+        return HitomiDownloadingItem(hitomiComic.data,
+            comic.coverPath, comic.target, onFinish, onError, updateInfo, id);
+      case "htmanga":
+        var htComic = await HtmangaNetwork().getComicInfo(comic.target);
+        return DownloadingHtComic(htComic.data, onFinish, onError, updateInfo, id);
+      case "nhentai":
+        var nhComic = await NhentaiNetwork().getComicInfo(comic.target);
+        return NhentaiDownloadingItem(nhComic.data, onFinish, onError, updateInfo, id);
+      default:
+        var comicSource = comic.type.comicSource;
+        if (comicSource.loadComicInfo == null) {
+          throw Exception(
+              "Comic source ${comicSource.name} does not support loading comic info");
+        }
+        var comicInfoData = await comicSource.loadComicInfo!(comic.target);
+        var downloadedCustomEp = List.generate(
+            comicInfoData.data.chapters?.length ?? 0, (index) => index);
+        return CustomDownloadingItem(comicInfoData.data, downloadedCustomEp,
+            onFinish, onError, updateInfo, id);
+    }
   }
 
   @override
   String get cover => comic.coverPath;
 
   @override
-  Future<Map<int, List<String>>> getLinks() => downloadLogic.getLinks();
+  Future<Map<int, List<String>>> getLinks() => downloadLogic!.getLinks();
 
   @override
   String get title => comic.name;
@@ -118,10 +123,10 @@ class FavoriteDownloading extends DownloadingItem{
 
   @override
   FutureOr<DownloadedItem> toDownloadedItem() =>
-      downloadLogic.toDownloadedItem();
+      downloadLogic!.toDownloadedItem();
 
   @override
   Future<Stream<DownloadProgress>> downloadImage(String link) async {
-    return downloadLogic.downloadImage(link);
+    return downloadLogic!.downloadImage(link);
   }
 }

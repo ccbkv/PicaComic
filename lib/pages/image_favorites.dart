@@ -300,6 +300,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
             child: Column(
               children: [
                 Appbar(
+                  allowLiquidGlass: false,
                   title: Text("图片收藏".tl),
                   actions: _buildAppBarActions(),
                 ),
@@ -1199,7 +1200,7 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
           },
         ),
       ],
-      title: SelectableText(
+      title: NonScrollableSelectableText(
         image.title.replaceAll("\n", ""),
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
       ),

@@ -8,6 +8,8 @@ import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/network/download_model.dart';
 import 'package:pica_comic/components/components.dart';
 
+const _allowLiquidGlassUi = false;
+
 class DownloadingPage extends StatefulWidget {
   const DownloadingPage({Key? key}) : super(key: key);
 
@@ -118,7 +120,7 @@ class _DownloadingPageState extends State<DownloadingPage> {
                 Text(displayText),
                 const Spacer(),
                 if (downloadManager.downloading.isNotEmpty)
-                  (enableLiquidGlassUi
+                  (_allowLiquidGlassUi
                       ? GlassSurface(
                           borderRadius: 16,
                           onTap: () {
@@ -153,7 +155,7 @@ class _DownloadingPageState extends State<DownloadingPage> {
                 ),
               ],
             );
-            if (enableLiquidGlassUi) {
+            if (_allowLiquidGlassUi) {
               return Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
                 child: GlassSurface(
@@ -304,7 +306,7 @@ class _DownloadingTileState extends State<_DownloadingTile> {
               child: Column(
                 children: [
                   const Spacer(),
-                  enableLiquidGlassUi
+                  _allowLiquidGlassUi
                       ? GlassIconActionButton(
                           icon: Icons.close,
                           tooltip: "取消".tl,
@@ -315,7 +317,7 @@ class _DownloadingTileState extends State<_DownloadingTile> {
                           onPressed: widget.cancel,
                         ),
                   const Spacer(),
-                  enableLiquidGlassUi
+                  _allowLiquidGlassUi
                       ? GlassIconActionButton(
                           icon: Icons.vertical_align_top,
                           tooltip: "置顶".tl,
@@ -339,7 +341,7 @@ class _DownloadingTileState extends State<_DownloadingTile> {
         ),
       ),
     );
-    if (enableLiquidGlassUi) {
+    if (_allowLiquidGlassUi) {
       return GlassSurface(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         borderRadius: 20,

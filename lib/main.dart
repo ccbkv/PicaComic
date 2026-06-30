@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:pica_comic/bean/dialog/dialog_helper.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/components/window_frame.dart';
 import 'package:pica_comic/foundation/app.dart';
@@ -327,6 +328,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
       (context as Element).visitChildren(rebuild);
     }
+
+    if (appdata.settings.length > 91 && appdata.settings[91] == "1" &&
+        appdata.settings.length > 103 && appdata.settings[103] == "1") {
+      appdata.settings[91] = "0";
+      appdata.settings[103] = "0";
+      appdata.updateSettings();
+    }
     return DynamicColorBuilder(builder: (light, dark) {
       var (lightColor, darkColor) = _generateColorSchemes(light, dark);
       if (appdata.settings.length > 91 && appdata.settings[91] == "1") {
@@ -334,6 +342,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           title: 'Pica Comic',
           debugShowCheckedModeBanner: false,
           navigatorKey: App.navigatorKey,
+          navigatorObservers: [KazumiDialog.observer],
           theme: fluent.FluentThemeData(
              accentColor: fluent.AccentColor('normal', {
                'normal': lightColor.primary,
@@ -473,6 +482,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         title: 'Pica Comic',
         debugShowCheckedModeBanner: false,
         navigatorKey: App.navigatorKey,
+        navigatorObservers: [KazumiDialog.observer],
         scrollBehavior: const _CustomScrollBehavior(),
         theme: ThemeData(
           colorScheme: lightColor,

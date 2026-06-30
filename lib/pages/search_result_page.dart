@@ -1238,24 +1238,6 @@ class _SearchOptionsState extends State<_SearchOptions> {
 
   Widget _buildOptionChip(BuildContext context, int index, MapEntry<String, String> e) {
     final selected = options[index] == e.key;
-    if (enableLiquidGlassUi) {
-      return GlassSurface(
-        borderRadius: 12,
-        onTap: () {
-          setState(() {
-            options[index] = e.key;
-          });
-        },
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Text(
-          e.value.tl,
-          style: TextStyle(
-            color: selected ? context.colorScheme.primary : null,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      );
-    }
     return InkWell(
       onTap: () {
         setState(() {
@@ -1306,14 +1288,7 @@ class _SearchOptionsState extends State<_SearchOptions> {
             ).paddingHorizontal(16),
           ],
         );
-        children.add(enableLiquidGlassUi
-            ? GlassSurface(
-                margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                borderRadius: 18,
-                padding: const EdgeInsets.only(bottom: 12),
-                child: optionContent,
-              )
-            : optionContent);
+        children.add(optionContent);
       }
     }
     return Column(

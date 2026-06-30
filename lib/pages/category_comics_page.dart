@@ -274,6 +274,7 @@ bool get _isNhentai => source.key == "nhentai";
    return Scaffold(
       backgroundColor: Colors.white,
       appBar: Appbar(
+        allowLiquidGlass: false,
         scrolledUnderElevation: 0,
         title: Text(
           widget.displayTitle ??

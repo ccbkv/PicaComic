@@ -701,25 +701,20 @@ class _SideNaviWidgetState extends State<_SideNaviWidget> {
         child: child,
       );
 
-      return GlassButton.custom(
+      return GlassIconActionButton(
         onTap: widget.onTap,
         width: double.infinity,
         height: itemHeight,
-        shape: const LiquidRoundedSuperellipse(borderRadius: 20),
-        settings: LiquidGlassSettings(
-          blur: 0,
-          glassColor: _pressed
-              ? pressedGlassColor
-              : (widget.enabled
-                  ? colorScheme.primary.withValues(alpha: isDark ? 0.18 : 0.12)
-                  : (isDark
-                      ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.18)
-                      : Colors.white.withValues(alpha: 0.12))),
-          saturation: 1.18,
-          ambientStrength: widget.enabled ? 0.50 : 0.38,
-          thickness: widget.enabled ? 24 : 18,
-        ),
-        child: Listener(
+        borderRadius: 20,
+        blur: 0,
+        backgroundColor: _pressed
+            ? pressedGlassColor
+            : (widget.enabled
+                ? colorScheme.primary.withValues(alpha: isDark ? 0.18 : 0.12)
+                : (isDark
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.18)
+                    : Colors.white.withValues(alpha: 0.12))),
+        content: Listener(
           behavior: HitTestBehavior.translucent,
           onPointerDown: (_) => setState(() => _pressed = true),
           onPointerUp: (_) => setState(() => _pressed = false),
@@ -784,21 +779,16 @@ class _PaneActionWidget extends StatelessWidget {
         : Align(alignment: Alignment.centerLeft, child: icon);
 
     if (enableLiquidGlassUi) {
-      return GlassButton.custom(
+      return GlassIconActionButton(
         onTap: entry.onTap,
         width: double.infinity,
         height: itemHeight,
-        shape: const LiquidRoundedSuperellipse(borderRadius: 18),
-        settings: LiquidGlassSettings(
-          blur: 0,
-          glassColor: isDark
-              ? scheme.surfaceContainerHighest.withValues(alpha: 0.20)
-              : Colors.white.withValues(alpha: 0.14),
-          ambientStrength: isDark ? 0.34 : 0.46,
-          saturation: 1.12,
-          thickness: 18,
-        ),
-        child: SizedBox(
+        borderRadius: 18,
+        blur: 0,
+        backgroundColor: isDark
+            ? scheme.surfaceContainerHighest.withValues(alpha: 0.20)
+            : Colors.white.withValues(alpha: 0.14),
+        content: SizedBox(
           height: itemHeight,
           width: double.infinity,
           child: Padding(
@@ -848,25 +838,15 @@ class _GlassPaneActionButton extends StatelessWidget {
 
     return Tooltip(
       message: entry.label,
-      child: GlassButton.custom(
+      child: GlassIconActionButton(
+        icon: entry.icon,
         onTap: entry.onTap,
-        width: 40,
-        height: 40,
-        shape: const LiquidRoundedSuperellipse(borderRadius: 18),
-        settings: LiquidGlassSettings(
-          blur: 0,
-          glassColor: isDark
-              ? scheme.surfaceContainerHighest.withValues(alpha: 0.24)
-              : Colors.white.withValues(alpha: 0.16),
-          ambientStrength: isDark ? 0.34 : 0.46,
-          saturation: 1.12,
-          thickness: 18,
-        ),
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(entry.icon),
-        ),
+        size: 40,
+        borderRadius: 18,
+        blur: 0,
+        backgroundColor: isDark
+            ? scheme.surfaceContainerHighest.withValues(alpha: 0.24)
+            : Colors.white.withValues(alpha: 0.16),
       ),
     );
   }

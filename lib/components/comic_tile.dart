@@ -116,7 +116,7 @@ abstract class ComicTile extends StatelessWidget {
           onClick: () => option.onTap(comicID),
         )),
       ],
-      title: SelectableText(
+      title: NonScrollableSelectableText(
         title.replaceAll("\n", ""),
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
       ),

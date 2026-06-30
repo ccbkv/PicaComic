@@ -3,6 +3,7 @@ import "dart:async";
 import "package:collection/collection.dart";
 import "package:flutter/material.dart";
 import "package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart";
+import "package:liquid_glass_widgets/liquid_glass_widgets.dart";
 import "package:pica_comic/base.dart";
 import "package:pica_comic/foundation/comic_source/comic_source.dart";
 import 'package:pica_comic/components/components.dart';
@@ -332,8 +333,8 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
       return enableLiquidGlassUi
           ? Padding(
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: GlassSurface(
-                borderRadius: 20,
+              child: GlassContainerLite(
+                shape: const LiquidRoundedSuperellipse(borderRadius: 20),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: content,
               ),
@@ -389,8 +390,8 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
     return enableLiquidGlassUi
         ? Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: GlassSurface(
-              borderRadius: 20,
+            child: GlassContainerLite(
+              shape: const LiquidRoundedSuperellipse(borderRadius: 20),
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: content,
             ),
@@ -1017,18 +1018,20 @@ class FavoritesPage extends StatelessWidget with _LocalFavoritesManager {
           SizedBox(
             width: double.infinity,
             child: enableLiquidGlassUi
-                ? GlassSurface(
-                    borderRadius: 18,
-                    onTap: () =>
-                        App.to(context, () => const LocalSearchPage()),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.search, size: 18),
-                        const SizedBox(width: 8),
-                        Text("搜索".tl),
-                      ],
+                ? InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () => App.to(context, () => const LocalSearchPage()),
+                    child: GlassContainerLite(
+                      shape: const LiquidRoundedSuperellipse(borderRadius: 18),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.search, size: 18),
+                          const SizedBox(width: 8),
+                          Text("搜索".tl),
+                        ],
+                      ),
                     ),
                   )
                 : OutlinedButton.icon(

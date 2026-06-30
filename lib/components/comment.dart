@@ -72,7 +72,7 @@ class CommentTile extends StatelessWidget {
                     const SizedBox(
                       height: 12,
                     ),
-                    SelectableText(content, style: const TextStyle(fontSize: 15),),
+                    NonScrollableSelectableText(content, style: const TextStyle(fontSize: 15),),
                     const SizedBox(
                       height: 4,
                     ),

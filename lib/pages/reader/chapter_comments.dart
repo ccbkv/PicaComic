@@ -216,6 +216,7 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: Appbar(
+        allowLiquidGlass: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -754,7 +755,7 @@ class _CommentContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!text.contains('<') && !text.contains('http')) {
-      return SelectableText(text);
+      return NonScrollableSelectableText(text);
     } else {
       return _RichCommentContent(text: text);
     }
@@ -994,7 +995,7 @@ class _RichCommentContentState extends State<_RichCommentContent> {
 
   @override
   Widget build(BuildContext context) {
-    Widget content = SelectableText.rich(
+    Widget content = NonScrollableSelectableRichText(
       TextSpan(style: DefaultTextStyle.of(context).style, children: textSpan),
     );
     if (images.isNotEmpty && widget.showImages) {

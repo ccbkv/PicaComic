@@ -102,6 +102,22 @@ class _SmoothScrollProviderState extends State<SmoothScrollProvider> {
 /// A [SelectableText] that never scrolls independently, even when content
 /// overflows. It should always be placed inside a parent scrollable widget
 /// (e.g. CustomScrollView / ListView) so the text scrolls with the page.
+Widget Function(BuildContext, EditableTextState)? _defaultSelectionContextMenuBuilder(
+  Widget Function(BuildContext, EditableTextState)? builder,
+) {
+  if (builder != null) {
+    return builder;
+  }
+  if (!App.isMobile) {
+    return null;
+  }
+  return (context, editableTextState) {
+    return AdaptiveTextSelectionToolbar.editableText(
+      editableTextState: editableTextState,
+    );
+  };
+}
+
 class NonScrollableSelectableText extends StatelessWidget {
   const NonScrollableSelectableText(
     this.data, {
@@ -177,7 +193,8 @@ class NonScrollableSelectableText extends StatelessWidget {
         semanticsLabel: semanticsLabel,
         textWidthBasis: textWidthBasis,
         onSelectionChanged: onSelectionChanged,
-        contextMenuBuilder: contextMenuBuilder,
+        contextMenuBuilder:
+            _defaultSelectionContextMenuBuilder(contextMenuBuilder),
       ),
     );
   }
@@ -257,7 +274,8 @@ class NonScrollableSelectableRichText extends StatelessWidget {
         semanticsLabel: semanticsLabel,
         textWidthBasis: textWidthBasis,
         onSelectionChanged: onSelectionChanged,
-        contextMenuBuilder: contextMenuBuilder,
+        contextMenuBuilder:
+            _defaultSelectionContextMenuBuilder(contextMenuBuilder),
       ),
     );
   }

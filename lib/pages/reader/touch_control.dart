@@ -50,26 +50,21 @@ class ScrollManager {
     }
     moveOffset = null;
     startTime = null;
-    if (logic.fABValue < 58) {
-      logic.fABValue = 0;
-      logic.update(["FAB"]);
-    } else if (logic.fABValue >= 58) {
-      logic.fABValue = 0;
-      logic.jumpToNextChapter();
-    }
+    // 松手时若蓄力未充满, 延时后自动回落
+    logic.chapterEndCharge.scheduleDecay();
+    logic.chapterStartCharge.scheduleDecay();
   }
 
   /// handle pointer move event
   void addOffset(Offset value) {
-    if (logic.scrollController.offset ==
-            logic.scrollController.position.maxScrollExtent &&
-        logic.photoViewController.scale == 1 &&
-        logic.showFloatingButtonValue == 1) {
-      logic.fABValue -= value.dy / 3;
-      logic.update(["FAB"]);
-      return;
-    }
     if (logic.photoViewController.scale == 1) {
+      // 未放大时列表自身负责滚动, 这里只处理章节边界的蓄力。
+      // 按拖动方向分发, 保证「本章高度不足一屏」时上下两个方向都能蓄力。
+      if (value.dy < 0 && logic.isAtChapterEnd) {
+        logic.chargeForNextChapter(-value.dy);
+      } else if (value.dy > 0 && logic.isAtChapterStart) {
+        logic.chargeForLastChapter(value.dy);
+      }
       return;
     }
     if (moveOffset != null) {

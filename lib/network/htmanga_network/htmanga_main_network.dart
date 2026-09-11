@@ -323,7 +323,8 @@ class HtmangaNetwork {
       return Res(null, errorMessage: res.errorMessage);
     }
     try {
-      var urls = RegExp(r"(?<=//)[\w./\[\]()-]+").allMatches(res.data);
+      // 保留 ?verify= 签名参数, 否则原图请求会被 WNACG/CDN 以 403 拒绝
+      var urls = RegExp(r"(?<=//)[\w./\[\]()?&=%+-]+").allMatches(res.data);
       var images = <String>[];
       for (var url in urls) {
         images.add("https://${url[0]!}");

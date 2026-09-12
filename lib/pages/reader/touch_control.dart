@@ -50,20 +50,16 @@ class ScrollManager {
     }
     moveOffset = null;
     startTime = null;
-    // 松手时若蓄力未充满, 延时后自动回落
-    logic.chapterEndCharge.scheduleDecay();
-    logic.chapterStartCharge.scheduleDecay();
   }
 
   /// handle pointer move event
   void addOffset(Offset value) {
     if (logic.photoViewController.scale == 1) {
-      // 未放大时列表自身负责滚动, 这里只处理章节边界的蓄力。
-      // 按拖动方向分发, 保证「本章高度不足一屏」时上下两个方向都能蓄力。
+      // 未放大时列表自身负责滚动, 到达章节边界后继续拖动则直接切章。
       if (value.dy < 0 && logic.isAtChapterEnd) {
-        logic.chargeForNextChapter(-value.dy);
+        logic.jumpToNextChapter();
       } else if (value.dy > 0 && logic.isAtChapterStart) {
-        logic.chargeForLastChapter(value.dy);
+        logic.jumpToLastChapter();
       }
       return;
     }

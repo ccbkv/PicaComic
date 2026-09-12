@@ -97,8 +97,8 @@ void _restoreAppOrientations() {
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft, 
-      DeviceOrientation.landscapeRight, 
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
     ]);
   } else if (OhosDeviceInfoBridge.shouldLockAppPortrait) {
     SystemChrome.setPreferredOrientations([
@@ -317,15 +317,6 @@ class ComicReadingPage extends StatelessWidget {
       BaseImageProvider.clearCache();
       BaseImageProvider.setCacheSizeLimit(100 * 1024 * 1024);
       logic.openEpsView = openEpsDrawer;
-      // 蓄力进度显示在切章悬浮按钮上: 按钮高度 58
-      logic.chapterEndCharge.onChanged = (v) {
-        logic.fABValue = v * 58;
-        logic.update(["FAB"]);
-      };
-      logic.chapterStartCharge.onChanged = (v) {
-        logic.fABValue = v * 58;
-        logic.update(["FAB"]);
-      };
       logic.continuationIndexCallback ??= (_) {
         unawaited(syncReaderContinuationState(readingData, logic));
       };
@@ -338,8 +329,6 @@ class ComicReadingPage extends StatelessWidget {
       BaseImageProvider.clearCache();
       BaseImageProvider.setCacheSizeLimit(50 * 1024 * 1024);
       logic.clearPhotoViewControllers();
-      logic.chapterEndCharge.dispose();
-      logic.chapterStartCharge.dispose();
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       _restoreAppOrientations();
       if (logic.listenVolume != null) {
@@ -387,7 +376,6 @@ class ComicReadingPage extends StatelessWidget {
         endDrawer: Drawer(
           child: buildEpsView(),
         ),
-        floatingActionButton: buildEpChangeButton(logic),
         body: StateBuilder<ComicReadingPageLogic>(builder: (logic) {
           if (logic.isLoading) {
             history.readEpisode.add(logic.order);
@@ -675,7 +663,12 @@ class ComicReadingPage extends StatelessWidget {
   /// Select a image form screen, to share or download
   Future<int?> selectImage() async {
     var logic = StateController.find<ComicReadingPageLogic>();
-    var items = logic.itemScrollListener.itemPositions.value.toList();
+    var items = logic.itemScrollListener.itemPositions.value
+        .where((item) => item.index < logic.urls.length)
+        .toList();
+    if (items.isEmpty) {
+      return null;
+    }
     if (items.length == 1) {
       return items[0].index;
     }
@@ -775,84 +768,5 @@ class ComicReadingPage extends StatelessWidget {
         readingData.loadImage(logic.order, index, logic.urls[index]));
 
     saveImage(file);
-  }
-
-  /// 切章悬浮按钮。[fillFromTop] 控制蓄力进度条的填充方向:
-  /// 切下一章从底部向上长, 切上一章从顶部向下长。
-  Widget _buildEpChangeButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    required bool fillFromTop,
-  }) {
-    return StateBuilder<ComicReadingPageLogic>(
-      id: "FAB",
-      builder: (logic) {
-        return Container(
-          width: 58,
-          height: 58,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-              color: Theme.of(App.globalContext!).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(16)),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                  child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Center(
-                      child: Icon(
-                    icon,
-                    size: 24,
-                    color:
-                        Theme.of(App.globalContext!).colorScheme.onPrimaryContainer,
-                  )),
-                ),
-              )),
-              Positioned(
-                top: fillFromTop ? 0 : null,
-                bottom: fillFromTop ? null : 0,
-                left: 0,
-                right: 0,
-                height: logic.fABValue,
-                child: ColoredBox(
-                  color: Theme.of(App.globalContext!)
-                      .colorScheme
-                      .surfaceTint
-                      .withOpacity(0.2),
-                  child: const SizedBox.expand(),
-                ),
-              )
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget? buildEpChangeButton(ComicReadingPageLogic logic) {
-    if (!readingData.hasEp) return null;
-    switch (logic.showFloatingButtonValue) {
-      case -1:
-        return _buildEpChangeButton(
-          icon: Icons.arrow_back_ios_outlined,
-          onTap: () => logic.jumpToLastChapter(),
-          fillFromTop: true,
-        );
-      case 0:
-        return null;
-      case 1:
-        return Hero(
-          tag: "FAB",
-          child: _buildEpChangeButton(
-            icon: Icons.arrow_forward_ios,
-            onTap: () => logic.jumpToNextChapter(),
-            fillFromTop: false,
-          ),
-        );
-    }
-    return null;
   }
 }

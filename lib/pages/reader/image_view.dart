@@ -21,25 +21,38 @@ const Set<PointerDeviceKind> _kTouchLikeDeviceTypes = <PointerDeviceKind>{
   PointerDeviceKind.unknown
 };
 
-
 extension ImageExt on ComicReadingPage {
   /// build comic image
   Widget buildComicView(
       ComicReadingPageLogic logic, BuildContext context, String target) {
     ScrollExtension.futurePosition = null;
     Widget buildType4() {
+      final showChapterTransitionPage = _shouldShowChapterTransitionPage(logic);
       return ScrollablePositionedList.builder(
         itemScrollController: logic.itemScrollController,
         itemPositionsListener: logic.itemScrollListener,
-        itemCount: logic.urls.length,
+        itemCount: logic.urls.length + (showChapterTransitionPage ? 1 : 0),
         addSemanticIndexes: false,
         scrollController: logic.scrollController,
         scrollBehavior: const MaterialScrollBehavior()
             .copyWith(scrollbars: false, dragDevices: _kTouchLikeDeviceTypes),
         physics: (logic.noScroll || logic.isCtrlPressed || logic.mouseScroll)
             ? const NeverScrollableScrollPhysics()
-            : const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            : const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics()),
         itemBuilder: (context, index) {
+          if (showChapterTransitionPage && index == logic.urls.length) {
+            return _ChapterTransitionPage(
+              comicTitle: readingData.title,
+              currentChapterTitle:
+                  readingData.eps?.values.elementAtOrNull(logic.order - 1) ??
+                      "",
+              nextChapterTitle:
+                  readingData.eps?.values.elementAtOrNull(logic.order) ?? "",
+              useDarkBackground: useDarkBackground,
+            );
+          }
+
           double width = MediaQuery.of(context).size.width;
           double height = MediaQuery.of(context).size.height;
 
@@ -64,7 +77,9 @@ extension ImageExt on ComicReadingPage {
     }
 
     final decoration = BoxDecoration(
-      color: useDarkBackground ? Colors.black : Theme.of(context).colorScheme.surface,
+      color: useDarkBackground
+          ? Colors.black
+          : Theme.of(context).colorScheme.surface,
     );
 
     Widget buildType123() {
@@ -83,7 +98,8 @@ extension ImageExt on ComicReadingPage {
             if (showCommentsAtEnd && index == logic.urls.length + 1) {
               var source = ComicSource.find(readingData.sourceKey);
               var epId = readingData.eps!.keys.elementAt(logic.order - 1);
-              var chapterTitle = readingData.eps!.values.elementAt(logic.order - 1);
+              var chapterTitle =
+                  readingData.eps!.values.elementAt(logic.order - 1);
               return PhotoViewGalleryPageOptions.customChild(
                 scaleStateController: PhotoViewScaleStateController(),
                 child: _EmbeddedChapterCommentsPage(
@@ -98,8 +114,9 @@ extension ImageExt on ComicReadingPage {
             imageProvider = createImageProvider(type, logic, index - 1, target);
           } else {
             return PhotoViewGalleryPageOptions.customChild(
-                scaleStateController: PhotoViewScaleStateController(),
-                child: const SizedBox(),);
+              scaleStateController: PhotoViewScaleStateController(),
+              child: const SizedBox(),
+            );
           }
 
           precacheComicImage(logic, context, index, target);
@@ -133,7 +150,10 @@ extension ImageExt on ComicReadingPage {
                         child: Center(
                           child: Text(
                             error.toString(),
-                            style: TextStyle(color: appdata.appSettings.useDarkBackground ? Colors.white : null),
+                            style: TextStyle(
+                                color: appdata.appSettings.useDarkBackground
+                                    ? Colors.white
+                                    : null),
                             maxLines: 3,
                           ),
                         ),
@@ -200,26 +220,25 @@ extension ImageExt on ComicReadingPage {
             logic.jumpToNextChapter();
           } else {
             logic.index = i;
-            logic.isOnChapterCommentsPage = showCommentsAtEnd && i == logic.urls.length + 1;
+            logic.isOnChapterCommentsPage =
+                showCommentsAtEnd && i == logic.urls.length + 1;
             logic.update();
           }
         },
       );
     }
 
-    Widget buildComicImageOrEmpty({
-      required int imageIndex,
-      required BoxFit fit,
-      required Alignment alignment
-    }) {
-      if(imageIndex < 0 || imageIndex >= logic.urls.length){
+    Widget buildComicImageOrEmpty(
+        {required int imageIndex,
+        required BoxFit fit,
+        required Alignment alignment}) {
+      if (imageIndex < 0 || imageIndex >= logic.urls.length) {
         return const SizedBox();
       }
 
       return ComicImage(
         key: ValueKey(imageIndex),
-        image: createImageProvider(
-            type, logic, imageIndex, target),
+        image: createImageProvider(type, logic, imageIndex, target),
         fit: fit,
         alignment: alignment,
       );
@@ -228,9 +247,9 @@ extension ImageExt on ComicReadingPage {
     Widget buildType56() {
       int calcItemCount() {
         int count = logic.urls.length ~/ 2;
-        if(logic.urls.length % 2 != 0) {
+        if (logic.urls.length % 2 != 0) {
           count++;
-        } else if(logic.singlePageForFirstScreen) {
+        } else if (logic.singlePageForFirstScreen) {
           count++;
         }
         return count + 2;
@@ -251,17 +270,14 @@ extension ImageExt on ComicReadingPage {
           logic.photoViewControllers[index] ??= PhotoViewController();
 
           int firstImage = index * 2 - 2;
-          if(firstImage % 2 != 0) {
+          if (firstImage % 2 != 0) {
             firstImage++;
           }
-          if(logic.singlePageForFirstScreen) {
+          if (logic.singlePageForFirstScreen) {
             firstImage--;
           }
-          var images = <int>[
-            firstImage,
-            firstImage+1
-          ];
-          if(logic.readingMethod == ReadingMethod.twoPageReversed) {
+          var images = <int>[firstImage, firstImage + 1];
+          if (logic.readingMethod == ReadingMethod.twoPageReversed) {
             images = images.reversed.toList();
           }
 
@@ -296,7 +312,8 @@ extension ImageExt on ComicReadingPage {
             logic.jumpToLastChapter();
           } else if (i == calcItemCount() - 1) {
             if (!logic.data.hasEp || logic.order == logic.data.eps?.length) {
-              logic.pageController.jumpByDeviceType(logic.pageController.page!.round() - 1);
+              logic.pageController
+                  .jumpByDeviceType(logic.pageController.page!.round() - 1);
               return;
             }
             logic.jumpToNextChapter();
@@ -351,13 +368,12 @@ extension ImageExt on ComicReadingPage {
               ? logic.jumpToNextPage()
               : logic.jumpToLastPage();
         } else {
-          // 滚到章末/章首后继续朝同方向滚动 -> 蓄力切章
           if (pointerSignal.scrollDelta.dy > 0 && logic.isAtChapterEnd) {
-            logic.chargeForNextChapter(_kWheelChargeStep);
+            logic.jumpToNextChapter();
             return;
           }
           if (pointerSignal.scrollDelta.dy < 0 && logic.isAtChapterStart) {
-            logic.chargeForLastChapter(_kWheelChargeStep);
+            logic.jumpToLastChapter();
             return;
           }
           if ((logic.scrollController.position.pixels <=
@@ -369,7 +385,7 @@ extension ImageExt on ComicReadingPage {
             logic.photoViewController.updateMultiple(
                 position: logic.photoViewController.position -
                     Offset(0, pointerSignal.scrollDelta.dy));
-          } else if (!App.isMacOS){
+          } else if (!App.isMacOS) {
             logic.scrollController.smoothTo(pointerSignal.scrollDelta.dy);
           }
         }
@@ -384,6 +400,14 @@ extension ImageExt on ComicReadingPage {
           if (event.kind == PointerDeviceKind.trackpad &&
               logic.readingMethod == ReadingMethod.topToBottomContinuously) {
             if (event.scale == 1.0) {
+              if (event.panDelta.dy < 0 && logic.isAtChapterEnd) {
+                logic.jumpToNextChapter();
+                return;
+              }
+              if (event.panDelta.dy > 0 && logic.isAtChapterStart) {
+                logic.jumpToLastChapter();
+                return;
+              }
               logic.scrollController.smoothTo(0 - event.panDelta.dy * 1.2);
             }
           }
@@ -393,25 +417,7 @@ extension ImageExt on ComicReadingPage {
           child: body,
           onNotification: (notification) {
             TapController.lastScrollTime = DateTime.now();
-            // update floating button
-            var length = logic.data.eps?.length ?? 1;
             if (!logic.scrollController.hasClients) return false;
-            if (logic.isAtScrollStart && logic.order != 0) {
-              logic.showFloatingButton(-1);
-            } else if (logic.isAtScrollEnd && logic.order < length) {
-              logic.showFloatingButton(1);
-            } else {
-              logic.showFloatingButton(0);
-            }
-
-            // 滚离章节边界时清除蓄力进度
-            if (logic.chapterEndCharge.isActive && !logic.isAtChapterEnd) {
-              logic.chapterEndCharge.reset();
-            }
-            if (logic.chapterStartCharge.isActive && !logic.isAtChapterStart) {
-              logic.chapterStartCharge.reset();
-            }
-
             return true;
           },
         ),
@@ -422,8 +428,8 @@ extension ImageExt on ComicReadingPage {
   /// create a image provider
   ImageProvider createImageProvider(
       ReadingType type, ComicReadingPageLogic logic, int index, String target) {
-
-    return logic.data.createImageProvider(logic.order, index, logic.urls[index]);
+    return logic.data
+        .createImageProvider(logic.order, index, logic.urls[index]);
   }
 
   /// check current location of [PageView], update location when it is out of range.
@@ -496,21 +502,110 @@ extension ImageExt on ComicReadingPage {
   }
 
   bool _shouldShowChapterCommentsAtEnd() {
-    if (!readingData.hasEp || readingData.eps == null || readingData.eps!.isEmpty) {
+    if (!readingData.hasEp ||
+        readingData.eps == null ||
+        readingData.eps!.isEmpty) {
       return false;
     }
-    var showChapterComments = appdata.settings.length > 92 && appdata.settings[92] == "1";
+    var showChapterComments =
+        appdata.settings.length > 92 && appdata.settings[92] == "1";
     if (!showChapterComments) return false;
     var showAtEnd = appdata.settings.length > 99 && appdata.settings[99] == "1";
     if (!showAtEnd) return false;
     var source = ComicSource.find(readingData.sourceKey);
     if (source == null || source.chapterCommentsLoader == null) return false;
-    var readingMethod = ReadingMethod.values[int.parse(appdata.settings[9]) - 1];
+    var readingMethod =
+        ReadingMethod.values[int.parse(appdata.settings[9]) - 1];
     if (readingMethod != ReadingMethod.leftToRight &&
         readingMethod != ReadingMethod.rightToLeft &&
         readingMethod != ReadingMethod.topToBottom) {
       return false;
     }
     return true;
+  }
+
+  bool _shouldShowChapterTransitionPage(ComicReadingPageLogic logic) {
+    return appdata.settings[9] == "4" &&
+        readingData.hasEp &&
+        readingData.eps != null &&
+        logic.order < readingData.eps!.length;
+  }
+}
+
+class _ChapterTransitionPage extends StatelessWidget {
+  const _ChapterTransitionPage({
+    required this.comicTitle,
+    required this.currentChapterTitle,
+    required this.nextChapterTitle,
+    required this.useDarkBackground,
+  });
+
+  final String comicTitle;
+  final String currentChapterTitle;
+  final String nextChapterTitle;
+  final bool useDarkBackground;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final textColor = useDarkBackground ? Colors.white : null;
+
+    return Container(
+      width: size.width,
+      height: size.height,
+      color: useDarkBackground
+          ? Colors.black
+          : Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 32,
+          right: 32,
+          top: size.height * 0.22,
+          bottom: size.height * 0.14,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "已读完:".tl,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              "$currentChapterTitle $comicTitle",
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: textColor,
+                height: 1.35,
+              ),
+            ),
+            SizedBox(height: size.height * 0.13),
+            Text(
+              "下一章:".tl,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              nextChapterTitle,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: textColor,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -9,7 +9,7 @@ import 'package:pica_comic/network/http_client.dart';
 import '../base.dart';
 import '../foundation/app.dart';
 
-class MyLogInterceptor implements Interceptor {
+class MyLogInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     LogManager.addLog(LogLevel.error, "Network",

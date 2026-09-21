@@ -135,6 +135,7 @@ class Appdata {
     "0", //102 下载时保存章节评论
     "0", //103 液态玻璃底部导航栏
     "0", //104 下载漫画时保存普通评论
+    "1", //105 收藏概览每行显示的文件夹数量, 存索引(0-4对应1-5列)
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步
@@ -1090,6 +1091,26 @@ class _Settings {
       appdata.settings.add("0");
     }
     appdata.settings[104] = value ? "1" : "0";
+  }
+
+  /// 收藏概览每行显示的文件夹数量 (1-5)
+  int get favoritesOverviewColumns {
+    while (_settings.length <= 105) {
+      _settings.add("1");
+    }
+    final v = int.tryParse(_settings[105]);
+    if (v == null || v < 0 || v > 4) {
+      _settings[105] = "1";
+      return 2;
+    }
+    return v + 1;
+  }
+
+  set favoritesOverviewColumns(int columns) {
+    while (_settings.length <= 105) {
+      _settings.add("1");
+    }
+    _settings[105] = (columns - 1).clamp(0, 4).toString();
   }
 }
 

@@ -30,6 +30,7 @@ part 'favorite_actions.dart';
 part 'side_bar.dart';
 part 'local_favorites_page.dart';
 part 'network_favorites_page.dart';
+part 'favorites_overview.dart';
 
 const _kLeftBarWidth = 256.0;
 
@@ -72,6 +73,14 @@ class _FavoritesPageState extends State<FavoritesPage> {
       appdata.implicitData[0] = "1;0;";
     }
     appdata.writeImplicitData();
+  }
+
+  /// 返回到收藏概览 (等价于取消选中文件夹)。
+  void backToOverview() {
+    if (folder == null) {
+      return;
+    }
+    setFolder(false, null);
   }
 
   @override
@@ -162,33 +171,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Widget buildBody() {
-    final bottomInset = bottomOverlayInsetOf(context);
     if (folder == null) {
-      return CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            leading: Tooltip(
-              message: "收藏夹".tl,
-              child: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
-                  ? IconButton(
-                      icon: const Icon(Icons.menu),
-                      color: Theme.of(context).colorScheme.primary,
-                      onPressed: showFolderSelector,
-                    )
-                  : null,
-            ),
-            title: GestureDetector(
-              onTap: MediaQuery.of(context).size.width < _kTwoPanelChangeWidth
-                  ? showFolderSelector
-                  : null,
-              child: Text("未选择".tl),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: SizedBox(height: bottomInset),
-          ),
-        ],
-      );
+      return _FavoritesOverview(favPage: this);
     }
     if (!isNetwork) {
       return _LocalFavoritesPage(

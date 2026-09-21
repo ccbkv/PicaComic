@@ -411,14 +411,14 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
               topPadding: MediaQuery.of(context).padding.top,
               leading: MediaQuery.of(context).size.width <= _kTwoPanelChangeWidth
                   ? _buildGlassToolbarIcon(
-                      icon: Icons.menu,
-                      tooltip: "菜单".tl,
+                      icon: Icons.arrow_back,
+                      tooltip: "返回概览".tl,
                       color: Theme.of(context).colorScheme.primary,
-                      onTap: favPage.showFolderSelector,
+                      onTap: favPage.backToOverview,
                     )
                   : null,
               titleGesture: MediaQuery.of(context).size.width < _kTwoPanelChangeWidth
-                  ? favPage.showFolderSelector
+                  ? favPage.backToOverview
                   : null,
               actions: [
               if (networkSource != null && !isAllFolder)

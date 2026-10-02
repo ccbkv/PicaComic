@@ -1,120 +1,235 @@
-line 000: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 001: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 002: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 003: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 004: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 005: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 006: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 007: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 008: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 009: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 010: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 011: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 012: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 013: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 014: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 015: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 016: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 017: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 018: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 019: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 020: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 021: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 022: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 023: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 024: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 025: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 026: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 027: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 028: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 029: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 030: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 031: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 032: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 033: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 034: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 035: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 036: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 037: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 038: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 039: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 040: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 041: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 042: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 043: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 044: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 045: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 046: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 047: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 048: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 049: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 050: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 051: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 052: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 053: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 054: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 055: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 056: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 057: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 058: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 059: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 060: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 061: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 062: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 063: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 064: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 065: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 066: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 067: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 068: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 069: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 070: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 071: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 072: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 073: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 074: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 075: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 076: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 077: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 078: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 079: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 080: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 081: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 082: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 083: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 084: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 085: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 086: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 087: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 088: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 089: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 090: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 091: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 092: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 093: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 094: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 095: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 096: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 097: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 098: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 099: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 100: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 101: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 102: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 103: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 104: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 105: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 106: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 107: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 108: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 109: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 110: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 111: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 112: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 113: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 114: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 115: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 116: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 117: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 118: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
-line 119: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pica_comic/components/components.dart';
+import 'package:pica_comic/foundation/app.dart';
+import 'package:pica_comic/foundation/log.dart';
+import 'package:pica_comic/utils/extensions.dart';
+import 'package:pica_comic/utils/io_tools.dart';
+import 'package:pica_comic/utils/translations.dart';
+import 'package:webdav_client/webdav_client.dart';
+
+import '../base.dart';
+
+Future<bool> _retryZone(Future<bool> Function() fn) async {
+  int time = 1;
+  while (time < 1 << 3) {
+    var res = await fn();
+    if (res) {
+      return true;
+    }
+    await Future.delayed(Duration(seconds: time));
+    time *= 2;
+  }
+  return false;
+}
+
+class Webdav {
+  static bool _isOperating = false;
+
+  static bool _haveWaitingTask = false;
+
+  /// Human-readable reason for the most recent sync failure, shown to the user.
+  static String? lastError;
+
+  /// Sync current data to webdav server. Return true if success.
+  static Future<bool> uploadData([String? config]) async {
+    if (_haveWaitingTask) {
+      return true;
+    }
+    if (_isOperating) {
+      _haveWaitingTask = true;
+      while (_isOperating) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+    }
+    _haveWaitingTask = false;
+    _isOperating = true;
+    lastError = null;
+    appdata.settings[46] =
+        (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+    appdata.updateSettings(false);
+    config ??= appdata.settings[45];
+    var configs = _parseConfig(config);
+    if (configs == null) {
+      _isOperating = false;
+      // Not configured / disabled: this is not an error.
+      return true;
+    }
+    LogManager.addLog(LogLevel.info, "network", "Uploading Data");
+    var client = newClient(
+      configs[0],
+      user: configs[1],
+      password: configs[2],
+      debug: false,
+    );
+    client.setHeaders({'content-type': 'text/plain'});
+    client.setConnectTimeout(15000);
+    try {
+      var files = await client.readDir(configs[3]);
+      for (var file in files) {
+        var name = file.name;
+        if (name != null) {
+          var version = name.split(".").first;
+          if (version.isNum) {
+            var days = int.parse(version) ~/ 86400;
+            var currentDays =
+                DateTime.now().millisecondsSinceEpoch ~/ 1000 ~/ 86400;
+            if (currentDays == days && file.path != null) {
+              client.remove(file.path!);
+              break;
+            }
+          }
+        }
+      }
+      await client.writeFromFile(await exportDataToFile(false, "${App.cachePath}/userdata.picadata"),
+          "${configs[3]}${appdata.settings[46]}.picadata");
+    } catch (e, s) {
+      lastError = _describeError(e, stage: "上传");
+      LogManager.addLog(LogLevel.error, "Sync",
+          "Failed to upload data to webdav server.\n$e\n$s");
+      _isOperating = false;
+      return false;
+    }
+    _isOperating = false;
+    return true;
+  }
+
+  /// Parse the webdav config string `url;user;password;path`.
+  ///
+  /// Returns null when sync is not configured / disabled. Also tolerates the
+  /// legacy "disabled" form that had a trailing ";0" appended.
+  static List<String>? _parseConfig(String config) {
+    var configs = config.split(';');
+    if (configs.length < 4) return null;
+    if (configs.elementAtOrNull(0) == "") return null;
+    // Take the first 4 segments, ignoring any trailing marker.
+    var result = configs.sublist(0, 4);
+    // Normalize: trim whitespace and ensure the path ends with a separator.
+    result[0] = result[0].trim();
+    result[3] = result[3].trim();
+    if (result[3].isEmpty) {
+      result[3] = "/";
+    }
+    if (!result[3].endsWith('/') && !result[3].endsWith('\\')) {
+      result[3] += '/';
+    }
+    return result;
+  }
+
+  /// Turn a low-level exception into something a user can act on.
+  static String _describeError(Object e, {required String stage}) {
+    var s = e.toString();
+    if (s.contains('Timeout') || s.contains('timeout')) {
+      return "$stage超时：无法连接到 WebDAV 服务器，请确认地址可访问（外网需组网或端口映射）";
+    }
+    if (s.contains('404')) {
+      return "$stage失败：服务器返回 404，储存路径不存在或拼写错误";
+    }
+    if (s.contains('401') || s.contains('403')) {
+      return "$stage失败：认证被拒绝，请检查用户名/密码";
+    }
+    if (s.contains('SocketException') || s.contains('Connection')) {
+      return "$stage失败：无法建立连接，请检查网络与地址";
+    }
+    return "$stage失败：$s";
+  }
+
+  static Future<bool> downloadData([String? config]) async {
+    _isOperating = true;
+    bool force = config != null;
+    lastError = null;
+    try {
+      config ??= appdata.settings[45];
+      var configs = _parseConfig(config);
+      if (configs == null) {
+        return true;
+      }
+      LogManager.addLog(LogLevel.info, "network", "Downloading Data");
+      var client = newClient(
+        configs[0],
+        user: configs[1],
+        password: configs[2],
+        debug: false,
+      );
+      client.setConnectTimeout(15000);
+      try {
+        var files = await client.readDir(configs[3]);
+        int? maxVersion;
+        for (var file in files) {
+          var name = file.name;
+          if (name != null) {
+            var version = name.split(".").first;
+            if (version.isNum) {
+              maxVersion = max(maxVersion ?? 0, int.parse(version));
+            }
+          }
+        }
+
+        if (maxVersion == null) {
+          lastError = "服务器上没有找到任何备份文件，请先在上传端执行一次上传";
+          LogManager.addLog(LogLevel.error, "Sync",
+              "No backup file found on webdav server.");
+          return false;
+        }
+
+        // Only skip when this is an automatic (non-forced) sync AND we already
+        // have exactly this version. A manual download always proceeds.
+        if (!force && maxVersion.toString() == appdata.settings[46]) {
+          LogManager.addLog(LogLevel.info, "Sync",
+              "No updated version of data.\nStop downloading data.");
+          return true;
+        }
+
+        final fileName = "$maxVersion.picadata";
+
+        var cachePath = (await getApplicationCacheDirectory()).path;
+        await client.read2File(
+            "${configs[3]}$fileName", "$cachePath/picadata");
+        // Force import: a manual download must never be silently skipped by the
+        // internal settings[46] version comparison.
+        var res = await importData("$cachePath/picadata", true);
+        if (!res) {
+          lastError = lastImportError ?? "导入备份数据失败";
+        }
+        return res;
+      } catch (e, s) {
+        lastError = _describeError(e, stage: "下载");
+        LogManager.addLog(LogLevel.error, "Sync",
+            "Failed to download data from webdav server.\n$e\n$s");
+        return false;
+      }
+    } finally {
+      _isOperating = false;
+    }
+  }
+
+  static void syncData() async {
+    var configs = _parseConfig(appdata.settings[45]);
+    if (configs == null) {
+      return;
+    }
+    var controller = showLoadingDialog(
+      App.globalContext!,
+      barrierDismissible: false,
+      allowCancel: true,
+      message: "同步数据中".tl,
+      cancelButtonText: "隐藏".tl,
+    );
+    var res = await _retryZone(Webdav.downloadData);
+    await Future.delayed(const Duration(milliseconds: 50));
+    controller.close();
+    if (!res) {
+      // Do NOT corrupt the stored config (old code appended ";" markers which
+      // permanently broke sync). Just report and offer a retry.
+      showToast(
+        message: (lastError ?? "下载数据失败").tl,
+        trailing: Button.icon(
+          onPressed: () => syncData(),
+          icon: const Icon(Icons.refresh),
+        ),
+      );
+    }
+  }
+}

@@ -351,6 +351,35 @@ class LocalFavoritesManager {
     await readData();
   }
 
+  /// 关闭数据库连接，以便外部（同步合并）独占访问 db 文件。
+  ///
+  /// 合并结束后必须调用 [readData] 重新加载；[init] 会重新打开连接。
+  /// 若数据库原本未初始化，这里不做任何事。
+  Future<void> closeForMerge() async {
+    if (_closed) return;
+    try {
+      _db.execute("PRAGMA wal_checkpoint(TRUNCATE);");
+    } catch (_) {
+      // 忽略：可能没有 WAL
+    }
+    try {
+      _db.dispose();
+    } catch (_) {
+      // 已关闭或未打开
+    }
+    _closed = true;
+  }
+
+  bool _closed = false;
+
+  /// 合并结束后重新打开数据库连接（配合 [closeForMerge] 使用）。
+  Future<void> reopenAfterMerge() async {
+    if (!_closed) return;
+    _db = sqlite3.open("${App.dataPath}/local_favorite.db");
+    _checkAndCreate();
+    _closed = false;
+  }
+
   void _checkAndCreate() async {
     final tables = _getTablesWithDB();
     if (!tables.contains('folder_sync')) {
@@ -471,9 +500,10 @@ class LocalFavoritesManager {
 
   /// read data from json file or temp db.
   ///
-  /// This function will delete current database, then create a new one, finally
-  /// import data.
-  Future<void> readData() async {
+  /// [merge] 为 true 时不清空现有收藏，而是把备份内容并入本机
+  /// （多设备同步必须用合并模式，否则会互相覆盖丢收藏）。
+  /// 为 false 时保留旧行为：清空后重建。
+  Future<void> readData({bool merge = false}) async {
     var file = File("${App.dataPath}/localFavorite");
     if (file.existsSync()) {
       Map<String, List<FavoriteItem>> allComics = {};
@@ -492,10 +522,20 @@ class LocalFavoritesManager {
           allComics[key] = comics.toList();
         }
 
-        await clearAll();
+        if (!merge) {
+          await clearAll();
+        } else {
+          // 合并模式：先把本机已有的收藏读进来，与备份做并集
+          for (var folder in folderNames) {
+            final existing = getAllComics(folder);
+            allComics.putIfAbsent(folder, () => []).addAll(existing);
+          }
+        }
 
         for (var folder in allComics.keys) {
-          createFolder(folder, true);
+          if (!folderNames.contains(folder)) {
+            createFolder(folder, true);
+          }
           var comics = allComics[folder]!;
           for (int i = 0; i < comics.length; i++) {
             addComic(folder, comics[i]);

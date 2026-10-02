@@ -724,16 +724,34 @@ class Appdata {
         "favoriteTags": favoriteTags.toList(),
       };
 
-  bool readDataFromJson(Map<String, dynamic> json) {
+  /// 从备份 json 恢复数据。
+  ///
+  /// [mergeSettings] 为 true 时使用「合并式导入」：本机已有非空值的设置项
+  /// 保留本机值，只有本机为空的项才用备份填充 —— 这样手动「导入用户数据」
+  /// 不会再抹掉本机原有配置。
+  /// 为 false 时保留旧行为（逐位覆盖），用于新设备首次从 WebDAV 恢复配置。
+  bool readDataFromJson(Map<String, dynamic> json,
+      {bool mergeSettings = false}) {
     try {
       var newSettings = List<String>.from(json["settings"]);
       var downloadPath = settings[22];
       var authRequired = settings[13];
+      // 同步配置(45)与本机数据版本(46)属于「本机身份」，绝不能被备份覆盖，
+      // 否则会把 A 机的 WebDAV 地址/密码写到 B 机上，并让版本号错乱
+      // （历史上正是 settings[46] 被覆盖导致同步被静默跳过）。
+      var localWebdavConfig = settings[45];
+      var localDataVersion = settings[46];
       for (var i = 0; i < settings.length && i < newSettings.length; i++) {
+        if (mergeSettings && settings[i].isNotEmpty) {
+          // 合并式导入：本机已有值 -> 保留
+          continue;
+        }
         settings[i] = newSettings[i];
       }
       settings[22] = downloadPath;
       settings[13] = authRequired;
+      settings[45] = localWebdavConfig;
+      settings[46] = localDataVersion;
       var newFirstUse = List<String>.from(json["firstUse"]);
       for (var i = 0; i < firstUse.length && i < newFirstUse.length; i++) {
         firstUse[i] = newFirstUse[i];

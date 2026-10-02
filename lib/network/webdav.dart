@@ -46,6 +46,15 @@ class Webdav {
     }
     _haveWaitingTask = false;
     _isOperating = true;
+    try {
+      return await _uploadInternal(config);
+    } finally {
+      _isOperating = false;
+    }
+  }
+
+  /// 执行上传（不处理并发锁），供 [uploadData] 和下载后的自动回传复用。
+  static Future<bool> _uploadInternal(String? config) async {
     lastError = null;
     appdata.settings[46] =
         (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
@@ -53,7 +62,6 @@ class Webdav {
     config ??= appdata.settings[45];
     var configs = _parseConfig(config);
     if (configs == null) {
-      _isOperating = false;
       // Not configured / disabled: this is not an error.
       return true;
     }
@@ -89,10 +97,8 @@ class Webdav {
       lastError = _describeError(e, stage: "上传");
       LogManager.addLog(LogLevel.error, "Sync",
           "Failed to upload data to webdav server.\n$e\n$s");
-      _isOperating = false;
       return false;
     }
-    _isOperating = false;
     return true;
   }
 
@@ -192,8 +198,25 @@ class Webdav {
         var res = await importData("$cachePath/picadata", true);
         if (!res) {
           lastError = lastImportError ?? "导入备份数据失败";
+          return false;
         }
-        return res;
+        // 若本次下载把备份里"本机没有"的收藏合并了进来，说明本机现在是
+        // 超集。此时必须把合并结果回传服务器，否则其它设备下次同步时，
+        // 会因为服务器上仍是旧备份而再次"看不到"这些收藏。
+        if (lastImportMergedSomething) {
+          LogManager.addLog(LogLevel.info, "Sync",
+              "Merged new data from server, pushing merged result back.");
+          try {
+            // 注意：downloadData 当前已持有 _isOperating，必须用内部方法，
+            // 否则 uploadData 会在锁上等待自己而死锁。
+            await _uploadInternal(config);
+          } catch (e, s) {
+            // 回传失败不影响本次下载结果，仅记录日志。
+            LogManager.addLog(LogLevel.error, "Sync",
+                "Failed to push merged data back.\n$e\n$s");
+          }
+        }
+        return true;
       } catch (e, s) {
         lastError = _describeError(e, stage: "下载");
         LogManager.addLog(LogLevel.error, "Sync",

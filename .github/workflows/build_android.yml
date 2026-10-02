@@ -33,22 +33,27 @@ jobs:
 
       - name: Build release APKs (universal + per ABI)
         run: |
-          flutter build apk --release --split-per-abi
+          flutter build apk --release --split-per-abi || flutter build apk --release
           flutter build apk --release
 
       - name: Collect artifacts
         run: |
           mkdir -p output
-          # Universal APK (works on any device, larger)
-          cp build/app/outputs/flutter-apk/app-release.apk \
-             output/pica-comic-universal-WebDAVSyncFix.apk
-          # Per-ABI APKs (smaller, pick the one matching your phone)
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
-             output/pica-comic-arm64-v8a-WebDAVSyncFix.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
-             output/pica-comic-armeabi-v7a-WebDAVSyncFix.apk
-          cp build/app/outputs/flutter-apk/app-x86_64-release.apk \
-             output/pica-comic-x86_64-WebDAVSyncFix.apk
+          echo "=== 所有产物 ==="
+          ls -lh build/app/outputs/flutter-apk/ || true
+          # 通配收集，兼容项目自定义的 outputFileName
+          for f in build/app/outputs/flutter-apk/*.apk; do
+            [ -e "$f" ] || continue
+            name=$(basename "$f")
+            # 重命名成易懂的名字，保留原文件名做后缀
+            case "$name" in
+              *arm64-v8a*) cp "$f" output/pica-comic-arm64-v8a-WebDAVSyncFix.apk ;;
+              *armeabi-v7a*) cp "$f" output/pica-comic-armeabi-v7a-WebDAVSyncFix.apk ;;
+              *x86_64*) cp "$f" output/pica-comic-x86_64-WebDAVSyncFix.apk ;;
+              *) cp "$f" "output/pica-comic-universal-WebDAVSyncFix.apk" ;;
+            esac
+          done
+          echo "=== 收集结果 ==="
           ls -lh output/
 
       - name: Upload APKs

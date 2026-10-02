@@ -1,0 +1,61 @@
+name: Build Android APK
+
+run-name: Build Android APK (WebDAV sync fixes)
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  Build_APK:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.2'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build universal release APK
+        run: flutter build apk --release
+
+      - name: Build split-per-abi release APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p output
+          # Universal APK (works on any device, larger)
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             output/pica-comic-universal-WebDAVSyncFix.apk
+          # Per-ABI APKs (smaller, pick the one matching your phone)
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+             output/pica-comic-arm64-v8a-WebDAVSyncFix.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+             output/pica-comic-armeabi-v7a-WebDAVSyncFix.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk \
+             output/pica-comic-x86_64-WebDAVSyncFix.apk
+          ls -lh output/
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-comic-apk-webdav-sync-fix
+          path: output/*.apk
+          if-no-files-found: error

@@ -496,8 +496,21 @@ Future<bool> runExportData(bool includeDownload) async {
 }
 
 /// import data, filePath is used for webdav
-Future<bool> importData([String? filePath]) async {
-  final enableCheck = filePath != null;
+/// Human-readable reason for the most recent [importData] failure.
+/// Used to surface a concrete error instead of a generic "sync failed".
+String? _lastImportError;
+
+String? get lastImportError => _lastImportError;
+
+/// Import user data from a backup file.
+///
+/// [filePath]  - the .picadata file to import. When null a file picker is shown.
+/// [force]     - when true, skip the version check entirely and always import.
+///               Manual "download data" from WebDAV must pass true, otherwise a
+///               device whose settings[46] already matches the server will
+///               silently refuse to import (the sync "deadlock" bug).
+Future<bool> importData([String? filePath, bool force = false]) async {
+  final enableCheck = filePath != null && !force;
   var path = (await getApplicationSupportDirectory()).path;
   if (filePath == null) {
     if (PlatformUtils.isOhos) {
@@ -543,6 +556,7 @@ Future<bool> importData([String? filePath]) async {
     }
     if (filePath == null) {
       LogManager.addLog(LogLevel.error, "importData", "filePath is null");
+      _lastImportError = "未选择备份文件";
       return false;
     }
   }
@@ -554,6 +568,7 @@ Future<bool> importData([String? filePath]) async {
         "准备导入: $filePath, 存在=$exists, 大小=${size}B");
     if (!exists || size == 0) {
       LogManager.addLog(LogLevel.error, "importData", "选中的备份文件不存在或大小为0");
+      _lastImportError = "备份文件不存在或大小为 0 (下载可能未完成)";
       return false;
     }
     final raf = pickedFile.openSync();
@@ -685,12 +700,15 @@ Future<bool> importData([String? filePath]) async {
     ]);
   } catch (e, s) {
     Log.error("importData", "$e\n$s");
+    _lastImportError = "解压或读取备份文件失败: $e";
     return false;
   } finally {
     await ComicSource.reload();
     SingleInstanceCookieJar.instance?.init();
     await DownloadManager().init();
-    Directory("$path/dataTemp").deleteSync(recursive: true);
+    try {
+      Directory("$path/dataTemp").deleteSync(recursive: true);
+    } catch (_) {}
   }
   var json = const JsonDecoder().convert(data);
   int fileVersion =
@@ -707,11 +725,13 @@ Future<bool> importData([String? filePath]) async {
   if (!dataReadRes) {
     LogManager.addLog(
         LogLevel.error, "Appdata", "appdata.readDataFromJson(json) failed");
+    _lastImportError = "解析备份内容失败 (readDataFromJson)";
     return false;
   }
   await LocalFavoritesManager().readData();
   LocalFavoritesManager().updateUI();
   await HistoryManager().tryUpdateDb();
+  _lastImportError = null;
   return true;
 }
 

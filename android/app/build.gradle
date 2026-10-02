@@ -106,6 +106,11 @@ android {
         }
     }
     namespace 'com.github.pacalini.pica_comic'
+
+    buildFeatures {
+        // HistoryWidget.kt 使用 Compose 编写 Glance 小组件
+        compose true
+    }
 }
 
 flutter {
@@ -115,4 +120,14 @@ flutter {
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
     implementation 'com.google.android.gms:play-services-base:18.3.0'
+    // HistoryWidget.kt 使用 Glance 实现桌面小组件（androidx.glance.*）。
+    // 原项目从未配置过 Android 构建，这些依赖一直缺失，导致 AAPT 找不到
+    // glance_default_loading_layout 等资源。
+    implementation 'androidx.glance:glance-appwidget:1.2.0'
+    implementation 'androidx.glance:glance-material3:1.2.0'
+    // Glance 依赖 Compose runtime / ui（HistoryWidget.kt 直接 import androidx.compose.*）
+    implementation platform('androidx.compose:compose-bom:2025.09.00')
+    implementation 'androidx.compose.runtime:runtime'
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
 }

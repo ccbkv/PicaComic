@@ -1,182 +1,120 @@
-import 'dart:math';
-
-import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:pica_comic/components/components.dart';
-import 'package:pica_comic/foundation/app.dart';
-import 'package:pica_comic/foundation/log.dart';
-import 'package:pica_comic/utils/extensions.dart';
-import 'package:pica_comic/utils/io_tools.dart';
-import 'package:pica_comic/utils/translations.dart';
-import 'package:webdav_client/webdav_client.dart';
-
-import '../base.dart';
-
-Future<bool> _retryZone(Future<bool> Function() fn) async {
-  int time = 1;
-  while (time < 1 << 3) {
-    var res = await fn();
-    if (res) {
-      return true;
-    }
-    await Future.delayed(Duration(seconds: time));
-    time *= 2;
-  }
-  return false;
-}
-
-class Webdav {
-  static bool _isOperating = false;
-
-  static bool _haveWaitingTask = false;
-
-  /// Sync current data to webdav server. Return true if success.
-  static Future<bool> uploadData([String? config]) async {
-    if (_haveWaitingTask) {
-      return true;
-    }
-    if (_isOperating) {
-      _haveWaitingTask = true;
-      while (_isOperating) {
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
-    }
-    _haveWaitingTask = false;
-    _isOperating = true;
-    appdata.settings[46] =
-        (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
-    appdata.updateSettings(false);
-    config ??= appdata.settings[45];
-    var configs = config.split(';');
-    if (configs.length != 4 || configs.elementAtOrNull(0) == "") {
-      _isOperating = false;
-      return true;
-    }
-    if (!configs[3].endsWith('/') && !configs[3].endsWith('\\')) {
-      configs[3] += '/';
-    }
-    LogManager.addLog(LogLevel.info, "network", "Uploading Data");
-    var client = newClient(
-      configs[0],
-      user: configs[1],
-      password: configs[2],
-      debug: false,
-    );
-    client.setHeaders({'content-type': 'text/plain'});
-    try {
-      var files = await client.readDir(configs[3]);
-      for (var file in files) {
-        var name = file.name;
-        if (name != null) {
-          var version = name.split(".").first;
-          if (version.isNum) {
-            var days = int.parse(version) ~/ 86400;
-            var currentDays =
-                DateTime.now().millisecondsSinceEpoch ~/ 1000 ~/ 86400;
-            if (currentDays == days && file.path != null) {
-              client.remove(file.path!);
-              break;
-            }
-          }
-        }
-      }
-      await client.writeFromFile(await exportDataToFile(false, "${App.cachePath}/userdata.picadata"),
-          "${configs[3]}${appdata.settings[46]}.picadata");
-    } catch (e, s) {
-      LogManager.addLog(LogLevel.error, "Sync",
-          "Failed to upload data to webdav server.\n$e\n$s");
-      _isOperating = false;
-      return false;
-    }
-    _isOperating = false;
-    return true;
-  }
-
-  static Future<bool> downloadData([String? config]) async {
-    _isOperating = true;
-    bool force = config != null;
-    try {
-      config ??= appdata.settings[45];
-      var configs = config.split(';');
-      if (configs.length != 4 || configs.elementAtOrNull(0) == "") {
-        return true;
-      }
-      if (!configs[3].endsWith('/') && !configs[3].endsWith('\\')) {
-        configs[3] += '/';
-      }
-      LogManager.addLog(LogLevel.info, "network", "Downloading Data");
-      var client = newClient(
-        configs[0],
-        user: configs[1],
-        password: configs[2],
-        debug: false,
-      );
-      client.setConnectTimeout(8000);
-      try {
-        var files = await client.readDir(configs[3]);
-        int? maxVersion;
-        for (var file in files) {
-          var name = file.name;
-          if (name != null) {
-            var version = name.split(".").first;
-            if (version.isNum) {
-              maxVersion = max(maxVersion ?? 0, int.parse(version));
-            }
-          }
-        }
-
-        if (!force && maxVersion.toString() == appdata.settings[46]) {
-          LogManager.addLog(LogLevel.info, "Sync",
-              "No updated version of data.\nStop downloading data.");
-          return true;
-        }
-
-        final fileName =
-            maxVersion != null ? "$maxVersion.picadata" : "picadata";
-
-        var cachePath = (await getApplicationCacheDirectory()).path;
-        await client.read2File("${configs[3]}$fileName", "$cachePath/picadata");
-        var res = await importData("$cachePath/picadata");
-        return res;
-      } catch (e, s) {
-        LogManager.addLog(LogLevel.error, "Sync",
-            "Failed to download data from webdav server.\n$e\n$s");
-        return false;
-      }
-    } finally {
-      _isOperating = false;
-    }
-  }
-
-  static void syncData() async {
-    var configs = appdata.settings[45].split(';');
-    if (configs.length != 4 || configs.elementAtOrNull(0) == "") {
-      return;
-    }
-    var controller = showLoadingDialog(
-      App.globalContext!,
-      barrierDismissible: false,
-      allowCancel: true,
-      message: "同步数据中".tl,
-      cancelButtonText: "隐藏".tl,
-    );
-    var res = await _retryZone(Webdav.downloadData);
-    await Future.delayed(const Duration(milliseconds: 50));
-    if (!res) {
-      controller.close();
-      appdata.settings[45] = "${appdata.settings[45]};0";
-      showToast(
-        message: "下载数据失败, 已禁用同步".tl,
-        trailing: Button.icon(
-          onPressed: () {
-            appdata.settings[45] = configs.join(';');
-            syncData();
-          },
-          icon: const Icon(Icons.refresh),
-        ),
-      );
-    } else {
-      controller.close();
-    }
-  }
-}
+line 000: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 001: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 002: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 003: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 004: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 005: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 006: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 007: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 008: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 009: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 010: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 011: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 012: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 013: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 014: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 015: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 016: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 017: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 018: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 019: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 020: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 021: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 022: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 023: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 024: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 025: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 026: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 027: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 028: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 029: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 030: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 031: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 032: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 033: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 034: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 035: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 036: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 037: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 038: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 039: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 040: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 041: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 042: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 043: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 044: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 045: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 046: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 047: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 048: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 049: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 050: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 051: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 052: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 053: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 054: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 055: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 056: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 057: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 058: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 059: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 060: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 061: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 062: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 063: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 064: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 065: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 066: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 067: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 068: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 069: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 070: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 071: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 072: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 073: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 074: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 075: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 076: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 077: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 078: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 079: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 080: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 081: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 082: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 083: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 084: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 085: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 086: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 087: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 088: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 089: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 090: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 091: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 092: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 093: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 094: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 095: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 096: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 097: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 098: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 099: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 100: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 101: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 102: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 103: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 104: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 105: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 106: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 107: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 108: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 109: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 110: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 111: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 112: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 113: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 114: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 115: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 116: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 117: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 118: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF
+line 119: the quick brown fox jumps over the lazy dog 0123456789 ABCDEF

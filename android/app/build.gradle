@@ -47,14 +47,15 @@ if (hasKeystore) {
 } else {
     // CI / 无本地密钥环境：把内联 keystore 落盘后再加载配置
     try {
-        def inlineJks = new File(rootProject.projectDir, "picacomic-release.jks")
+        // 写到 app 模块目录，并用绝对路径，避免相对路径解析歧义
+        def inlineJks = new File(project.projectDir, "picacomic-release.jks")
         if (!inlineJks.exists()) {
             inlineJks.bytes = inlineKeystoreB64.decodeBase64()
         }
         keystoreProperties.setProperty('storePassword', 'Picacomic2026')
         keystoreProperties.setProperty('keyPassword', 'Picacomic2026')
         keystoreProperties.setProperty('keyAlias', 'picacomic')
-        keystoreProperties.setProperty('storeFile', 'picacomic-release.jks')
+        keystoreProperties.setProperty('storeFile', inlineJks.absolutePath)
         hasKeystore = true
         println "[signing] 使用内联固定 keystore 签名: ${inlineJks.absolutePath}"
     } catch (Exception e) {

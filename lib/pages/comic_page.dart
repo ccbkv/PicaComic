@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -16,15 +17,19 @@ import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/image_loader/cached_image.dart';
 import 'package:pica_comic/foundation/image_loader/stream_image_provider.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
+import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/foundation/stack.dart' as stack;
 import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/network/base_comic.dart';
+import 'package:pica_comic/network/custom_download_model.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/favorites/local_favorites.dart';
+import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
+import 'package:pica_comic/pages/ehentai/eh_prime_thumbnail.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
 import 'package:pica_comic/utils/app_url_launcher.dart';
 import 'package:pica_comic/utils/app_share.dart';
@@ -88,6 +93,150 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
         return;
       }
     }
+    final archiveDownloader = ComicSource.find(sourceKey)?.archiveDownloader;
+    if (archiveDownloader != null) {
+      final pageContext = context;
+      if (DownloadManager().isExists(downloadId)) {
+        final local = await DownloadManager().getComicOrNull(downloadId);
+        if (eps == null ||
+            (local is CustomDownloadedItem && local.chapters == null)) {
+          showToast(message: '已下载'.tl);
+          return;
+        }
+      }
+      List<ArchiveInfo>? archives;
+      var selected = -1;
+      var loading = false;
+      var gettingLink = false;
+      String? error;
+      if (!pageContext.mounted) return;
+      final choice = await showDialog<String>(
+        context: pageContext,
+        barrierDismissible: true,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setState) {
+            Future<void> loadArchives() async {
+              if (loading || archives != null) return;
+              setState(() {
+                loading = true;
+                error = null;
+              });
+              final res = await archiveDownloader.getArchives(id);
+              if (!context.mounted) return;
+              setState(() {
+                loading = false;
+                if (res.error) {
+                  error = res.errorMessage;
+                } else {
+                  archives = res.data;
+                }
+              });
+            }
+
+            return PopScope(
+              canPop: !gettingLink,
+              child: ContentDialog(
+                title: '下载'.tl,
+                dismissible: !gettingLink,
+                content: RadioGroup<int>(
+                  groupValue: selected,
+                  onChanged: (value) {
+                    if (!gettingLink && value != null) {
+                      setState(() => selected = value);
+                    }
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile<int>(
+                        value: -1,
+                        enabled: !gettingLink,
+                        title: Text('普通下载'.tl),
+                      ),
+                      ExpansionTile(
+                        title: Text('归档下载'.tl),
+                        shape: Border.all(color: Colors.transparent),
+                        onExpansionChanged: (expanded) {
+                          if (expanded) loadArchives();
+                        },
+                        children: [
+                          if (loading)
+                            const CircularProgressIndicator().paddingVertical(8)
+                          else if (error != null) ...[
+                            Text(error!),
+                            TextButton(
+                              onPressed: loadArchives,
+                              child: Text('重试'.tl),
+                            ),
+                          ] else if (archives?.isEmpty == true)
+                            Text('暂无可用归档'.tl)
+                          else
+                            for (var i = 0; i < (archives?.length ?? 0); i++)
+                              RadioListTile<int>(
+                                value: i,
+                                enabled: !gettingLink,
+                                title: Text(archives![i].title.tl),
+                                subtitle: Text(archives![i].description),
+                              ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  FilledButton(
+                    onPressed: gettingLink ? null : () async {
+                      if (selected == -1) {
+                        Navigator.pop(dialogContext, 'normal');
+                        return;
+                      }
+                      if (DownloadManager().isExists(downloadId)) {
+                        showToast(message: '已有本地下载，不能重复下载整本归档'.tl);
+                        return;
+                      }
+                      setState(() => gettingLink = true);
+                      final res = await archiveDownloader.getDownloadUrl(
+                          id, archives![selected].id);
+                      if (!context.mounted) return;
+                      setState(() => gettingLink = false);
+                      if (res.error) {
+                        showToast(message: res.errorMessage!);
+                        return;
+                      }
+                      final url = res.data;
+                      final uri = Uri.tryParse(url);
+                      if (url.isNotEmpty &&
+                          (uri == null || uri.host.isEmpty ||
+                              !const ['http', 'https'].contains(uri.scheme))) {
+                        showToast(message: '无效的归档下载地址'.tl);
+                        return;
+                      }
+                      Navigator.pop(dialogContext, url);
+                    },
+                    child: Text(gettingLink ? '加载中'.tl : '确认'.tl),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+      // Empty URLs mean the script handled the download remotely (e.g. H@H).
+      if (choice == null || choice.isEmpty) return;
+      if (DownloadManager().downloading.any((item) => item.id == downloadId)) {
+        showToast(message: '下载中'.tl);
+        return;
+      }
+      if (choice != 'normal') {
+        if (DownloadManager().isExists(downloadId)) {
+          showToast(message: '已下载'.tl);
+          return;
+        }
+        DownloadManager().addCustomDownload(data!, [0], archiveUrl: choice);
+        showToast(message: '已加入下载队列'.tl);
+        return;
+      }
+    }
     var downloaded = <int>[];
     if (DownloadManager().isExists(downloadId)) {
       if (eps == null) {
@@ -99,7 +248,7 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
     } else {
       if (eps == null) {
         DownloadManager().addCustomDownload(data!, [0]);
-        App.globalBack();
+        if (archiveDownloader == null) App.globalBack();
         showToast(message: "已加入下载队列".tl);
         return;
       }
@@ -250,6 +399,52 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
 
   @override
   void tapOnTag(String tag, String key) {
+    try {
+      final result = JsEngine().runCode("""
+        (() => {
+          const comic = ComicSource.sources[${jsonEncode(sourceKey)}]?.comic;
+          return typeof comic?.onClickTag === 'function'
+            ? comic.onClickTag(${jsonEncode(key)}, ${jsonEncode(tag)})
+            : null;
+        })()
+      """);
+      final target = PageJumpTarget.parse(sourceKey, result);
+      final categoryKey = comicSource?.categoryData?.key;
+      if (target.page == 'category' && categoryKey != null) {
+        final category = target.attributes?['category'] as String? ?? tag;
+        final param = target.attributes?['param'] as String?;
+        HistoryManager.addSearchHistory(tag);
+        context.to(
+          () => CategoryComicsPage(
+            category: category,
+            categoryKey: categoryKey,
+            param: param,
+          ),
+        );
+        return;
+      } else if (target.page == 'search') {
+        final keyword = (target.attributes?['text'] ??
+            target.attributes?['keyword'] ??
+            tag) as String;
+        HistoryManager.addSearchHistory(keyword);
+        context.to(
+          () => SearchResultPage(
+            keyword: keyword,
+            options: const [],
+            sourceKey: sourceKey,
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      Log.error(sourceKey, 'Failed to handle tag click: $e');
+    }
+    if (sourceKey == 'ehentai' && key.isNotEmpty && key != 'Category') {
+      if (tag.contains(' ')) {
+        tag = '"$tag"';
+      }
+      tag = '$key:$tag';
+    }
     HistoryManager.addSearchHistory(tag);
     context.to(
       () => SearchResultPage(
@@ -274,6 +469,22 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
 
   @override
   Widget thumbnailImageBuilder(int index, String imageUrl) {
+    if (sourceKey == 'ehentai') {
+      final suffix = RegExp(
+          r'@((?:x=\d+-\d+(?:&y=\d+-\d+)?)|(?:y=\d+-\d+))$')
+          .firstMatch(imageUrl);
+      if (suffix != null) {
+        final ranges = Uri.splitQueryString(suffix[1]!);
+        final x = ranges['x']?.split('-').map(double.parse).toList();
+        final y = ranges['y']?.split('-').map(double.parse).toList();
+        return EhPrimeThumbnail(
+          key: ValueKey(imageUrl),
+          url: imageUrl.substring(0, suffix.start),
+          crop: Rect.fromLTRB(x?[0] ?? 0, y?[0] ?? 0,
+              x?[1] ?? double.infinity, y?[1] ?? double.infinity),
+        );
+      }
+    }
     return Image(
       image: StreamImageProvider(
           () => ImageManager().getCustomThumbnail(imageUrl, sourceKey),
@@ -312,7 +523,68 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
   }
 
   @override
-  Card? get uploaderInfo => null;
+  Card? get uploaderInfo {
+    final uploader = data?.uploader;
+    if (uploader == null || uploader.id.isEmpty) {
+      return null;
+    }
+    var time = uploader.updateTime ?? "";
+    if (time.length >= 19) {
+      time = "${time.substring(0, 10)} ${time.substring(11, 19)}更新";
+    }
+    return Card(
+      elevation: 0,
+      color: context.colorScheme.inversePrimary,
+      child: SizedBox(
+        height: 60,
+        child: Row(
+          children: [
+            Expanded(
+              flex: 0,
+              child: Avatar(
+                size: 50,
+                avatarUrl: uploader.avatarUrl,
+                frame: uploader.frameUrl,
+                couldBeShown: true,
+                name: uploader.name,
+                slogan: uploader.slogan,
+                level: uploader.level,
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: InkWell(
+                onTap: () {
+                  context.to(
+                    () => CategoryComicsPage(
+                      category: uploader.id,
+                      param: "ca",
+                      categoryKey: sourceKey,
+                      displayTitle: uploader.name,
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(15, 10, 0, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        uploader.name,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                      if (time.isNotEmpty) Text(time)
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   bool? get favoriteOnPlatformInitial => data?.isFavorite;

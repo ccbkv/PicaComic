@@ -3,12 +3,14 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:dio/dio.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:html/parser.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/image_loader/image_recombine.dart';
+import 'package:pica_comic/foundation/image_loader/script_image.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/app_dio.dart';
 import 'package:pica_comic/network/cloudflare.dart';
@@ -627,31 +629,31 @@ class ImageManager {
 
   Stream<DownloadProgress> getCustomImage(
       String url, String comicId, String epId, String sourceKey) async* {
-    var cacheKey = "$sourceKey$comicId$epId$url";
-    await wait(cacheKey);
-    loadingItems[cacheKey] = DownloadProgress(0, 1, cacheKey, "");
-
-    var cache = await CacheManager().findCache(cacheKey);
-    if (cache != null) {
-      yield DownloadProgress(1, 1, cacheKey, cache);
-      loadingItems.remove(cacheKey);
-      return;
+    final source = ComicSource.find(sourceKey) ??
+        (throw "Unknown Comic Source $sourceKey");
+    final config = source.getImageLoadingConfig == null
+        ? <String, dynamic>{}
+        : await source.getImageLoadingConfig!(url, comicId, epId);
+    final script = config['modifyImage'];
+    if (script != null && script is! String) {
+      throw 'Invalid Config: onImageLoad.modifyImage must be a string';
     }
-
+    var cacheKey = "$sourceKey$comicId$epId$url";
+    if (script != null) {
+      // Do not reuse images cached before script processing was supported.
+      cacheKey += ':modifyImage:${md5.convert(utf8.encode(script as String))}';
+    }
     CachingFile? caching;
 
-    var source = ComicSource.find(sourceKey) ??
-        (throw "Unknown Comic Source $sourceKey");
-
     try {
-      Map<String, dynamic> config;
-
-      if (source.getImageLoadingConfig == null) {
-        config = {};
-      } else {
-        config = await source.getImageLoadingConfig!(url, comicId, epId);
+      await wait(cacheKey);
+      loadingItems[cacheKey] = DownloadProgress(0, 1, cacheKey, "");
+      var cache = await CacheManager().findCache(cacheKey);
+      if (cache != null) {
+        yield DownloadProgress(
+            1, 1, cacheKey, cache, null, CacheManager().getType(cacheKey));
+        return;
       }
-
       caching = await CacheManager().openWrite(cacheKey);
       final savePath = caching.file.path;
 
@@ -669,7 +671,7 @@ class ImageManager {
         expectedBytes = null;
       }
 
-      bool shouldModifyData = config['onResponse'] != null;
+      bool shouldModifyData = config['onResponse'] != null || script != null;
 
       await for (var data in res.data!.stream) {
         if (!shouldModifyData) {
@@ -678,7 +680,9 @@ class ImageManager {
         imageData.addAll(data);
         var progress = DownloadProgress(
           imageData.length,
-          (expectedBytes ?? imageData.length + 1),
+          shouldModifyData
+              ? max(expectedBytes ?? 0, imageData.length + 1)
+              : (expectedBytes ?? imageData.length + 1),
           url,
           savePath,
         );
@@ -689,19 +693,27 @@ class ImageManager {
       Uint8List? result;
 
       if (shouldModifyData) {
-        var data = (config['onResponse']
-            as JSInvokable)(Uint8List.fromList(imageData));
+        var data = Uint8List.fromList(imageData);
         imageData.clear();
-        if (data is! Uint8List) {
-          throw "Invalid Config: onImageLoad.onResponse return invalid type\n"
-              "Expected: Uint8List(ArrayBuffer)\n"
-              "Got: ${data.runtimeType}";
+        if (config['onResponse'] != null) {
+          final callback = config['onResponse'] as JSInvokable;
+          dynamic response = callback([data]);
+          if (response is Future) response = await response;
+          if (response is! Uint8List) {
+            throw "Invalid Config: onImageLoad.onResponse return invalid type\n"
+                "Expected: Uint8List(ArrayBuffer)\n"
+                "Got: ${response.runtimeType}";
+          }
+          data = response;
+        }
+        if (script != null) {
+          data = await modifyImageWithScript(data, script as String);
         }
         result = data;
         await caching.writeBytes(data);
       }
 
-      var ext = getExt(res);
+      var ext = script != null ? 'png' : getExt(res);
       CacheManager().setType(cacheKey, ext);
       await caching.close();
       var length = result?.length ?? imageData.length;
@@ -723,6 +735,7 @@ class ImageManager {
       }
       rethrow;
     } finally {
+      (config['onResponse'] as JSInvokable?)?.free();
       loadingItems.remove(cacheKey);
     }
   }

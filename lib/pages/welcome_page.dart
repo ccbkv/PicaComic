@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 //import 'package:file_picker_ohos/file_picker_ohos.dart';
+import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +11,8 @@ import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/pages/main_page.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/log.dart';
+import 'package:pica_comic/network/app_dio.dart';
+import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/utils/io_tools.dart';
 import '../utils/font_manager.dart';
@@ -506,6 +510,117 @@ class _ComicSource extends StatefulWidget {
 
 class _ComicSourceState extends State<_ComicSource>
     with _WelcomePageComponents {
+  String? _busyKey;
+
+  Future<void> add(String key) async {
+    if (_busyKey != null || ComicSource.find(key) != null) return;
+    setState(() => _busyKey = key);
+    final loading = showLoadingDialog(
+      context,
+      barrierDismissible: false,
+      allowCancel: false,
+    );
+    try {
+      const repository =
+          'https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/';
+      final response = await logDio().get<String>(
+        '${repository}index.json',
+        options: Options(responseType: ResponseType.plain),
+      );
+      final entries = jsonDecode(response.data!) as List;
+      final entry = entries.firstWhereOrNull((item) => item['key'] == key);
+      if (entry == null) {
+        throw '未找到漫画源: $key';
+      }
+      String url;
+      final configuredUrl = entry['url']?.toString();
+      if (configuredUrl != null && configuredUrl.isURL) {
+        url = configuredUrl;
+      } else {
+        final fileName = entry['fileName']?.toString();
+        if (fileName == null || fileName.isEmpty) {
+          throw '漫画源缺少下载地址: $key';
+        }
+        url = Uri.parse(repository).resolve(fileName).toString();
+      }
+      final script = await logDio().get<String>(
+        url,
+        options: Options(responseType: ResponseType.plain),
+      );
+      if (!mounted || ComicSource.find(key) != null) return;
+      final source = await ComicSourceParser().createAndParse(
+        script.data!,
+        Uri.parse(url).pathSegments.last,
+      );
+      ComicSource.sources.add(source);
+      appdata.appSettings.explorePages = {
+        ...appdata.appSettings.explorePages,
+        ...source.explorePages.map((page) => page.title),
+      }.toList();
+      if (source.categoryData != null) {
+        appdata.appSettings.categoryPages = {
+          ...appdata.appSettings.categoryPages,
+          source.categoryData!.key,
+        }.toList();
+      }
+      if (source.favoriteData != null) {
+        appdata.appSettings.networkFavorites = {
+          ...appdata.appSettings.networkFavorites,
+          source.favoriteData!.key,
+        }.toList();
+      }
+      await appdata.updateSettings();
+    } catch (e) {
+      showToast(message: e.toString());
+    } finally {
+      loading.close();
+      if (mounted) setState(() => _busyKey = null);
+    }
+  }
+
+  void delete(ComicSource source) {
+    if (_busyKey != null) return;
+    showConfirmDialog(
+      context: context,
+      title: '删除'.tl,
+      content: "要删除漫画源 '${source.name}' 吗?".tl,
+      btnColor: context.colorScheme.error,
+      onConfirm: () async {
+        if (!mounted || _busyKey != null) return;
+        setState(() => _busyKey = source.key);
+        try {
+          final file = File(source.filePath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+          ComicSource.sources.remove(source);
+          final exploreTitles = ComicSource.sources
+              .expand((item) => item.explorePages)
+              .map((page) => page.title)
+              .toSet();
+          final categoryKeys =
+              ComicSource.sources.map((item) => item.categoryData?.key).toSet();
+          final favoriteKeys =
+              ComicSource.sources.map((item) => item.favoriteData?.key).toSet();
+          appdata.appSettings.explorePages = appdata.appSettings.explorePages
+              .where(exploreTitles.contains)
+              .toList();
+          appdata.appSettings.categoryPages = appdata.appSettings.categoryPages
+              .where(categoryKeys.contains)
+              .toList();
+          appdata.appSettings.networkFavorites = appdata.appSettings.networkFavorites
+              .where(favoriteKeys.contains)
+              .toList();
+          await appdata.updateSettings();
+        } catch (e) {
+          showToast(message: e.toString());
+        } finally {
+          if (mounted) setState(() => _busyKey = null);
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return buildView(
@@ -516,22 +631,39 @@ class _ComicSourceState extends State<_ComicSource>
             itemCount: builtInSources.length,
             itemBuilder: (context, index) {
               var key = builtInSources[index];
+              final installed = ComicSource.sources.firstWhereOrNull(
+                (source) => source.key == key && !source.isBuiltIn,
+              );
               return ListTile(
                 title: Text(
                     ComicSource.builtIn.firstWhere((e) => e.key == key).name),
-                trailing: AdaptiveSwitch(
-                  value: appdata.appSettings.isComicSourceEnabled(key),
-                  onChanged: (v) {
-                    appdata.appSettings.setComicSourceEnabled(key, v);
-                    appdata.updateSettings();
-                    setState(() {});
-                  },
-                ),
+                trailing: FilledButton(
+                  style: installed == null
+                      ? null
+                      : FilledButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                  onPressed: _busyKey != null
+                      ? null
+                      : () {
+                          if (installed == null) {
+                            add(key);
+                          } else {
+                            delete(installed);
+                          }
+                        },
+                  child: Text(
+                    _busyKey == key
+                        ? (installed == null ? '添加中'.tl : '删除中'.tl)
+                        : (installed == null ? '添加'.tl : '删除'.tl),
+                  ),
+                ).fixHeight(32),
               );
             },
           ),
         ),
-        buildBottom(context, 6)
+        buildBottom(context, 6, _busyKey == null)
       ],
     );
   }

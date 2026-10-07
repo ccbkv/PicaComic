@@ -1,7 +1,9 @@
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:flutter/material.dart';
 import 'package:pica_comic/utils/translations.dart';
+import '../../network/base_comic.dart';
 import '../../network/eh_network/eh_main_network.dart';
 import '../../network/eh_network/eh_models.dart';
 import '../../network/res.dart';
@@ -16,6 +18,16 @@ class SubscriptionPage extends StatefulWidget {
 class _SubscriptionPageState extends State<SubscriptionPage> {
   @override
   Widget build(BuildContext context) {
+    final source = ComicSource.find('ehentai');
+    ComicListBuilder? watchedLoader;
+    if (source != null && !source.isBuiltIn) {
+      for (final page in source.explorePages) {
+        if (page.title == 'Eh观看') {
+          watchedLoader = page.loadPage;
+          break;
+        }
+      }
+    }
     return Scaffold(
       appBar: Appbar(title: Text("EH订阅".tl), actions: [
         Tooltip(
@@ -34,9 +46,33 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
           ),
         )
       ],),
-      body: EhSubscriptionComics(),
+      body: source == null
+          ? Center(child: Text('请先添加EH漫画源'.tl))
+          : source.isBuiltIn
+              ? EhSubscriptionComics()
+              : watchedLoader == null
+                  ? Center(child: Text('当前EH脚本未提供订阅入口（Eh观看）'.tl))
+                  : _ScriptSubscriptionComics(watchedLoader),
     );
   }
+}
+
+class _ScriptSubscriptionComics extends ComicsPage<BaseComic> {
+  const _ScriptSubscriptionComics(this.loader);
+
+  final ComicListBuilder loader;
+
+  @override
+  Future<Res<List<BaseComic>>> getComics(int i) => loader(i);
+
+  @override
+  String get tag => 'EhScriptSubscriptionPage';
+
+  @override
+  String? get title => null;
+
+  @override
+  String get sourceKey => 'ehentai';
 }
 
 

@@ -445,7 +445,7 @@ class AdaptiveSwitch extends StatelessWidget {
   });
 
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -455,10 +455,10 @@ class AdaptiveSwitch extends StatelessWidget {
         onChanged: onChanged,
       );
     }
-    if (enableLiquidGlassUi) {
+    if (enableLiquidGlassUi && onChanged != null) {
       return GlassSwitch(
         value: value,
-        onChanged: onChanged,
+        onChanged: onChanged!,
       );
     }
     return Switch(

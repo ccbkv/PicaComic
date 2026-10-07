@@ -55,6 +55,7 @@ import 'package:pica_comic/utils/font_manager.dart';
 import 'package:pica_comic/pages/settings/font_management_page.dart';
 import 'package:pica_comic/pages/settings/file_manager_page.dart';
 import 'user_comments_page.dart';
+import 'pikacg_leavemsg_page.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 part "reading_settings.dart";

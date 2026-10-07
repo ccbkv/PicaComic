@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/utils/app_links.dart';
 import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/pages/search/image_search_page.dart';
 
 import 'ehentai/subscription.dart';
-import 'jm/jm_comic_page.dart';
+import 'comic_page.dart';
 import 'webview.dart';
 
 void openTool(BuildContext context) {
@@ -166,10 +167,13 @@ void openTool(BuildContext context) {
                       if (!value.isNum) {
                         return "输入的ID不是数字".tl;
                       }
+                      if (ComicSource.find('jm') == null) {
+                        return "请先添加禁漫漫画源".tl;
+                      }
                       // 不调用 App.globalBack()，让 showInputDialog 自己关闭
                       // 也不关闭工具侧边栏，直接导航到新页面
                       App.mainNavigatorKey?.currentContext
-                          ?.to(() => JmComicPage(value));
+                          ?.to(() => ComicPage(sourceKey: 'jm', id: value));
                       return null;
                     },
                   );

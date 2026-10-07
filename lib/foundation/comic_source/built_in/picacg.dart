@@ -16,6 +16,7 @@ import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
 import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/pages/settings/user_comments_page.dart';
+import 'package:pica_comic/pages/settings/pikacg_leavemsg_page.dart';
 import 'package:pica_comic/utils/translations.dart';
 
 import '../comic_source.dart';
@@ -90,6 +91,15 @@ final picacg = ComicSource.named(
         },
       ),
       AccountInfoItem(title: "简介", data: () => network.user?.slogan ?? ''),
+      AccountInfoItem(
+        title: "留言板",
+        onTap: () {
+          App.mainNavigatorKey?.currentContext?.to(
+            () => const PicacgLeaveMsgPage(),
+          );
+          App.globalBack();
+        },
+      ),
       AccountInfoItem(
         title: "我的评论",
         onTap: () {

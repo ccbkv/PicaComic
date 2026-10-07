@@ -15,6 +15,8 @@ import 'package:pica_comic/utils/ohos_continuation.dart';
 import 'package:pica_comic/utils/ohos_widget.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pica_comic/pages/tools.dart';
+
 import 'category_page.dart';
 import 'explore_page.dart';
 import 'favorites/favorites_page.dart';
@@ -417,6 +419,11 @@ class MainPageState extends State<MainPage> {
             label: "搜索".tl,
             onTap: () => to(() => PreSearchPage(), preventDuplicate: true),
           ),
+        PaneActionEntry(
+          icon: Icons.handyman_outlined,
+          label: "工具".tl,
+          onTap: () => openTool(context),
+        ),
         PaneActionEntry(
           icon: Icons.settings,
           label: "设置".tl,

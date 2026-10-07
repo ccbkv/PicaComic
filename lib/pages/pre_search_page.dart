@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -11,6 +12,7 @@ import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:pica_comic/foundation/pair.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
+import 'package:pica_comic/pages/settings/settings_page.dart';
 import 'package:pica_comic/pages/aggregated_search_page.dart';
 import 'package:pica_comic/utils/app_links.dart';
 import 'package:pica_comic/utils/extensions.dart';
@@ -264,8 +266,11 @@ class PreSearchController extends StateController {
   PreSearchController() {
     var searchSource = <String>[];
     for (var source in ComicSource.sources) {
-      searchSource.add(source.key);
+      if (source.searchPageData != null) {
+        searchSource.add(source.key);
+      }
     }
+    if (searchSource.isEmpty) return;
     if (!searchSource.contains(appdata.appSettings.initialSearchTarget)) {
       appdata.appSettings.initialSearchTarget = searchSource.first;
       appdata.updateSettings();
@@ -290,12 +295,13 @@ class PreSearchPage extends StatelessWidget {
 
   final searchController = StateController.put(PreSearchController());
 
-  final comicSources =
+  Iterable<ComicSource> get comicSources =>
       ComicSource.sources.where((element) => element.searchPageData != null);
 
   final FocusNode _focusNode = FocusNode();
 
   void search([String? s, String? type]) {
+    if (comicSources.isEmpty) return;
     var keyword = (s ?? controller.text).trim();
 
     HistoryManager.addSearchHistory(s ?? controller.text);
@@ -331,6 +337,7 @@ class PreSearchPage extends StatelessWidget {
   }
 
   void findSuggestions() {
+    if (comicSources.isEmpty) return;
     var text = controller.text.split(" ").last;
     var suggestions = searchController.suggestions;
 
@@ -481,6 +488,7 @@ class PreSearchPage extends StatelessWidget {
     var widget = StateBuilder<PreSearchController>(
       id: 100,
       builder: (logic) {
+        if (comicSources.isEmpty) return buildEmpty(context);
         if (controller.text.removeAllBlank.isEmpty ||
             controller.text.endsWith(" ") ||
             searchController.suggestions.isEmpty) {
@@ -492,6 +500,30 @@ class PreSearchPage extends StatelessWidget {
     );
     return Expanded(
       child: widget,
+    );
+  }
+
+  Widget buildEmpty(BuildContext context) {
+    var msg = "没有漫画源".tl;
+    msg += '\n';
+    msg += "请添加一些源".tl;
+    return NetworkError(
+      message: msg,
+      retry: () async {
+        await context.to(() => const ComicSourceSettings());
+        if (!context.mounted) return;
+        if (comicSources.isNotEmpty &&
+            !comicSources.any((source) => source.key == searchController.target)) {
+          final target = comicSources.first.key;
+          appdata.appSettings.initialSearchTarget = target;
+          appdata.updateSettings();
+          searchController.updateTarget(target);
+        } else {
+          searchController.update();
+        }
+      },
+      withAppbar: false,
+      buttonText: "管理".tl,
     );
   }
 
@@ -833,15 +865,47 @@ class PreSearchPage extends StatelessWidget {
             children.add(ListTile(
               title: Text(option.label.tl),
             ));
+            final isEh = logic.target == 'ehentai';
+            if (isEh && option.type == 'dropdown') {
+              children.add(Select(
+                current: option.options[logic.options[i]]?.tl,
+                values: option.options.values.map((e) => e.tl).toList(),
+                onTap: (index) {
+                  logic.options[i] = option.options.keys.elementAt(index);
+                  logic.update();
+                },
+                minWidth: 96,
+              ).paddingHorizontal(16));
+              continue;
+            }
+            final multiSelect = isEh && option.type == 'multi-select';
+            final selectedValues = <String>[];
+            if (multiSelect) {
+              final value = jsonDecode(logic.options[i]);
+              selectedValues.addAll(value is List
+                  ? value.map((e) => e.toString())
+                  : [value.toString()]);
+            }
             children.add(Wrap(
               runSpacing: 8,
               spacing: 8,
               children: option.options.entries.map<Widget>((e) {
                 return OptionChip(
                   text: e.value.tl,
-                  isSelected: logic.options[i] == e.key,
+                  isSelected: multiSelect
+                      ? selectedValues.contains(e.key)
+                      : logic.options[i] == e.key,
                   onTap: () {
-                    logic.options[i] = e.key;
+                    if (multiSelect) {
+                      if (selectedValues.contains(e.key)) {
+                        selectedValues.remove(e.key);
+                      } else {
+                        selectedValues.add(e.key);
+                      }
+                      logic.options[i] = jsonEncode(selectedValues);
+                    } else {
+                      logic.options[i] = e.key;
+                    }
                     logic.update();
                   },
                 );

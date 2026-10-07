@@ -4,6 +4,7 @@ import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/utils/translations.dart';
 import '../../base.dart';
 import '../../foundation/app.dart';
+import '../../network/base_comic.dart';
 import '../../network/hitomi_network/hitomi_models.dart';
 import 'package:pica_comic/components/components.dart';
 
@@ -157,7 +158,10 @@ class HitomiHomePageComics extends StatelessWidget {
 }
 
 class HitomiHomePage extends StatefulWidget {
-  const HitomiHomePage({super.key});
+  const HitomiHomePage({super.key, this.loadPage});
+
+  final Future<Res<List<BaseComic>>> Function(
+      int page, String type, String language)? loadPage;
 
   @override
   State<HitomiHomePage> createState() => _HitomiHomePageState();
@@ -230,12 +234,46 @@ class _HitomiHomePageState extends State<HitomiHomePage> {
         ),
         const Divider(),
         Expanded(
-          child: HitomiHomePageComics(
-            url,
-            key: Key(url),
-          ),
+          child: widget.loadPage == null
+              ? HitomiHomePageComics(
+                  url,
+                  key: Key(url),
+                )
+              : _HitomiScriptComics(
+                  key: ValueKey('$type$lang'),
+                  tag: 'hitomi-script-${identityHashCode(this)}-$type$lang',
+                  loader: widget.loadPage!,
+                  type: type,
+                  language: lang,
+                ),
         )
       ],
     );
   }
+}
+
+class _HitomiScriptComics extends ComicsPage<BaseComic> {
+  const _HitomiScriptComics({
+    super.key,
+    required this.tag,
+    required this.loader,
+    required this.type,
+    required this.language,
+  });
+
+  @override
+  final String tag;
+
+  final Future<Res<List<BaseComic>>> Function(int, String, String) loader;
+  final String type;
+  final String language;
+
+  @override
+  String get sourceKey => 'hitomi';
+
+  @override
+  String? get title => null;
+
+  @override
+  Future<Res<List<BaseComic>>> getComics(int i) => loader(i, type, language);
 }

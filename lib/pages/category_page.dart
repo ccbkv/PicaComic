@@ -8,6 +8,7 @@ import 'package:pica_comic/pages/ranking_page.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
 import 'package:pica_comic/utils/tags_translation.dart';
 import 'package:pica_comic/pages/category_comics_page.dart';
+import 'package:pica_comic/pages/picacg/collections_page.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
@@ -93,7 +94,7 @@ class _AllCategoryPageState extends State<AllCategoryPage>
     if (ComicSource.sources.isEmpty) {
       msg += "请添加一些源".tl;
       onTap = () {
-        App.globalContext!.to(() => const SettingsPage());
+        App.globalContext!.to(() => const ComicSourceSettings());
       };
     } else {
       msg += "请检查您的设置".tl;
@@ -273,6 +274,10 @@ class CategoryPage extends StatelessWidget {
           children: [
             for (var buttonData in data.buttons)
               buildTag(buttonData.label.tl, (p0, p1) => buttonData.onTap()),
+            if (data.buttons.isEmpty && findComicSourceKey() == "picacg")
+              buildTag("推荐".tl, (p0, p1) {
+                context.to(() => const CollectionsPage());
+              }),
             if (data.enableRankingPage && findComicSourceKey() == "picacg")
               buildTag("骑士榜".tl, (p0, p1) {
                 context.to(() => RankingPage(

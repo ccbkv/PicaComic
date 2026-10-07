@@ -2,10 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
+import 'package:pica_comic/foundation/log.dart';
+import 'package:pica_comic/network/app_dio.dart';
 import 'package:pica_comic/network/download_model.dart';
+import 'package:pica_comic/utils/zip_utils.dart';
 
 import '../utils/io_tools.dart';
 import 'download.dart';
@@ -111,14 +116,13 @@ class CustomDownloadingItem extends DownloadingItem {
   bool get haveEps => comic.chapters != null;
 
   Future<Stream<DownloadProgress>> _getImage(String url) async {
-    if (source.getImageLoadingConfig != null) {
-      int ep = links!.keys.elementAt(downloadingEp);
-      var config = await source.getImageLoadingConfig!(url, comic.comicId,
-          comic.chapters?.ids.elementAtOrNull(ep - 1) ?? comic.comicId);
-      return ImageManager()
-          .getImage(config["url"] ?? url, Map.from(config['headers'] ?? {}));
-    }
-    return ImageManager().getImage(url);
+    final ep = links!.keys.elementAt(downloadingEp);
+    return ImageManager().getCustomImage(
+      url,
+      comic.comicId,
+      comic.chapters?.ids.elementAtOrNull(ep - 1) ?? comic.comicId,
+      source.key,
+    );
   }
 
   @override
@@ -203,7 +207,7 @@ class CustomDownloadingItem extends DownloadingItem {
     return CustomDownloadedItem(
       await getFolderSize(Directory(path)),
       downloaded,
-      comic.chapters,
+      haveEps ? comic.chapters : null,
       id,
       comic.title,
       comic.subTitle ?? "",
@@ -263,4 +267,138 @@ class CustomDownloadingItem extends DownloadingItem {
       }
     }
   }
+}
+
+class CustomArchiveDownloadingItem extends CustomDownloadingItem {
+  CustomArchiveDownloadingItem(
+      ComicInfoData comic, this.archiveUrl,
+      DownloadProgressCallback onFinish, DownloadProgressCallback onError,
+      DownloadProgressCallbackAsync updateInfo, String id)
+      : super(comic, [0], onFinish, onError, updateInfo, id);
+
+  CustomArchiveDownloadingItem.fromMap(
+      Map<String, dynamic> map,
+      DownloadProgressCallback onFinish, DownloadProgressCallback onError,
+      DownloadProgressCallbackAsync updateInfo, String id)
+      : archiveUrl = map['archiveUrl'] as String,
+        super.fromMap(map, onFinish, onError, updateInfo, id);
+
+  final String archiveUrl;
+  CancelToken? _cancel;
+  Future<void>? _work;
+  bool _stopped = false;
+  int _received = 0;
+  int _total = 1;
+  int _speed = 0;
+
+  @override
+  bool get haveEps => false;
+
+  @override
+  int get totalPages => _total;
+
+  @override
+  int get downloadedPages => _received;
+
+  @override
+  int get currentSpeed => _speed;
+
+  @override
+  Map<String, dynamic> toMap() => {...super.toMap(), 'archiveUrl': archiveUrl};
+
+  @override
+  void start() {
+    if (_stopped) return;
+    _cancel?.cancel();
+    final previous = _work;
+    final cancel = CancelToken();
+    _cancel = cancel;
+    _work = _downloadArchive(cancel, previous);
+  }
+
+  Future<void> _downloadArchive(CancelToken cancel, Future<void>? previous) async {
+    final dio = logDio();
+    try {
+      // Serialize runs so resumed downloads cannot race extraction or file writes.
+      await previous;
+      if (cancel.isCancelled) return;
+      await onStart();
+      if (cancel.isCancelled) return;
+      await updateInfo?.call();
+      await downloadCover();
+      if (cancel.isCancelled) return;
+      _received = 0;
+      _total = 1;
+      _speed = 0;
+      final clock = Stopwatch()..start();
+      var lastBytes = 0;
+      final zip = File('$path/.archive.zip');
+      await dio.download(archiveUrl, zip.path, cancelToken: cancel,
+          onReceiveProgress: (received, total) {
+        if (cancel.isCancelled) return;
+        _received = received;
+        _total = (total > received ? total : received) + 1;
+        if (clock.elapsedMilliseconds >= 500) {
+          _speed = (received - lastBytes) * 1000 ~/ clock.elapsedMilliseconds;
+          lastBytes = received;
+          clock.reset();
+          updateInfo?.call();
+        }
+      });
+      if (cancel.isCancelled) return;
+      _speed = 0;
+      await updateInfo?.call();
+      final staging = Directory('$path/.archive-pages');
+      await compute(extractComicArchive, [zip.path, staging.path]);
+      if (cancel.isCancelled) return;
+      // Remove pages from an interrupted publish before copying the new result.
+      await for (final file in Directory(path).list()) {
+        if (cancel.isCancelled) return;
+        if (file is File &&
+            RegExp(r'^\d+\.(jpg|jpeg|png|gif|webp|avif|bmp)$')
+                .hasMatch(file.uri.pathSegments.last)) {
+          await file.delete();
+        }
+      }
+      await for (final file in staging.list()) {
+        if (cancel.isCancelled) return;
+        if (file is File) {
+          await file.copy('$path/${file.uri.pathSegments.last}');
+        }
+      }
+      if (cancel.isCancelled) return;
+      await staging.delete(recursive: true);
+      await zip.delete();
+      if (cancel.isCancelled) return;
+      _received = _total;
+      if (identical(DownloadManager().downloading.firstOrNull, this)) {
+        onFinish?.call();
+      }
+    } catch (e, s) {
+      if (!cancel.isCancelled) {
+        log('$e\n$s', 'Download', LogLevel.error);
+        onError?.call();
+      }
+    } finally {
+      dio.close(force: true);
+    }
+  }
+
+  @override
+  void pause() {
+    _cancel?.cancel();
+    _speed = 0;
+    super.pause();
+  }
+
+  @override
+  void stop() async {
+    _stopped = true;
+    _cancel?.cancel();
+    await _work;
+    if (directory != null) super.stop();
+  }
+
+  @override
+  Future<void> saveChapterComments() async {}
 }

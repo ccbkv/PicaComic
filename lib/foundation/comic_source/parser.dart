@@ -17,6 +17,41 @@ class ComicSourceParser {
 
   String? _name;
 
+  ArchiveDownloader? _parseArchiveDownloader() {
+    final key = _key!;
+    if (JsEngine().runCode("""
+      typeof ComicSource.sources.$key.comic?.archive?.getArchives === 'function' &&
+      typeof ComicSource.sources.$key.comic?.archive?.getDownloadUrl === 'function'
+    """) != true) {
+      return null;
+    }
+    return ArchiveDownloader(
+      (cid) async {
+        try {
+          final result = await JsEngine().runCode(
+              'ComicSource.sources.$key.comic.archive.getArchives(${jsonEncode(cid)})');
+          return Res((result as List)
+              .map((e) => ArchiveInfo.fromJson(Map<String, dynamic>.from(e)))
+              .toList());
+        } catch (e, s) {
+          log('$e\n$s', 'Network', LogLevel.error);
+          return Res.error(e.toString());
+        }
+      },
+      (cid, aid) async {
+        try {
+          final result = await JsEngine().runCode(
+              'ComicSource.sources.$key.comic.archive.getDownloadUrl('
+              '${jsonEncode(cid)}, ${jsonEncode(aid)})');
+          return Res(result as String);
+        } catch (e, s) {
+          log('$e\n$s', 'Network', LogLevel.error);
+          return Res.error(e.toString());
+        }
+      },
+    );
+  }
+
   Future<ComicSource> createAndParse(String js, String fileName) async{
     if(!fileName.endsWith("js")){
       fileName = "$fileName.js";
@@ -109,6 +144,7 @@ class ComicSourceParser {
         settings: [],
         loadComicInfo: loadComicFunc,
         loadComicPages: loadComicPagesFunc,
+        archiveDownloader: _parseArchiveDownloader(),
         getImageLoadingConfig: getImageLoadingConfigFunc,
         getThumbnailLoadingConfig: getThumbnailLoadingConfigFunc,
         matchBriefIdReg: matchBriefIdRegex,
@@ -123,6 +159,17 @@ class ComicSourceParser {
         veneraSettings: veneraSettings);
 
     await source.loadData();
+
+    // 当 JS 源覆盖同 key 的内置源时, 让内置源对象直接共享 JS 源的数据 map。
+    // 这样读取内置源数据的代码 (如 PicacgNetwork 读取 picacg.data)
+    // 与 JS 源的 saveData/loadData 操作的是同一份数据, 始终保持同步。
+    var builtInSource = ComicSource.builtIn.firstWhereOrNull((e) => e.key == key);
+    if (builtInSource != null && !identical(builtInSource, source)) {
+      builtInSource.data.forEach((k, v) {
+        source.data.putIfAbsent(k, () => v);
+      });
+      builtInSource.data = source.data;
+    }
 
     Future.delayed(const Duration(milliseconds: 50), () {
       // Initialize apiDomains for JM source if not defined (Venera compatibility)
@@ -162,6 +209,83 @@ class ComicSourceParser {
     if (!_checkExists("account")) {
       return null;
     }
+    if (_getValue("account.type") == "script") {
+      final key = _key!;
+      return AccountConfig.named(
+        onLogin: (context) async {
+          final success = await App.to<bool>(context, () => ScriptLoginPage(
+            call: (method, arguments) async => await JsEngine().runCode(
+              "ComicSource.sources[${jsonEncode(key)}].account[${jsonEncode(method)}]"
+              "(${arguments.map(jsonEncode).join(',')})",
+            ),
+          ));
+          if (success != true) return;
+          final source = ComicSource.find(key)!;
+          source.data["account"] = 'ok';
+          await source.saveData();
+          // Legacy native pages share the script source's login state.
+          if (key == 'nhentai') {
+            NhentaiNetwork().logged = true;
+            final userAgent = source.data['_loginUserAgent'];
+            if (userAgent is String && userAgent.isNotEmpty) {
+              appdata.implicitData[3] = userAgent;
+              appdata.writeImplicitData();
+            }
+          }
+        },
+        logout: () {
+          JsEngine().runCode("ComicSource.sources[${jsonEncode(key)}].account.logout()");
+          if (key == 'nhentai') NhentaiNetwork().logged = false;
+        },
+        allowReLogin: false,
+      );
+    }
+    if (_key == "nhentai" && _getValue("account.native") == "nhentai") {
+      // Reuse login.dart, including CAPTCHA, cookies and native logout.
+      return nhentai.account;
+    }
+    if (_key == "ehentai" &&
+        _checkExists("account.loginWithCookies") &&
+        _checkExists("account.loginWithCookies.validate")) {
+      final key = _key!;
+      final hasWebview = _checkExists("account.loginWithWebview");
+      return AccountConfig.named(
+        onLogin: (context) async {
+          final success = await App.to<bool>(context, () => EhScriptLoginPage(
+            fields: List<String>.from(
+                _getValue("account.loginWithCookies.fields")),
+            validateCookies: (values) async => await JsEngine().runCode(
+              "ComicSource.sources.$key.account.loginWithCookies.validate"
+              "(${jsonEncode(values)})",
+            ) == true,
+            loginUrl: hasWebview
+                ? _getValue("account.loginWithWebview.url") as String?
+                : null,
+            checkStatus: hasWebview
+                ? (url, title) async => await JsEngine().runCode(
+                    "ComicSource.sources.$key.account.loginWithWebview.checkStatus"
+                    "(${jsonEncode(url)}, ${jsonEncode(title)})",
+                  ) == true
+                : null,
+            onLoginSuccess: hasWebview &&
+                    _checkExists("account.loginWithWebview.onLoginSuccess")
+                ? () async {
+                    await JsEngine().runCode(
+                        "ComicSource.sources.$key.account.loginWithWebview.onLoginSuccess()");
+                  }
+                : null,
+          ));
+          if (success != true) return;
+          final source = ComicSource.find(key)!;
+          source.data["account"] = 'ok';
+          await source.saveData();
+        },
+        logout: () {
+          JsEngine().runCode("ComicSource.sources.$key.account.logout()");
+        },
+        allowReLogin: false,
+      );
+    }
 
     Future<Res<bool>> login(account, pwd) async {
       try {
@@ -184,12 +308,82 @@ class ComicSourceParser {
       JsEngine().runCode("ComicSource.sources.$_key.account.logout()");
     }
 
-    return AccountConfig(
-      login,
-      _checkExists("account.login") ? _getValue("account.login.website") : null,
-      _getValue("account.registerWebsite"),
-      logout
+    var infoItems = <AccountInfoItem>[];
+    try {
+      var items = _getValue("account.infoItems");
+      if (items is List) {
+        for (int i = 0; i < items.length; i++) {
+          var item = items[i];
+          if (item is! Map) continue;
+          var title = item["title"]?.toString() ?? "";
+          if (title.isEmpty) continue;
+          infoItems.add(AccountInfoItem(
+            title: title,
+            data: item["data"] != null
+                ? () {
+                    try {
+                      var res = JsEngine().runCode(
+                          "ComicSource.sources.$_key.account.infoItems[$i].data()");
+                      return res?.toString() ?? "";
+                    } catch (e) {
+                      return "";
+                    }
+                  }
+                : null,
+            onTap: _parseAccountInfoAction(item["action"]?.toString()),
+          ));
+        }
+      }
+    } catch (e) {
+      log("Failed to parse account infoItems: $e", "Network", LogLevel.error);
+    }
+
+    return AccountConfig.named(
+      login: login,
+      loginWebsite: _checkExists("account.login")
+          ? _getValue("account.login.website")
+          : null,
+      registerWebsite: _getValue("account.registerWebsite"),
+      logout: logout,
+      infoItems: infoItems,
     );
+  }
+
+  /// Parse the action of a JS account info item to an onTap callback.
+  /// Supported actions: "picacg_leave_messages", "picacg_user_comments".
+  void Function()? _parseAccountInfoAction(String? action) {
+    if (action == null) {
+      return null;
+    }
+    return () {
+      switch (action) {
+        case "picacg_leave_messages":
+          App.mainNavigatorKey?.currentContext
+              ?.to(() => const PicacgLeaveMsgPage());
+          App.globalBack();
+        case "picacg_user_comments":
+          App.mainNavigatorKey?.currentContext
+              ?.to(() => const UserCommentsPage());
+          App.globalBack();
+      }
+    };
+  }
+
+  String? _parseExploreViewMore(dynamic value) {
+    if (value is String) return value.isEmpty ? null : value;
+    if (value is! Map || value["attributes"] is! Map) return null;
+    final attributes = value["attributes"] as Map;
+    if (value["page"] == "search") {
+      final keyword = attributes["keyword"] ?? attributes["text"];
+      return keyword is String ? "search:$keyword" : null;
+    }
+    if (value["page"] == "category") {
+      final category = attributes["category"];
+      if (category is! String) return null;
+      final param = attributes["param"];
+      return param == null ? "category:$category" : "category:$category@$param";
+    }
+    return null;
   }
 
   List<ExplorePageData> _loadExploreData() {
@@ -201,6 +395,36 @@ class ComicSourceParser {
     for (int i=0; i<length; i++) {
       final String title = _getValue("explore[$i].title");
       final String type = _getValue("explore[$i].type");
+      if (type == "hitomi" && _key == "hitomi") {
+        final sourceKey = _key!;
+        final exploreIndex = i;
+        pages.add(ExplorePageData.named(
+          title: title,
+          type: ExplorePageType.override,
+          overridePageBuilder: (context) => HitomiHomePage(
+            loadPage: (page, sort, language) async {
+              try {
+                final res = await JsEngine().runCode(
+                    "ComicSource.sources.$sourceKey.explore[$exploreIndex].load("
+                    "${jsonEncode(page)}, ${jsonEncode(sort)}, ${jsonEncode(language)})");
+                if (res is! Map || res["comics"] is! List) {
+                  return const Res.error("Invalid response from hitomi explore");
+                }
+                return Res<List<BaseComic>>(
+                  (res["comics"] as List)
+                      .map((e) => CustomComic.fromJson(e, sourceKey))
+                      .toList(),
+                  subData: res["maxPage"],
+                );
+              } catch (e, s) {
+                log("$e\n$s", "Network", LogLevel.error);
+                return Res.error(e.toString());
+              }
+            },
+          ),
+        ));
+        continue;
+      }
       Future<Res<List<ExplorePagePart>>> Function()? loadMultiPart;
       Future<Res<List<BaseComic>>> Function(int page)? loadPage;
       Future<Res<List<Object>>> Function(int index)? loadMixed;
@@ -228,6 +452,47 @@ class ComicSourceParser {
             return Res.error(e.toString());
           }
         };
+      } else if (type == "multiPageComicList" &&
+          _key == "ehentai" &&
+          !_checkExists("explore[$i].load") &&
+          _checkExists("explore[$i].loadNext")) {
+        var cachedPages = <List<BaseComic>>[];
+        var nextTokens = <String?>[null];
+        loadPage = (int page) async {
+          try {
+            if (page < 1) return const Res.error("Invalid page");
+            if (page == 1) {
+              cachedPages = <List<BaseComic>>[];
+              nextTokens = <String?>[null];
+            }
+            // Keep each refresh separate from any older pending request.
+            final loaded = cachedPages;
+            final tokens = nextTokens;
+            while (loaded.length < page && loaded.length < tokens.length) {
+              final token = tokens[loaded.length];
+              final res = await JsEngine().runCode(
+                  "ComicSource.sources.$_key.explore[$i].loadNext(${jsonEncode(token)})");
+              if (res is! Map || res["comics"] is! List) {
+                return const Res.error("Invalid response from explore loadNext");
+              }
+              final comics = (res["comics"] as List)
+                  .map<BaseComic>((e) => CustomComic.fromJson(e, _key!))
+                  .toList();
+              final next = res["next"] as String?;
+              loaded.add(comics);
+              if (next != null && !tokens.contains(next)) tokens.add(next);
+            }
+            return Res<List<BaseComic>>(
+              page <= loaded.length
+                  ? List<BaseComic>.of(loaded[page - 1])
+                  : <BaseComic>[],
+              subData: loaded.length == tokens.length ? loaded.length : null,
+            );
+          } catch (e, s) {
+            log("$e\n$s", "Network", LogLevel.error);
+            return Res.error(e.toString());
+          }
+        };
       } else if (type == "multiPageComicList") {
         loadPage = (int page) async {
           try {
@@ -252,13 +517,14 @@ class ComicSourceParser {
             }
             return Res(List.from(res.map((e) {
               var comics = e['comics'];
+              final viewMore = _parseExploreViewMore(e['viewMore']);
               if (comics == null || comics is! List) {
-                return ExplorePagePart(e['title'] ?? "", [], null);
+                return ExplorePagePart(e['title'] ?? "", [], viewMore);
               }
               return ExplorePagePart(
                 e['title'] ?? "",
                 comics.map<CustomComic>((e) => CustomComic.fromJson(e, _key!)).toList(),
-                null);
+                viewMore);
             })));
           } catch (e, s) {
             log("$e\n$s", "Data Analysis", LogLevel.error);
@@ -283,13 +549,14 @@ class ComicSourceParser {
                 list.add(item.map<CustomComic>((e) => CustomComic.fromJson(e, _key!)).toList());
               } else if (item is Map) {
                 var comics = item['comics'];
+                final viewMore = _parseExploreViewMore(item['viewMore']);
                 if (comics == null || comics is! List) {
-                  list.add(ExplorePagePart(item['title'] ?? "", [], null));
+                  list.add(ExplorePagePart(item['title'] ?? "", [], viewMore));
                 } else {
                   list.add(ExplorePagePart(
                     item['title'] ?? "",
                     comics.map<CustomComic>((e) => CustomComic.fromJson(e, _key!)).toList(),
-                    null));
+                    viewMore));
                 }
               }
             }
@@ -320,6 +587,10 @@ class ComicSourceParser {
 
   CategoryData? _loadCategoryData() {
     var doc = _getValue("category");
+
+    if (_key == "ehentai" && doc?["native"] == "ehentai") {
+      return ehCategory;
+    }
 
     if (doc?["title"] == null) {
       return null;
@@ -377,7 +648,7 @@ class ComicSourceParser {
         title: title,
         categories: categoryParts,
         enableRankingPage: enableRankingPage ?? false,
-        key: doc["key"] ?? title);
+        key: _key == "jm" ? _key! : doc["key"] ?? title);
   }
 
   CategoryComicsData? _loadCategoryComicsData() {
@@ -407,6 +678,47 @@ class ComicSourceParser {
               element["showWhen"] == null ? null : List<String>.from(element["showWhen"])
             ));
       }
+    }
+    CategoryOptionsLoader? optionsLoader;
+    if (_key == "jm" &&
+        optionList == null &&
+        _checkExists("categoryComics.optionLoader")) {
+      optionsLoader = (category, param) async {
+        try {
+          final res = await JsEngine().runCode("""
+            ComicSource.sources.$_key.categoryComics.optionLoader(
+              ${jsonEncode(category)}, ${jsonEncode(param)})
+          """);
+          if (res is! List) {
+            return Res.error("Invalid category options: expected a list");
+          }
+          final result = <CategoryComicsOptions>[];
+          for (final element in res) {
+            final map = LinkedHashMap<String, String>();
+            for (final option in element["options"]) {
+              final separator = (option as String).indexOf("-");
+              if (separator < 0) continue;
+              map[option.substring(0, separator)] =
+                  option.substring(separator + 1);
+            }
+            if (map.isEmpty) {
+              return Res.error("No category options available");
+            }
+            result.add(CategoryComicsOptions.named(
+              label: element["label"] ?? "",
+              options: map,
+              notShowWhen: List<String>.from(element["notShowWhen"] ?? []),
+              showWhen: element["showWhen"] == null
+                  ? null
+                  : List<String>.from(element["showWhen"]),
+            ));
+          }
+          return Res(result);
+        } catch (e, s) {
+          log("$e\n$s", "Network", LogLevel.error);
+          return Res.error(e.toString());
+        }
+      };
     }
     RankingData? rankingData;
     if(_checkExists("categoryComics.ranking")){
@@ -454,7 +766,7 @@ class ComicSourceParser {
         log("$e\n$s", "Network", LogLevel.error);
         return Res.error(e.toString());
       }
-    }, rankingData: rankingData);
+    }, rankingData: rankingData, optionsLoader: optionsLoader);
   }
 
   SearchPageData? _loadSearchData() {
@@ -477,13 +789,57 @@ class ComicSourceParser {
             map[key] = value;
           }
         }
-        options.add(SearchOptions(map, element["label"]));
+        options.add(SearchOptions(map, element["label"],
+            type: _key == "ehentai" ? element["type"] ?? "select" : "select",
+            defaultValue: _key == "ehentai" && element["default"] != null
+                ? (element["default"] is List
+                    ? jsonEncode(element["default"])
+                    : element["default"].toString())
+                : null));
       }
     }
+    final ehPages = <String, List<List<BaseComic>>>{};
+    final ehTokens = <String, List<String?>>{};
     return SearchPageData(options, (keyword, page, searchOption) async {
       try {
         // Check if search.load exists, otherwise use search.loadNext (Venera compatibility)
         var hasLoad = _checkExists("search.load");
+        if (_key == "ehentai" && !hasLoad) {
+          if (page < 1) return const Res.error("Invalid page");
+          final query = jsonEncode([keyword, searchOption]);
+          if (page == 1 || !ehPages.containsKey(query)) {
+            if (ehPages.length >= 8 && !ehPages.containsKey(query)) {
+              final oldest = ehPages.keys.first;
+              ehPages.remove(oldest);
+              ehTokens.remove(oldest);
+            }
+            ehPages[query] = <List<BaseComic>>[];
+            ehTokens[query] = <String?>[null];
+          }
+          final loaded = ehPages[query]!;
+          final tokens = ehTokens[query]!;
+          while (loaded.length < page && loaded.length < tokens.length) {
+            final result = await JsEngine().runCode(
+                "ComicSource.sources.$_key.search.loadNext("
+                "${jsonEncode(keyword)}, ${jsonEncode(searchOption)}, "
+                "${jsonEncode(tokens[loaded.length])})");
+            if (result is! Map || result["comics"] is! List) {
+              return const Res.error("Invalid response from search.loadNext");
+            }
+            final comics = (result["comics"] as List)
+                .map<BaseComic>((e) => CustomComic.fromJson(e, _key!))
+                .toList();
+            final next = result["next"] as String?;
+            loaded.add(comics);
+            if (next != null && !tokens.contains(next)) tokens.add(next);
+          }
+          return Res<List<BaseComic>>(
+            page <= loaded.length
+                ? List<BaseComic>.of(loaded[page - 1])
+                : <BaseComic>[],
+            subData: loaded.length == tokens.length ? loaded.length : null,
+          );
+        }
         String jsCode;
         if (hasLoad) {
           jsCode = """
@@ -548,6 +904,7 @@ class ComicSourceParser {
         Future<Res<List<String>>> Function(String, int)? thumbnailLoader;
         List<String>? initialThumbnails;
         int thumbnailMaxPage = res["thumbnailMaxPage"] ?? 1;
+        final ehNextTokens = <int, String?>{1: null};
         var hasLoadThumbnails = _checkExists("comic.loadThumbnails");
         if (hasLoadThumbnails) {
           // If loadInfo didn't return thumbnails, call loadThumbnails to get initial thumbnails
@@ -563,6 +920,12 @@ class ComicSourceParser {
                   // If there's a next page, estimate max pages (ehentai typically has 20-40 thumbs per page)
                   thumbnailMaxPage = 10; // Default to a reasonable number
                 }
+                if (_key == "ehentai") {
+                  ehNextTokens[2] = thumbnailResult["next"]?.toString();
+                  thumbnailMaxPage = (thumbnailResult["maxPage"] as num?)
+                          ?.toInt() ??
+                      thumbnailMaxPage;
+                }
               }
             } catch (e) {
               // Ignore error, thumbnails will be loaded on demand
@@ -570,6 +933,22 @@ class ComicSourceParser {
           }
 
           thumbnailLoader = (String comicId, int page) async {
+            if (_key == "ehentai" && initialThumbnails != null) {
+              final token = ehNextTokens[page];
+              if (token == null) return const Res(<String>[]);
+              try {
+                final result = await JsEngine().runCode("""
+                  ComicSource.sources.$_key.comic.loadThumbnails(${jsonEncode(comicId)}, ${jsonEncode(token)})
+                """);
+                if (result is! Map || result["thumbnails"] is! List) {
+                  return const Res.error("No thumbnails");
+                }
+                ehNextTokens[page + 1] = result["next"]?.toString();
+                return Res(List<String>.from(result["thumbnails"]));
+              } catch (e) {
+                return Res.error(e.toString());
+              }
+            }
             // ThumbnailsData calls load(current + 1), so page 2 is first load
             // Convert to 0-based index for ehentai: page 2 -> "0", page 3 -> "1", etc.
             String? nextToken;
@@ -586,6 +965,9 @@ class ComicSourceParser {
           };
         }
 
+        var uploader = res["uploader"] is Map
+            ? UploaderInfo.fromJson(Map<String, dynamic>.from(res["uploader"]))
+            : null;
         return Res(ComicInfoData(
             res["title"] ?? "",
             res["subTitle"] ?? "",
@@ -601,7 +983,8 @@ class ComicSourceParser {
             id,
             isFavorite: res["isFavorite"],
             subId: res["subId"],
-            stars: res["stars"] != null ? (res["stars"] as num).toDouble() : null,));
+            stars: res["stars"] != null ? (res["stars"] as num).toDouble() : null,
+            uploader: uploader));
       } catch (e, s) {
         log("$e\n$s", "Network", LogLevel.error);
         return Res.error(e.toString());
@@ -765,9 +1148,21 @@ class ComicSourceParser {
           return Res([]);
         }
         return Res(
-            comments.map((e) => Comment(
-                e["userName"] ?? "", e["avatar"] ?? "", e["content"] ?? "", e["time"] ?? "", e["replyCount"] ?? 0, e["id"]?.toString() ?? ""
-            )).toList(),
+            comments.map((e) {
+              String content = e["content"] ?? "";
+              if (_key == "ehentai") {
+                // Prime returns HTML; PicaComic's comment widget is plain text.
+                content = html.parseFragment(content
+                    .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+                    .replaceAll(
+                        RegExp(r'</(?:p|div)>', caseSensitive: false), '\n'))
+                    .text ?? '';
+              }
+              return Comment(
+                  e["userName"] ?? "", e["avatar"] ?? "", content,
+                  e["time"] ?? "", e["replyCount"] ?? 0,
+                  e["id"]?.toString() ?? "");
+            }).toList(),
             subData: res["maxPage"]);
       } catch (e, s) {
         log("$e\n$s", "Network", LogLevel.error);

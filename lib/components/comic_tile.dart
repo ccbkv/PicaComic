@@ -950,6 +950,9 @@ class CustomComicTile extends ComicTile {
   String get description => comic.description;
 
   @override
+  int? get pages => comic.pages;
+
+  @override
   Widget get image => AnimatedImage(
     image: StreamImageProvider(
             () =>
@@ -962,6 +965,18 @@ class CustomComicTile extends ComicTile {
 
   @override
   void onTap_() {
+    if (comic.id.startsWith("creator:")) {
+      final creatorId = comic.id.substring("creator:".length);
+      App.mainNavigatorKey!.currentContext!.to(
+        () => CategoryComicsPage(
+          category: creatorId,
+          param: "ca",
+          categoryKey: comic.sourceKey,
+          displayTitle: comic.title,
+        ),
+      );
+      return;
+    }
     App.mainNavigatorKey!.currentContext!.to(() => ComicPage(
       sourceKey: comic.sourceKey,
       id: comic.id,
@@ -988,12 +1003,22 @@ class CustomComicTile extends ComicTile {
   String? get comicID => comic.id;
 
   @override
-  String? get badge => badge_;
+  String? get badge {
+    if (badge_ != null) return badge_;
+    if (comic.sourceKey != 'ehentai') return null;
+    final language = comic.language;
+    if (language == null || language.isEmpty) return null;
+    return App.locale.languageCode == 'zh'
+        ? TagsTranslation.translationTagWithNamespace(language, 'language')
+        : language;
+  }
 
   final String? badge_;
 
   @override
-  get read => () async {
+  get read => comic.id.startsWith("creator:")
+      ? null
+      : () async {
     bool cancel = false;
     var dialog = showLoadingDialog(
       App.globalContext!,
@@ -1028,6 +1053,20 @@ Widget buildComicTile(BuildContext context, BaseComic item, String sourceKey,
   var source = ComicSource.find(sourceKey);
   if (source == null) {
     throw "Comic Source $sourceKey Not Found";
+  }
+  if (item is! CustomComic && source.comicTileBuilderOverride == null) {
+    // JS 源覆盖内置源时, 原生漫画模型 (如哔咔推荐页的 ComicItemBrief)
+    // 回退到同 key 内置源的 tile 构建器
+    ComicSource? fallback;
+    for (var e in ComicSource.builtIn) {
+      if (e.key == sourceKey && e.comicTileBuilderOverride != null) {
+        fallback = e;
+        break;
+      }
+    }
+    if (fallback != null) {
+      source = fallback;
+    }
   }
   if (!appdata.appSettings.fullyHideBlockedWorks) {
     var blockWord = isBlocked(item);

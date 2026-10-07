@@ -64,7 +64,10 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
             ),
           ),
           buildCard(context),
-          const _SliverBuiltInSources(),
+          _SliverBuiltInSources(
+            onAdd: handleAddSource,
+            onDelete: delete,
+          ),
           if (appdata.appSettings.isComicSourceEnabled("picacg"))
             const SliverPicacgSettings(),
           if (appdata.appSettings.isComicSourceEnabled("ehentai"))
@@ -120,13 +123,20 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
       title: "删除".tl,
       content: "要删除漫画源 '${source.name}' 吗?".tl,
       btnColor: context.colorScheme.error,
-      onConfirm: () {
-        var file = File(source.filePath);
-        file.delete();
-        ComicSource.sources.remove(source);
-        _validatePages();
-        MyApp.updater?.call();
-        StateController.findOrNull(tag: "me_page_sources")?.update();
+      onConfirm: () async {
+        try {
+          var file = File(source.filePath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+          ComicSource.sources.remove(source);
+          _validatePages();
+          if (mounted) setState(() {});
+          MyApp.updater?.call();
+          StateController.findOrNull(tag: "me_page_sources")?.update();
+        } catch (e) {
+          showToast(message: e.toString());
+        }
       },
     );
   }
@@ -141,16 +151,17 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     );
   }
 
-  static void update(ComicSource source) async {
-    ComicSource.sources.remove(source);
-    if (!source.url.isURL) {
+  static Future<void> update(ComicSource source, {String? url}) async {
+    final downloadUrl = url ?? source.url;
+    if (!downloadUrl.isURL) {
       showToast(message: "Invalid url config");
+      return;
     }
     bool cancel = false;
     var controller = showLoadingDialog(App.globalContext!,
         onCancel: () => cancel = true, barrierDismissible: false);
     try {
-      var res = await logDio().get<String>(source.url,
+      var res = await logDio().get<String>(downloadUrl,
           options: Options(responseType: ResponseType.plain));
       if (cancel) return;
       controller.close();
@@ -159,8 +170,13 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     } catch (e) {
       if (cancel) return;
       showToast(message: e.toString());
+    } finally {
+      controller.close();
     }
     await ComicSource.reload();
+    if (ComicSource.find(source.key)?.version == ComicSource.updates[source.key]) {
+      ComicSource.updates.remove(source.key);
+    }
     MyApp.updater?.call();
     StateController.findOrNull(tag: "me_page_sources")?.update();
   }
@@ -304,6 +320,8 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     } catch (e) {
       if (cancel) return;
       showToast(message: e.toString());
+    } finally {
+      controller.close();
     }
   }
 
@@ -312,6 +330,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     ComicSource.sources.add(comicSource);
     _addAllPagesWithComicSource(comicSource);
     appdata.updateSettings();
+    if (mounted) setState(() {});
     MyApp.updater?.call();
     StateController.findOrNull(tag: "me_page_sources")?.update();
   }
@@ -405,9 +424,7 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
         shouldUpdate.add(source.key);
       }
     }
-    if (shouldUpdate.isNotEmpty) {
-      ComicSource.updates = {for (var key in shouldUpdate) key: versions[key]!};
-    }
+    ComicSource.updates = {for (var key in shouldUpdate) key: versions[key]!};
     return shouldUpdate.length;
   }
 
@@ -744,13 +761,85 @@ class SliverHtSettings extends StatelessWidget {
 }
 
 class _SliverBuiltInSources extends StatefulWidget {
-  const _SliverBuiltInSources();
+  const _SliverBuiltInSources({
+    required this.onAdd,
+    required this.onDelete,
+  });
+
+  final Future<void> Function(String url) onAdd;
+  final void Function(ComicSource source) onDelete;
 
   @override
   State<_SliverBuiltInSources> createState() => _SliverBuiltInSourcesState();
 }
 
 class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
+  String? _addingKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForUpdates();
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      await _CheckUpdatesButtonState.checkComicSourceUpdate();
+      if (mounted) setState(() {});
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, 'ComicSourceSettings', e.toString());
+    }
+  }
+
+  Future<void> add(String key, {ComicSource? installed}) async {
+    if (_addingKey != null ||
+        (installed == null && ComicSource.find(key) != null)) {
+      return;
+    }
+    setState(() => _addingKey = key);
+    try {
+      const repository =
+          'https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/';
+      String url;
+      final response = await logDio().get<String>(
+        '${repository}index.json',
+        options: Options(responseType: ResponseType.plain),
+      );
+      final entries = jsonDecode(response.data!) as List;
+      final entry = entries.firstWhereOrNull((item) => item['key'] == key);
+      if (entry == null) {
+        throw '未找到漫画源: $key';
+      }
+      final configuredUrl = entry['url']?.toString();
+      if (configuredUrl != null && configuredUrl.isURL) {
+        url = configuredUrl;
+      } else {
+        final fileName = entry['fileName']?.toString();
+        if (fileName == null || fileName.isEmpty) {
+          throw '漫画源缺少下载地址: $key';
+        }
+        url = Uri.parse(repository).resolve(fileName).toString();
+      }
+      if (!mounted) return;
+      if (installed == null) {
+        if (ComicSource.find(key) != null) return;
+        await widget.onAdd(url);
+      } else {
+        await _ComicSourceSettingsState.update(installed, url: url);
+        if (mounted) {
+          context
+              .findAncestorStateOfType<_ComicSourceSettingsState>()
+              ?.setState(() {});
+        }
+      }
+      await _checkForUpdates();
+    } catch (e) {
+      showToast(message: e.toString());
+    } finally {
+      if (mounted) setState(() => _addingKey = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SliverMainAxisGroup(
@@ -770,7 +859,7 @@ class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
         ),
         SliverToBoxAdapter(
           child: ListTile(
-            title: Text("内置漫画源".tl),
+            title: Text("常用漫画源".tl),
           ),
         ),
         SliverList(
@@ -796,38 +885,71 @@ class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
     );
   }
 
-  bool isLoading = false;
-
   Widget buildTile(int index) {
     var key = builtInSources[index];
+    final installed = ComicSource.sources
+        .firstWhereOrNull((source) => source.key == key && !source.isBuiltIn);
+    final newVersion = ComicSource.updates[key];
+    final hasUpdate = installed != null &&
+        newVersion != null &&
+        newVersion != installed.version;
     return ListTile(
-      title: Text(ComicSource.builtIn.firstWhere((e) => e.key == key).name.tl),
-      trailing: AdaptiveSwitch(
-        value: appdata.appSettings.isComicSourceEnabled(key),
-        onChanged: (v) async {
-          if (isLoading) return;
-          isLoading = true;
-          appdata.appSettings.setComicSourceEnabled(key, v);
-          await appdata.updateSettings();
-          if (!v) {
-            ComicSource.sources.removeWhere((e) => e.key == key);
-            _validatePages();
-          } else {
-            var source = ComicSource.builtIn.firstWhere((e) => e.key == key);
-            ComicSource.sources.add(source);
-            source.loadData();
-            _addAllPagesWithComicSource(source);
-          }
-          isLoading = false;
-          if (mounted) {
-            setState(() {});
-            context
-                .findAncestorStateOfType<_ComicSourceSettingsState>()
-                ?.setState(() {});
-          }
-          StateController.findOrNull(tag: "me_page_sources")?.update();
-        },
+      title: Wrap(
+        spacing: 16,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(ComicSource.builtIn.firstWhere((e) => e.key == key).name.tl),
+              Text(
+                '当前版本号：${installed?.version ?? '未安装'}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          if (hasUpdate) ...[
+            Text(
+              '新版本可更新：$newVersion',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _addingKey != null
+                  ? null
+                  : () => add(key, installed: installed),
+              child: Text(_addingKey == key ? '更新中'.tl : '更新'.tl),
+            ).fixHeight(32),
+          ],
+        ],
       ),
+      trailing: FilledButton(
+        style: installed == null
+            ? null
+            : FilledButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+        onPressed: _addingKey != null
+            ? null
+            : () {
+                if (installed == null) {
+                  add(key);
+                } else {
+                  widget.onDelete(installed);
+                }
+              },
+        child: Text(
+          _addingKey == key && installed == null
+              ? '添加中'.tl
+              : (installed == null ? '添加'.tl : '删除'.tl),
+        ),
+      ).fixHeight(32),
     );
   }
 }
@@ -895,6 +1017,23 @@ class _SliverComicSource extends StatefulWidget {
 
 class _SliverComicSourceState extends State<_SliverComicSource> {
   ComicSource get source => widget.source;
+  bool _jmCallbackRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    JmSettings._checkInRevision.addListener(_syncJmCheckIn);
+  }
+
+  void _syncJmCheckIn() {
+    if (source.key == 'jm') setState(() {});
+  }
+
+  @override
+  void dispose() {
+    JmSettings._checkInRevision.removeListener(_syncJmCheckIn);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -906,10 +1045,12 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
         SliverPadding(padding: const EdgeInsets.only(top: 16)),
         SliverToBoxAdapter(
           child: ListTile(
-            title: Row(
+            title: Wrap(
+              spacing: 6,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(source.name, style: const TextStyle(fontSize: 18)),
-                const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -925,7 +1066,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
                     style: const TextStyle(fontSize: 13),
                   ),
                 ),
-                if (hasUpdate)
+                if (hasUpdate) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
@@ -936,10 +1077,19 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      "新版本".tl,
+                      "新版本可更新：$newVersion",
                       style: const TextStyle(fontSize: 13),
                     ),
-                  ).paddingLeft(4),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => widget.update(source),
+                    child: Text("更新".tl),
+                  ).fixHeight(32),
+                ],
               ],
             ),
             trailing: Row(
@@ -1010,13 +1160,75 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
       var type = setting['type'] as String?;
       var title = setting['title'] as String? ?? key;
 
+      // saveTo == 'data' 时直接读写源数据顶层字段 (与内置哔咔设置页共享)
+      bool saveToData = setting['saveTo'] == 'data';
+      bool isJmCheckIn = source.key == 'jm' && key == 'dailyCheckInTask';
+      Object? readSetting() =>
+          isJmCheckIn
+              ? appdata.settings[88] == '1'
+              : saveToData ? source.data[key] : source.data['settings'][key];
+      void writeSetting(Object? value) {
+        if (isJmCheckIn) {
+          appdata.settings[88] = value == true ? '1' : '0';
+          appdata.updateSettings();
+          JmSettings._checkInRevision.value++;
+          return;
+        }
+        if (saveToData) {
+          source.data[key] = value;
+        } else {
+          source.data['settings'][key] = value;
+        }
+        source.saveData();
+      }
+
       try {
-        if (type == 'select') {
+        if (type == 'native' &&
+            source.key == 'nhentai' &&
+            setting['page'] == 'nhentai') {
+          widgets.add(const SliverToBoxAdapter(child: NhSettings(false)));
+        } else if (type == 'native' &&
+            source.key == 'htmanga' &&
+            setting['page'] == 'htmanga') {
+          widgets.add(const SliverToBoxAdapter(child: HtSettings(false)));
+        } else if (source.key == 'jm' && type == 'callback') {
+          widgets.add(SliverToBoxAdapter(
+            child: ListTile(
+              leading: Icon(key == 'refreshDomains'
+                  ? Icons.update_outlined
+                  : Icons.today),
+              title: Text(title),
+              trailing: _jmCallbackRunning
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.arrow_right),
+              onTap: _jmCallbackRunning
+                  ? null
+                  : () async {
+                      setState(() => _jmCallbackRunning = true);
+                      try {
+                        await JsEngine().runCode(
+                            "ComicSource.sources.jm.settings[${jsonEncode(key)}].callback()");
+                      } catch (e, s) {
+                        log("$e\n$s", "JM settings", LogLevel.error);
+                        showToast(message: e.toString());
+                      } finally {
+                        if (mounted) {
+                          setState(() => _jmCallbackRunning = false);
+                        }
+                      }
+                    },
+            ),
+          ));
+        } else if (type == 'select') {
           var options = setting['options'] as List? ?? [];
           var defaultValue = setting['default'];
 
           // Get current value or use default
-          var currentValue = source.data['settings'][key] ?? defaultValue;
+          var currentValue = readSetting() ?? defaultValue;
 
           // Find display text for current value
           String currentText = currentValue?.toString() ?? '';
@@ -1058,8 +1270,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
                   initialValue: currentIndex,
                   values: optionTexts,
                   onChange: (index) {
-                    source.data['settings'][key] = optionValues[index];
-                    source.saveData();
+                    writeSetting(optionValues[index]);
                     setState(() {});
                   },
                 ),
@@ -1068,7 +1279,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
           );
         } else if (type == 'switch') {
           var defaultValue = setting['default'] ?? false;
-          var currentValue = source.data['settings'][key] ?? defaultValue;
+          var currentValue = readSetting() ?? defaultValue;
 
           widgets.add(
             SliverToBoxAdapter(
@@ -1077,8 +1288,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
                 trailing: AdaptiveSwitch(
                   value: currentValue is bool ? currentValue : false,
                   onChanged: (value) {
-                    source.data['settings'][key] = value;
-                    source.saveData();
+                    writeSetting(value);
                     setState(() {});
                   },
                 ),
@@ -1087,8 +1297,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
           );
         } else if (type == 'input') {
           var defaultValue = setting['default']?.toString() ?? '';
-          var currentValue =
-              source.data['settings'][key]?.toString() ?? defaultValue;
+          var currentValue = readSetting()?.toString() ?? defaultValue;
 
           widgets.add(
             SliverToBoxAdapter(
@@ -1107,11 +1316,71 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
                       title: title,
                       initialValue: currentValue,
                       onConfirm: (value) {
-                        source.data['settings'][key] = value;
-                        source.saveData();
+                        writeSetting(value);
                         setState(() {});
                       },
                     );
+                  },
+                ),
+              ),
+            ),
+          );
+        } else if (type == 'action') {
+          // 打开指定页面 (目前支持哔咔的留言板/我的评论)
+          var action = setting['action'] as String?;
+          VoidCallback? onTap;
+          IconData? icon;
+          switch (action) {
+            case 'picacg_leave_messages':
+              onTap = () => App.to(context, () => const PicacgLeaveMsgPage());
+              icon = Icons.forum;
+            case 'picacg_user_comments':
+              onTap = () => App.to(context, () => const UserCommentsPage());
+              icon = Icons.comment;
+          }
+          if (onTap == null) continue;
+          widgets.add(
+            SliverToBoxAdapter(
+              child: ListTile(
+                leading: Icon(icon),
+                title: Text(title),
+                onTap: onTap,
+              ),
+            ),
+          );
+        } else if (type == 'appSwitch') {
+          // App 级开关 (读写 appdata.settings, 与内置设置页同步)
+          var appKey = setting['appKey'] as String?;
+          int settingsIndex;
+          switch (appKey) {
+            case 'showAvatarFrame':
+              settingsIndex = 5;
+            case 'autoPunchIn':
+              settingsIndex = 6;
+            default:
+              continue;
+          }
+          widgets.add(
+            SliverToBoxAdapter(
+              child: ListTile(
+                leading: Icon(appKey == 'showAvatarFrame'
+                    ? Icons.circle_outlined
+                    : Icons.today),
+                title: Text(title),
+                subtitle: appKey == 'autoPunchIn'
+                    ? Text(supportsWorkmanager
+                        ? "APP启动或是距离上次打卡间隔一天时执行".tl
+                        : "启动时执行".tl)
+                    : null,
+                trailing: AdaptiveSwitch(
+                  value: appdata.settings[settingsIndex] == "1",
+                  onChanged: (b) {
+                    appdata.settings[settingsIndex] = b ? "1" : "0";
+                    if (appKey == 'autoPunchIn' && supportsWorkmanager) {
+                      b ? runBackgroundService() : cancelBackgroundService();
+                    }
+                    appdata.writeData();
+                    setState(() {});
                   },
                 ),
               ),

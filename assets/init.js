@@ -600,12 +600,14 @@ let Network = {
     /**
      * Deletes cookies for a specific URL.
      * @param {string} url - The URL to delete the cookies from.
+     * @param {string[]?} names - Delete only these names; omit to delete all.
      */
-    deleteCookies(url) {
+    deleteCookies(url, names = null) {
         sendMessage({
             method: 'cookie',
             function: 'delete',
             url: url,
+            names: names,
         });
     },
 };

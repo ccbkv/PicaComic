@@ -32,12 +32,57 @@ class CategoryComicsPage extends StatefulWidget {
 
 class _CategoryComicsPageState extends State<CategoryComicsPage> {
   late final CategoryComicsData data;
-  late final List<CategoryComicsOptions> options;
+  late List<CategoryComicsOptions> options;
   late final ComicSource source;
   late List<String> optionsValue;
   late String? currentParam;
   List<String> selectedCategories = [];
   bool showCategorySelector = false;
+  bool _optionsLoading = false;
+  String? _optionsError;
+
+  bool get _hasDynamicOptions =>
+      source.key == "jm" && data.optionsLoader != null;
+
+  Future<void> _loadOptions() async {
+    final res = await data.optionsLoader!(widget.category, widget.param);
+    if (!mounted) return;
+    setState(() {
+      _optionsLoading = false;
+      _optionsError = res.error ? res.errorMessage : null;
+      if (!res.error) {
+        options = res.data.where((option) =>
+            !option.notShowWhen.contains(widget.category) &&
+            (option.showWhen == null ||
+                option.showWhen!.contains(widget.category))).toList();
+        optionsValue = options.map((e) => e.options.keys.first).toList();
+      }
+    });
+  }
+
+  Widget _buildOptionsStatus() {
+    if (_optionsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(_optionsError ?? ""),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _optionsLoading = true;
+                _optionsError = null;
+              });
+              _loadOptions();
+            },
+            child: Text("重试".tl),
+          ),
+        ],
+      ),
+    );
+  }
 
   void findData() {
     for (final source in ComicSource.sources) {
@@ -71,6 +116,10 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     currentParam = widget.param;
     findData();
     super.initState();
+    if (_hasDynamicOptions) {
+      _optionsLoading = true;
+      _loadOptions();
+    }
   }
 
   bool get _isNhentai => source.key == "nhentai";
@@ -209,7 +258,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
                     ? "${selectedCategories.length}个分类"
                     : selectedCategories.firstOrNull ?? widget.category),
           ),
-          commandBar: widget.param != "ca"
+          commandBar: widget.param != "ca" && !_hasDynamicOptions
               ? fluent.CommandBar(
                   primaryItems: [
                     fluent.CommandBarButton(
@@ -261,16 +310,18 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
               ),
             ],
             Expanded(
-              child: _CategoryComicsList(
-                key: ValueKey(
-                    "${selectedCategories.join(',')} with $optionsValue and $currentParam"),
-                loader: data.load,
-                category: selectedCategories.join(','),
-                options: optionsValue,
-                param: currentParam,
-                header: buildOptions(),
-                sourceKey: source.key,
-              ),
+              child: _optionsLoading || _optionsError != null
+                  ? _buildOptionsStatus()
+                  : _CategoryComicsList(
+                      key: ValueKey(
+                          "${selectedCategories.join(',')} with $optionsValue and $currentParam"),
+                      loader: data.load,
+                      category: selectedCategories.join(','),
+                      options: optionsValue,
+                      param: currentParam,
+                      header: buildOptions(),
+                      sourceKey: source.key,
+                    ),
             ),
           ],
         ),
@@ -289,7 +340,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
                   : selectedCategories.firstOrNull ?? widget.category),
         ),
         actions: [
-          if (widget.param != "ca")
+          if (widget.param != "ca" && !_hasDynamicOptions)
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
@@ -325,16 +376,18 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
           ],
 
           Expanded(
-            child: _CategoryComicsList(
-              key: ValueKey(
-                  "${selectedCategories.join(',')} with $optionsValue and $currentParam"),
-              loader: data.load,
-              category: selectedCategories.join(','),
-              options: optionsValue,
-              param: currentParam,
-              header: buildOptions(),
-              sourceKey: source.key,
-            ),
+            child: _optionsLoading || _optionsError != null
+                ? _buildOptionsStatus()
+                : _CategoryComicsList(
+                    key: ValueKey(
+                        "${selectedCategories.join(',')} with $optionsValue and $currentParam"),
+                    loader: data.load,
+                    category: selectedCategories.join(','),
+                    options: optionsValue,
+                    param: currentParam,
+                    header: buildOptions(),
+                    sourceKey: source.key,
+                  ),
           ),
         ],
       ),
@@ -422,19 +475,39 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
   Widget buildOptions() {
     List<Widget> children = [];
     for (var optionList in options) {
-      children.add(Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (var option in optionList.options.entries)
-            buildOptionItem(
-              option.value.tl,
-              option.key,
-              options.indexOf(optionList),
-              context,
-            )
-        ],
-      ));
+      if (_hasDynamicOptions && optionList.label.isNotEmpty) {
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text(optionList.label.tl,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        ));
+      }
+      if (_hasDynamicOptions && optionList.options.length > 8) {
+        final group = options.indexOf(optionList);
+        children.add(Select(
+          current: optionList.options[optionsValue[group]]?.tl,
+          values: optionList.options.values.map((e) => e.tl).toList(),
+          onTap: (index) {
+            setState(() {
+              optionsValue[group] = optionList.options.keys.elementAt(index);
+            });
+          },
+        ));
+      } else {
+        children.add(Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var option in optionList.options.entries)
+              buildOptionItem(
+                option.value.tl,
+                option.key,
+                options.indexOf(optionList),
+                context,
+              )
+          ],
+        ));
+      }
       if (options.last != optionList) {
         children.add(const SizedBox(height: 8));
       }

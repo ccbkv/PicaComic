@@ -400,9 +400,17 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
         );
         return false;
       },
-      child: CustomScrollView(
+      child: Scrollbar(
         controller: scrollController,
-        slivers: [
+        interactive: true,
+        thumbVisibility: true,
+        //thickness: App.isMobile ? 12 : null,
+        radius: const Radius.circular(8),
+        child: ScrollConfiguration(
+          behavior: const ScrollBehavior().copyWith(scrollbars: false),
+          child: CustomScrollView(
+            controller: scrollController,
+            slivers: [
         if (!searchMode && !multiSelectMode)
           SliverPersistentHeader(
             pinned: true,
@@ -838,6 +846,8 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
           child: SizedBox(height: bottomInset),
         ),
         ],
+          ),
+        ),
       ),
     );
 

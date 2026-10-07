@@ -499,6 +499,10 @@ DownloadingItem downloadingItemFromMap(
       return NhentaiDownloadingItem.fromMap(
           map, whenFinish, whenError, updateInfo, map["id"]);
     case 6:
+      if (map['archiveUrl'] is String) {
+        return CustomArchiveDownloadingItem.fromMap(
+            map, whenFinish, whenError, updateInfo, map['id']);
+      }
       return CustomDownloadingItem.fromMap(
           map, whenFinish, whenError, updateInfo, map["id"]);
     case 7:
@@ -579,10 +583,22 @@ extension AddDownloadExt on DownloadManager {
     }
   }
 
-  void addCustomDownload(ComicInfoData comic, List<int> downloadEps) {
+  void addCustomDownload(ComicInfoData comic, List<int> downloadEps,
+      {String? archiveUrl}) {
     var id = generateId(comic.sourceKey, comic.comicId);
-    downloading.addLast(CustomDownloadingItem(
-        comic, downloadEps, _onFinish, _onError, _saveInfo, id));
+    if (archiveUrl != null) {
+      final uri = Uri.tryParse(archiveUrl);
+      if (uri == null || uri.host.isEmpty ||
+          !const ['http', 'https'].contains(uri.scheme)) {
+        throw ArgumentError('Invalid archive URL');
+      }
+      if (isExists(id) || downloading.any((item) => item.id == id)) return;
+      downloading.addLast(CustomArchiveDownloadingItem(
+          comic, archiveUrl, _onFinish, _onError, _saveInfo, id));
+    } else {
+      downloading.addLast(CustomDownloadingItem(
+          comic, downloadEps, _onFinish, _onError, _saveInfo, id));
+    }
     _saveInfo();
     if (!isDownloading) {
       downloading.first.start();

@@ -17,6 +17,7 @@ class SetJmComicsOrderController extends StateController{
 class JmSettings extends StatefulWidget {
   const JmSettings(this.popUp, {Key? key}) : super(key: key);
   final bool popUp;
+  static final _checkInRevision = ValueNotifier<int>(0);
 
   @override
   State<JmSettings> createState() => _JmSettingsState();
@@ -85,6 +86,22 @@ class JmSettings extends StatefulWidget {
 class _JmSettingsState extends State<JmSettings> {
   bool autoSelectStream = appdata.settings[15] == "1";
   bool autoCheckIn = appdata.settings[88] == "1";
+
+  @override
+  void initState() {
+    super.initState();
+    JmSettings._checkInRevision.addListener(_syncCheckIn);
+  }
+
+  void _syncCheckIn() {
+    setState(() => autoCheckIn = appdata.settings[88] == "1");
+  }
+
+  @override
+  void dispose() {
+    JmSettings._checkInRevision.removeListener(_syncCheckIn);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,6 +196,7 @@ class _JmSettingsState extends State<JmSettings> {
                 autoCheckIn = b;
               });
               appdata.updateSettings();
+              JmSettings._checkInRevision.value++;
               if (autoCheckIn && jm.isLogin) JmSettings.daily(false);
             },
           ),

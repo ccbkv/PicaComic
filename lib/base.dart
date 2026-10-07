@@ -6,7 +6,6 @@ import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/jm_network/jm_network.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/network/webdav.dart';
-import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/io_tools.dart';
 import 'package:pica_comic/utils/notification.dart';
 import 'package:pica_comic/foundation/history.dart';
@@ -112,7 +111,7 @@ class Appdata {
     "6", //79 下载并行
     "1", //80 启动时检查自定义漫画源的更新
     "0", //81 使用深色背景
-    "111111", //82 内置漫画源启用状态,
+    "000000", //82 内置漫画源启用状态,
     "1", //83 完全隐藏屏蔽的作品
     "0", //84 纯黑色模式
     "www.cdntwice.org,www.cdnsha.org,www.cdnaspa.cc,www.cdnntr.cc", //85 jm api domains
@@ -897,7 +896,8 @@ class _Settings {
     if (index == -1) {
       throw "Not Found";
     }
-    return appdata.settings[82][index] == '1';
+    // Built-in sources remain disabled regardless of saved settings.
+    return false;
   }
 
   void setComicSourceEnabled(String key, bool enabled) {
@@ -905,8 +905,7 @@ class _Settings {
     if (index == -1) {
       throw "Not Found";
     }
-    appdata.settings[82] =
-        appdata.settings[82].setValueAt(enabled ? '1' : '0', index);
+    appdata.settings[82] = '000000';
   }
 
   List<String> get jmApiDomains => appdata.settings[85].split(',');

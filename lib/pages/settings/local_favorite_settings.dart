@@ -60,6 +60,20 @@ class _LocalFavoritesSettingsState extends State<LocalFavoritesSettings> {
             width: 140,
           ),
         ),
+        ListTile(
+          leading: const Icon(Icons.grid_view),
+          title: Text("收藏概览每行显示".tl),
+          subtitle: Text("概览页每行显示的文件夹数量".tl),
+          trailing: components.Select(
+            initialValue: appdata.appSettings.favoritesOverviewColumns - 1,
+            values: const ["1", "2", "3", "4", "5"],
+            onChange: (i) {
+              appdata.appSettings.favoritesOverviewColumns = i + 1;
+              appdata.updateSettings();
+            },
+            width: 140,
+          ),
+        ),
         Padding(
             padding:
                 EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))

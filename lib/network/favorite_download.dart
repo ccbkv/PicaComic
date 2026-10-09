@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
@@ -7,18 +6,7 @@ import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/custom_download_model.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/network/download_model.dart';
-import 'package:pica_comic/network/eh_network/eh_download_model.dart';
-import 'package:pica_comic/network/eh_network/eh_main_network.dart';
-import 'package:pica_comic/network/hitomi_network/hitomi_download_model.dart';
-import 'package:pica_comic/network/hitomi_network/hitomi_main_network.dart';
-import 'package:pica_comic/network/htmanga_network/ht_download_model.dart';
-import 'package:pica_comic/network/htmanga_network/htmanga_main_network.dart';
-import 'package:pica_comic/network/jm_network/jm_download.dart';
-import 'package:pica_comic/network/jm_network/jm_network.dart';
-import 'package:pica_comic/network/nhentai_network/download.dart';
-import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
-import 'package:pica_comic/network/picacg_network/methods.dart';
-import 'package:pica_comic/network/picacg_network/picacg_download_model.dart';
+import 'package:pica_comic/components/components.dart';
 
 class FavoriteDownloading extends DownloadingItem{
   FavoriteDownloading(this.comic, super.whenFinish, super.onError,
@@ -44,6 +32,7 @@ class FavoriteDownloading extends DownloadingItem{
     }
     catch(e, s) {
       Log.error("Download", "$e$s");
+      showToast(message: e.toString());
       onError?.call();
       return;
     }
@@ -54,46 +43,16 @@ class FavoriteDownloading extends DownloadingItem{
   }
 
   Future<DownloadingItem> _createDownloadLogic() async {
-    switch(comic.type.comicSource.key){
-      case "picacg":
-        var comicItem = await PicacgNetwork().getComicInfo(comic.target);
-        return PicDownloadingItem(
-            comicItem.data, List.generate(comicItem.data.eps.length,
-                (index) => index), onFinish, onError, updateInfo, id);
-      case "ehentai":
-        var gallery = await EhNetwork().getGalleryInfo(comic.target);
-        return EhDownloadingItem(gallery.data,
-            onFinish, onError, updateInfo, id, 0);
-      case "jm":
-        var jmComic = await JmNetwork().getComicInfo(comic.target);
-        var downloadedEp = List.generate(jmComic.data.epNames.length, (index) => index);
-        if(downloadedEp.isEmpty) {
-          downloadedEp.add(0);
-        }
-        return JmDownloadingItem(jmComic.data, downloadedEp,
-            onFinish, onError, updateInfo, id);
-      case "hitomi":
-        var hitomiComic = await HiNetwork().getComicInfo(comic.target);
-        return HitomiDownloadingItem(hitomiComic.data,
-            comic.coverPath, comic.target, onFinish, onError, updateInfo, id);
-      case "htmanga":
-        var htComic = await HtmangaNetwork().getComicInfo(comic.target);
-        return DownloadingHtComic(htComic.data, onFinish, onError, updateInfo, id);
-      case "nhentai":
-        var nhComic = await NhentaiNetwork().getComicInfo(comic.target);
-        return NhentaiDownloadingItem(nhComic.data, onFinish, onError, updateInfo, id);
-      default:
-        var comicSource = comic.type.comicSource;
-        if (comicSource.loadComicInfo == null) {
-          throw Exception(
-              "Comic source ${comicSource.name} does not support loading comic info");
-        }
-        var comicInfoData = await comicSource.loadComicInfo!(comic.target);
-        var downloadedCustomEp = List.generate(
-            comicInfoData.data.chapters?.length ?? 0, (index) => index);
-        return CustomDownloadingItem(comicInfoData.data, downloadedCustomEp,
-            onFinish, onError, updateInfo, id);
+    final source = comic.type.comicSource;
+    if (source.isBuiltIn) throw "Comic Source Not Found: ${source.key}";
+    if (source.loadComicInfo == null || source.loadComicPages == null) {
+      throw "Comic source ${source.name} does not support downloading";
     }
+    final res = await source.loadComicInfo!(comic.target);
+    if (res.error) throw res.errorMessageWithoutNull;
+    final eps = List.generate(res.data.chapters?.length ?? 0, (i) => i);
+    return CustomDownloadingItem(res.data, eps, onFinish, onError, updateInfo,
+        DownloadManager().generateId(source.key, res.data.comicId));
   }
 
   @override

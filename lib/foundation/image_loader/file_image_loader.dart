@@ -1,4 +1,5 @@
 import 'dart:async' show Future;
+import 'dart:io' show Platform;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +40,14 @@ class FileImageProvider extends ImageProvider<FileImageProvider> {
       // The file may become available later.
       PaintingBinding.instance.imageCache.evict(key);
       throw StateError('$file is empty and cannot be loaded as an image.');
+    }
+    if (Platform.isWindows) {
+      // Workaround: ImmutableBuffer.fromFilePath uses fopen() with an ANSI
+      // path, so it fails when the path exceeds MAX_PATH (260) or contains
+      // characters outside the system code page. dart:io reads via
+      // wide-character APIs with long-path support, so load bytes manually.
+      final bytes = await file.readAsBytes();
+      return decode(await ImmutableBuffer.fromUint8List(bytes));
     }
     return decode(await ImmutableBuffer.fromFilePath(file.path));
   }

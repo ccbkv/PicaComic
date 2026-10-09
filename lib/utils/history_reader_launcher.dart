@@ -1,18 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:pica_comic/base.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/app_page_route.dart';
-import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/history.dart';
-import 'package:pica_comic/network/eh_network/eh_main_network.dart';
-import 'package:pica_comic/network/hitomi_network/hitomi_main_network.dart';
-import 'package:pica_comic/network/htmanga_network/htmanga_main_network.dart';
-import 'package:pica_comic/network/jm_network/jm_network.dart';
-import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
-import 'package:pica_comic/network/picacg_network/methods.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/utils/translations.dart';
 
@@ -104,98 +96,16 @@ Future<Widget?> buildHistoryReaderPage({
   final historyType = HistoryType(type);
 
   try {
-    if (historyType == HistoryType.picacg) {
-      final res = await PicacgNetwork().getComicInfo(target);
-      if (res.error) {
-        showToast(message: res.errorMessageWithoutNull);
-        return null;
-      }
-      final comic = res.data;
-      return ComicReadingPage.picacg(
-        target,
-        readEp,
-        comic.eps,
-        comic.title,
-        initialPage: readPage,
-        historySubTitle: comic.subTitle,
-        historyCover: comic.cover,
-      );
-    }
-
-    if (historyType == HistoryType.ehentai) {
-      final res =
-          await EhNetwork().getGalleryInfo(target, appdata.settings[47] == '1');
-      if (res.error) {
-        showToast(message: res.errorMessageWithoutNull);
-        return null;
-      }
-      return ComicReadingPage.ehentai(res.data, initialPage: readPage);
-    }
-
-    if (historyType == HistoryType.jmComic) {
-      final res = await JmNetwork().getComicInfo(target);
-      if (res.error) {
-        showToast(message: res.errorMessageWithoutNull);
-        return null;
-      }
-      return ComicReadingPage.jmComic(
-        res.data,
-        readEp,
-        initialPage: readPage,
-      );
-    }
-
-    if (historyType == HistoryType.hitomi) {
-      final res = await HiNetwork().getComicInfo(target);
-      if (res.error) {
-        showToast(message: res.errorMessageWithoutNull);
-        return null;
-      }
-      return ComicReadingPage.hitomi(
-        res.data,
-        target,
-        initialPage: readPage,
-      );
-    }
-
-    if (historyType == HistoryType.htmanga) {
-      final res = await HtmangaNetwork().getComicInfo(target);
-      if (res.error) {
-        showToast(message: res.errorMessageWithoutNull);
-        return null;
-      }
-      final comic = res.data;
-      return ComicReadingPage.htmanga(
-        comic.target,
-        comic.title,
-        initialPage: readPage,
-        historySubTitle: comic.subTitle,
-        historyCover: comic.cover,
-      );
-    }
-
-    if (historyType == HistoryType.nhentai) {
-      final res = await NhentaiNetwork().getComicInfo(target);
-      if (res.error) {
-        showToast(message: res.errorMessageWithoutNull);
-        return null;
-      }
-      final comic = res.data;
-      return ComicReadingPage.nhentai(
-        comic.target,
-        comic.title,
-        initialPage: readPage,
-        historySubTitle: comic.subTitle,
-        historyCover: comic.cover,
-      );
-    }
-
     final source = historyType.comicSource;
-    if (source?.loadComicInfo == null) {
-      showToast(message: 'Comic Source Not Found');
+    if (source == null || source.isBuiltIn) {
+      showToast(message: '请先添加对应漫画源'.tl);
       return null;
     }
-    final res = await source!.loadComicInfo!(target);
+    if (source.loadComicInfo == null || source.loadComicPages == null) {
+      showToast(message: '漫画源不支持阅读'.tl);
+      return null;
+    }
+    final res = await source.loadComicInfo!(target);
     if (res.error) {
       showToast(message: res.errorMessageWithoutNull);
       return null;
@@ -203,9 +113,9 @@ Future<Widget?> buildHistoryReaderPage({
     final comic = res.data;
     return ComicReadingPage(
       CustomReadingData(
-        comic.target,
+        target,
         comic.title,
-        ComicSource.find(source.key),
+        source,
         comic.chapters,
         historySubTitle: comic.subTitle ?? '',
         historyCover: comic.cover,

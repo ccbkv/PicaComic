@@ -1,7 +1,13 @@
 part of pica_settings;
 
 class ComicSourceSettings extends StatefulWidget {
-  const ComicSourceSettings({super.key});
+  const ComicSourceSettings({super.key, this.onBack, this.showHeader = true});
+
+  /// 覆盖头部返回键行为 (嵌入设置页时返回分类列表, 而非退出整个路由)
+  final VoidCallback? onBack;
+
+  /// 是否显示自带的固定头部 (Fluent 嵌入模式下由外层 PageHeader 提供标题)
+  final bool showHeader;
 
   @override
   State<ComicSourceSettings> createState() => _ComicSourceSettingsState();
@@ -56,13 +62,15 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _ComicSourceAppBarDelegate(
-              title: "漫画源".tl,
-              topPadding: MediaQuery.of(context).padding.top,
+          if (widget.showHeader)
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _ComicSourceAppBarDelegate(
+                title: "漫画源".tl,
+                topPadding: MediaQuery.of(context).padding.top,
+                onBack: widget.onBack,
+              ),
             ),
-          ),
           buildCard(context),
           _SliverBuiltInSources(
             onAdd: handleAddSource,
@@ -859,7 +867,7 @@ class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
         ),
         SliverToBoxAdapter(
           child: ListTile(
-            title: Text("常用漫画源".tl),
+            title: Text("常用漫画源(github)".tl),
           ),
         ),
         SliverList(
@@ -1519,10 +1527,12 @@ void _addAllPagesWithComicSource(ComicSource source) {
 class _ComicSourceAppBarDelegate extends SliverPersistentHeaderDelegate {
   final String title;
   final double topPadding;
+  final VoidCallback? onBack;
 
   _ComicSourceAppBarDelegate({
     required this.title,
     required this.topPadding,
+    this.onBack,
   });
 
   @override
@@ -1537,7 +1547,7 @@ class _ComicSourceAppBarDelegate extends SliverPersistentHeaderDelegate {
             const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: onBack ?? () => Navigator.of(context).pop(),
             ),
             const SizedBox(width: 16),
             Expanded(

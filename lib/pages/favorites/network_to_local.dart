@@ -3,8 +3,6 @@ import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
-import 'package:pica_comic/network/eh_network/eh_main_network.dart';
-import 'package:pica_comic/network/eh_network/eh_models.dart';
 import 'package:pica_comic/network/net_fav_to_local.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/components/components.dart';
@@ -22,40 +20,15 @@ class _ChooseNetworkFolderWidget extends StatefulWidget {
 }
 
 class LoadComicClass {
-  NetToLocalEhPageData data = NetToLocalEhPageData();
-
   Future<Res<List<BaseComic>>> loadComic(
-      FavoriteData fData, int i, String folder) async {
-    if (fData.key == "ehentai") {
-      if (data.galleries == null) {
-        Res<Galleries> res = await EhNetwork().getGalleries(
-            "${EhNetwork().ehBaseUrl}/favorites.php?favcat=$folder",
-            favoritePage: true);
-        if (res.error) {
-          return Res(null, errorMessage: res.errorMessage);
-        } else {
-          data.galleries = res.data;
-          data.comics[1] = [];
-          data.comics[1]!.addAll(data.galleries!.galleries);
-          data.galleries!.galleries.clear();
-        }
-      }
-      if (data.comics[i] != null) {
-        return Res(data.comics[i]!);
-      } else {
-        while (data.comics[i] == null) {
-          data.page++;
-          if (!await EhNetwork().getNextPageGalleries(data.galleries!)) {
-            return Res(null, errorMessage: "网络错误".tl);
-          }
-          data.comics[data.page] = [];
-          data.comics[data.page]!.addAll(data.galleries!.galleries);
-          data.galleries!.galleries.clear();
-        }
-        return Res(data.comics[i]);
-      }
+      FavoriteData fData, int i, String? folder) async {
+    final source = ComicSource.find(fData.key);
+    if (source == null || source.isBuiltIn) {
+      return Res.error("请先添加对应漫画源".tl);
     }
-    return fData.loadComic(i, folder);
+    final favorites = source.favoriteData;
+    if (favorites == null) return Res.error("漫画源不支持网络收藏".tl);
+    return favorites.loadComic(i, favorites.multiFolder ? folder : null);
   }
 }
 
@@ -68,16 +41,16 @@ class _ChooseNetworkFolderWidgetState
   String? selected;
   bool agreeSync = false;
 
-  Map<String, Map<String, String>> multiFolderData = {
-    "ehentai": Map.fromIterables(
-        List.generate(10, (index) => index.toString()), EhNetwork().folderNames)
-  };
+  Map<String, Map<String, String>> multiFolderData = {};
 
   @override
   void initState() {
     var folders = <FavoriteData>[];
     for (var key in appdata.settings[68].split(',')) {
-      folders.add(getFavoriteData(key));
+      final source = ComicSource.find(key);
+      if (source != null && !source.isBuiltIn && source.favoriteData != null) {
+        folders.add(source.favoriteData!);
+      }
     }
     _folders = folders;
     isExpanded = _folders.map((e) => false).toList();
@@ -100,7 +73,9 @@ class _ChooseNetworkFolderWidgetState
         children: [
           Expanded(
             child: SingleChildScrollView(
-              child: ExpansionPanelList(
+              child: _folders.isEmpty
+                  ? Text("请先添加支持网络收藏的漫画源".tl)
+                  : ExpansionPanelList(
                 materialGapSize: 0,
                 expandedHeaderPadding: EdgeInsets.zero,
                 expansionCallback: (i, value) =>
@@ -128,7 +103,8 @@ class _ChooseNetworkFolderWidgetState
                     }),
                 Text("支持下拉更新".tl),
                 const Spacer(),
-                FilledButton(onPressed: onConfirm, child: Text("继续".tl)),
+                FilledButton(onPressed: selected == null ? null : onConfirm,
+                    child: Text("继续".tl)),
                 const SizedBox(
                   width: 24,
                 ),
@@ -174,6 +150,7 @@ class _ChooseNetworkFolderWidgetState
         if (multiFolderData[data.key] == null) {
           if (isExpanded[_folders.indexOf(data)]) {
             data.loadFolders!().then((value) {
+              if (!mounted) return;
               if (value.error) {
                 showToast(message: "网络错误".tl);
               } else {
@@ -212,7 +189,7 @@ class _ChooseNetworkFolderWidgetState
       name = data.title;
     } else {
       name = multiFolderData[data.key]![folderId]!;
-      if (data.key == "ehentai") {
+      if (data.key == "ehentai" && name.contains("(")) {
         name = name.substring(0, name.lastIndexOf("("));
       }
     }
@@ -234,8 +211,3 @@ void networkToLocal() {
   showPopUpWidget(App.globalContext!, const _ChooseNetworkFolderWidget());
 }
 
-class NetToLocalEhPageData {
-  Galleries? galleries;
-  int page = 1;
-  Map<int, List<EhGalleryBrief>> comics = {};
-}

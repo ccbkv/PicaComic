@@ -19,7 +19,6 @@ import 'package:pica_comic/network/nhentai_network/download.dart';
 import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/downloaded_comic_comments_page.dart';
-import 'package:pica_comic/pages/picacg/comic_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/io_extensions.dart';
@@ -28,24 +27,17 @@ import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/utils/pdf.dart';
 import 'package:pica_comic/utils/tags_translation.dart';
 import 'package:pica_comic/pages/downloading_page.dart';
-import 'package:pica_comic/pages/ehentai/eh_gallery_page.dart';
-import 'package:pica_comic/pages/hitomi/hitomi_comic_page.dart';
-import 'package:pica_comic/pages/jm/jm_comic_page.dart';
-import 'package:pica_comic/pages/nhentai/comic_page.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/network/eh_network/eh_download_model.dart';
 import 'package:pica_comic/network/jm_network/jm_download.dart';
-import 'package:pica_comic/network/jm_network/jm_network.dart';
 import 'package:pica_comic/network/picacg_network/picacg_download_model.dart';
-import 'package:pica_comic/network/picacg_network/methods.dart';
 import 'dart:io';
 import 'package:pica_comic/utils/show_delayed_dialog.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
-import 'htmanga/ht_comic_page.dart';
 
 enum DownloadSortType {
   time(0),
@@ -144,7 +136,7 @@ extension ReadComic on DownloadedItem {
         0,
         null,
         comic.sourceKey,
-        comic.id.replaceFirst("${comic.sourceKey}-", ""),
+        comic.comicId,
       );
       var history = await History.findOrCreate(data);
       App.globalTo(
@@ -305,16 +297,11 @@ class DownloadPageLogic extends StateController {
       filteredComics = List.from(baseComics);
     } else {
       filteredComics = baseComics.where((comic) {
-        // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
-        if (comic is DownloadedComic) {
-          return comic.comicItem.categories.any((c) =>
-              c.toLowerCase().contains(categoryKeyword.toLowerCase()) ||
-              c.translateTagsToCN
-                  .toLowerCase()
-                  .contains(categoryKeyword.toLowerCase()));
-        }
-        // 对于其他类型的DownloadedItem，暂时不进行分类搜索
-        return false;
+        return comic._displayCategories.any((c) =>
+            c.toLowerCase().contains(categoryKeyword.toLowerCase()) ||
+            c.translateTagsToCN
+                .toLowerCase()
+                .contains(categoryKeyword.toLowerCase()));
       }).toList();
       print('找到 ${filteredComics.length} 个匹配的漫画');
     }
@@ -482,7 +469,7 @@ class DownloadPageLogic extends StateController {
     // 应用类型筛选
     if (downloadTypeFilter != null) {
       filteredComics = filteredComics
-          .where((comic) => comic.type == downloadTypeFilter)
+          .where((comic) => comic._displayType == downloadTypeFilter)
           .toList();
     }
 
@@ -501,6 +488,31 @@ class DownloadPageLogic extends StateController {
 
     resetSelected(comics.length);
   }
+}
+
+// Classify script records for this page without changing their download type.
+extension _DownloadedItemDisplay on DownloadedItem {
+  DownloadType get _displayType {
+    final comic = this;
+    if (comic is CustomDownloadedItem) {
+      return switch (comic.sourceKey) {
+        'picacg' => DownloadType.picacg,
+        'ehentai' => DownloadType.ehentai,
+        'jm' => DownloadType.jm,
+        'hitomi' => DownloadType.hitomi,
+        'htmanga' => DownloadType.htmanga,
+        'nhentai' => DownloadType.nhentai,
+        _ => DownloadType.other,
+      };
+    }
+    return type;
+  }
+
+  List<String> get _displayCategories => switch (this) {
+        DownloadedComic comic => List.of(comic.comicItem.categories),
+        CustomDownloadedItem comic => List.of(comic.categories),
+        _ => <String>[],
+      };
 }
 
 /// 获取下载类型的显示名称
@@ -1277,18 +1289,11 @@ class _DownloadPageState extends State<DownloadPage> {
           fullResultComics = logic.baseComics;
         } else {
           fullResultComics = logic.baseComics.where((comic) {
-            // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
-            if (comic is DownloadedComic) {
-              return comic.comicItem.categories.any((c) =>
-                  c
-                      .toLowerCase()
-                      .contains(logic.categoryKeyword.toLowerCase()) ||
-                  c.translateTagsToCN
-                      .toLowerCase()
-                      .contains(logic.categoryKeyword.toLowerCase()));
-            }
-            // 对于其他类型的DownloadedItem，暂时不进行分类搜索
-            return false;
+            return comic._displayCategories.any((c) =>
+                c.toLowerCase().contains(logic.categoryKeyword.toLowerCase()) ||
+                c.translateTagsToCN
+                    .toLowerCase()
+                    .contains(logic.categoryKeyword.toLowerCase()));
           }).toList();
         }
       } else if (logic.searchMode) {
@@ -1310,7 +1315,8 @@ class _DownloadPageState extends State<DownloadPage> {
         // 默认使用所有漫画
         if (logic.downloadTypeFilter != null) {
           fullResultComics = logic.baseComics
-              .where((element) => element.type == logic.downloadTypeFilter)
+              .where((element) =>
+                  element._displayType == logic.downloadTypeFilter)
               .toList();
         } else {
           fullResultComics = logic.baseComics;
@@ -1355,18 +1361,11 @@ class _DownloadPageState extends State<DownloadPage> {
           logic.comics = logic.baseComics.toList();
         } else {
           logic.comics = logic.baseComics.where((comic) {
-            // 检查是否是DownloadedComic类型，如果是，则访问其comicItem.categories
-            if (comic is DownloadedComic) {
-              return comic.comicItem.categories.any((c) =>
-                  c
-                      .toLowerCase()
-                      .contains(logic.categoryKeyword.toLowerCase()) ||
-                  c.translateTagsToCN
-                      .toLowerCase()
-                      .contains(logic.categoryKeyword.toLowerCase()));
-            }
-            // 对于其他类型的DownloadedItem，暂时不进行分类搜索
-            return false;
+            return comic._displayCategories.any((c) =>
+                c.toLowerCase().contains(logic.categoryKeyword.toLowerCase()) ||
+                c.translateTagsToCN
+                    .toLowerCase()
+                    .contains(logic.categoryKeyword.toLowerCase()));
           }).toList();
         }
       } else if (logic.searchMode) {
@@ -1386,7 +1385,11 @@ class _DownloadPageState extends State<DownloadPage> {
         }
       } else {
         // 默认使用所有漫画
-        logic.comics = logic.baseComics.toList();
+        logic.comics = logic.baseComics
+            .where((comic) =>
+                logic.downloadTypeFilter == null ||
+                comic._displayType == logic.downloadTypeFilter)
+            .toList();
       }
     }
 
@@ -1503,15 +1506,14 @@ class _DownloadPageState extends State<DownloadPage> {
     bool selected = logic.selected[index];
     var type = logic.comics[index].type.name;
     if (logic.comics[index].type == DownloadType.other) {
-      type = (logic.comics[index] as CustomDownloadedItem).sourceName;
+      final comic = logic.comics[index] as CustomDownloadedItem;
+      type = comic._displayType == DownloadType.other
+          ? comic.sourceName
+          : getDownloadTypeName(comic._displayType);
     }
 
     // 获取分类信息
-    List<String>? categories;
-    if (logic.comics[index].type == DownloadType.picacg) {
-      categories =
-          (logic.comics[index] as DownloadedComic).comicItem.categories;
-    }
+    final categories = logic.comics[index]._displayCategories;
 
     return Padding(
       padding: const EdgeInsets.all(2),
@@ -2482,82 +2484,87 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
   Future<void> _fetchLatestEps() async {
     setState(() => _loadingEps = true);
     try {
+      if (comic is! DownloadedComic && comic is! DownloadedJmComic &&
+          comic is! CustomDownloadedItem) {
+        return;
+      }
+      final source = ComicSource.find(ComicCommentsHelper.getSourceKey(comic));
+      if (source == null || source.isBuiltIn) {
+        showToast(message: '请先添加对应漫画源'.tl);
+        return;
+      }
+      if (source.loadComicInfo == null) {
+        showToast(message: '漫画源不支持加载详情'.tl);
+        return;
+      }
+      final res = await source.loadComicInfo!(ComicCommentsHelper.getComicId(comic));
+      if (!mounted) return;
+      if (res.error) throw res.errorMessageWithoutNull;
+      if (!identical(source, ComicSource.find(source.key))) {
+        throw '请先添加对应漫画源'.tl;
+      }
+      final newChapters = res.data.chapters;
+      if (newChapters == null || newChapters.length == 0) return;
       if (comic is DownloadedComic) {
         var c = comic as DownloadedComic;
-        var res = await network.getEps(c.id);
-        if (!res.error && res.data.isNotEmpty) {
-          var newEps = res.data;
-          var oldEps = c.eps;
-          setState(() {
-            _refreshVisibleEpisodes(allEps: newEps);
-            _loadingEps = false;
-          });
-          if (!_listEquals(newEps, oldEps)) {
-            c.chapters = newEps;
-            _persistComic(c);
-          }
-          return;
+        var newEps = newChapters.titles.toList();
+        var oldEps = c.eps;
+        setState(() {
+          _refreshVisibleEpisodes(allEps: newEps);
+        });
+        if (!_listEquals(newEps, oldEps)) {
+          c.chapters = newEps;
+          _persistComic(c);
         }
       } else if (comic is DownloadedJmComic) {
         var c = comic as DownloadedJmComic;
-        var res = await jmNetwork.getComicInfo(c.comic.id);
-        if (!res.error) {
-          var info = res.data;
-          var newEps = info.epNames.isEmpty
-              ? List<String>.generate(
-                  info.series.isEmpty ? 1 : info.series.length,
-                  (index) => "第${index + 1}章")
-              : info.epNames;
-          var oldEps = c.eps;
-          setState(() {
-            _refreshVisibleEpisodes(allEps: newEps);
-            _loadingEps = false;
-          });
-          if (!_listEquals(newEps, oldEps)) {
-            c.comic.epNames = info.epNames;
-            c.comic.series = info.series;
-            _persistComic(c);
+        final ids = newChapters.ids.toList();
+        for (final old in c.comic.series.entries) {
+          if (ids.elementAtOrNull(old.key - 1) != old.value) {
+            throw '章节顺序已变化，已保留旧下载章节'.tl;
           }
-          return;
+        }
+        var newEps = newChapters.titles.toList();
+        var oldEps = c.eps;
+        setState(() {
+          _refreshVisibleEpisodes(allEps: newEps);
+        });
+        if (!_listEquals(newEps, oldEps) || c.comic.series.length != ids.length) {
+          c.comic.epNames = newEps;
+          c.comic.series = {
+            for (int i = 0; i < ids.length; i++) i + 1: ids[i],
+          };
+          _persistComic(c);
         }
       } else if (comic is CustomDownloadedItem) {
         var c = comic as CustomDownloadedItem;
-        var source = ComicSource.find(c.sourceKey);
-        if (source?.loadComicInfo != null) {
-          var res = await source!.loadComicInfo!(c.comicId);
-          if (!res.error && res.data!.chapters != null) {
-            var newChapters = res.data!.chapters;
-            var newEps = newChapters!.titles.toList();
-            var oldEps = c.eps;
-            setState(() {
-              _refreshVisibleEpisodes(
-                allEps: newEps,
-                chapters: newChapters,
-              );
-              _buildTabController();
-              _loadingEps = false;
-            });
-            bool epsChanged = !_listEquals(newEps, oldEps);
-            bool subIdMissing = c.subId == null && res.data!.subId != null;
-            if (epsChanged || subIdMissing) {
-              var json = c.toJson();
-              if (epsChanged) {
-                json["chapters"] = newChapters.toJson();
-              }
-              if (res.data!.subId != null) {
-                json["subId"] = res.data!.subId;
-              }
-              var updated = CustomDownloadedItem.fromJson(json);
-              updated.time = c.time;
-              updated.directory = c.directory;
-              _persistComic(updated);
-            }
-            return;
+        var newEps = newChapters.titles.toList();
+        var oldEps = c.eps;
+        setState(() {
+          _refreshVisibleEpisodes(allEps: newEps, chapters: newChapters);
+          _buildTabController();
+        });
+        bool epsChanged = !_listEquals(newEps, oldEps);
+        bool subIdMissing = c.subId == null && res.data.subId != null;
+        if (epsChanged || subIdMissing) {
+          var json = c.toJson();
+          if (epsChanged) {
+            json["chapters"] = newChapters.toJson();
           }
+          if (res.data.subId != null) {
+            json["subId"] = res.data.subId;
+          }
+          var updated = CustomDownloadedItem.fromJson(json);
+          updated.time = c.time;
+          updated.directory = c.directory;
+          _persistComic(updated);
         }
       }
-    } catch (_) {}
-    setState(() => _loadingEps = false);
+    } catch (e) {
+      if (mounted) showToast(message: e.toString());
+    } finally {
+      if (mounted) setState(() => _loadingEps = false);
+    }
   }
 
   void _refreshVisibleEpisodes({
@@ -2937,17 +2944,19 @@ class DownloadedComicTile extends ComicTile {
 void _toComicInfoPage(DownloadedItem comic) {
   var context = App.mainNavigatorKey!.currentContext!;
   if (comic is DownloadedComic) {
-    context.to(() => PicacgComicPage((comic).comicItem.id, null));
+    context.to(() => ComicPage(sourceKey: 'picacg', id: comic.comicItem.id));
   } else if (comic is DownloadedGallery) {
-    context.to(() => EhGalleryPage((comic).gallery.toBrief()));
+    context.to(() => ComicPage(sourceKey: 'ehentai', id: comic.gallery.link));
   } else if (comic is DownloadedJmComic) {
-    context.to(() => JmComicPage((comic).comic.id));
+    context.to(() => ComicPage(sourceKey: 'jm', id: comic.comic.id));
   } else if (comic is DownloadedHitomiComic) {
-    context.to(() => HitomiComicPage(comic.toBrief()));
+    context.to(() => ComicPage(sourceKey: 'hitomi', id: comic.comic.id));
   } else if (comic is DownloadedHtComic) {
-    context.to(() => HtComicPage(comic.id.replaceFirst('Ht', '')));
+    context.to(() => ComicPage(
+        sourceKey: 'htmanga', id: comic.id.replaceFirst('Ht', '')));
   } else if (comic is NhentaiDownloadedComic) {
-    context.to(() => NhentaiComicPage(comic.id.replaceFirst("nhentai", "")));
+    context.to(() => ComicPage(
+        sourceKey: 'nhentai', id: comic.id.replaceFirst("nhentai", "")));
   } else if (comic is CustomDownloadedItem) {
     context.to(() => ComicPage(sourceKey: comic.sourceKey, id: comic.comicId));
   }

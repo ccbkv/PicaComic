@@ -1,12 +1,9 @@
 import 'package:pica_comic/base.dart';
+import 'package:pica_comic/components/components.dart' show showToast;
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/network/download_model.dart';
-import 'package:pica_comic/network/eh_network/eh_main_network.dart';
-import 'package:pica_comic/network/jm_network/jm_network.dart';
-import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/network/nhentai_network/download.dart';
-import 'package:pica_comic/network/picacg_network/methods.dart';
-import 'package:pica_comic/network/picacg_network/models.dart' as pica;
 import 'package:pica_comic/network/picacg_network/picacg_download_model.dart';
 import 'package:pica_comic/network/jm_network/jm_download.dart';
 import 'package:pica_comic/network/eh_network/eh_download_model.dart';
@@ -66,101 +63,26 @@ class ComicCommentsHelper {
   static Future<List<Map<String, dynamic>>?> fetchForDownloadedItem(
       DownloadedItem item) async {
     try {
-      if (item is DownloadedComic) {
-        return await _fetchPicacg(item.id);
-      } else if (item is DownloadedJmComic) {
-        return await _fetchJm(item.comic.id);
-      } else if (item is DownloadedGallery) {
-        return await _fetchEh(item.gallery.link);
-      } else if (item is NhentaiDownloadedComic) {
-        return await _fetchNhentai(item.comicID);
-      } else if (item is CustomDownloadedItem) {
-        var source = ComicSource.find(item.sourceKey);
-        if (source?.commentsLoader == null) return null;
-        return await _fetchCustom(source!, item.comicId, item.subId);
+      final source = ComicSource.find(getSourceKey(item));
+      if (source == null || source.isBuiltIn) {
+        showToast(message: '请先添加对应漫画源'.tl);
+        return null;
       }
+      if (source.commentsLoader == null) {
+        showToast(message: '漫画源不支持评论'.tl);
+        return null;
+      }
+      final id = item is DownloadedGallery
+          ? item.gallery.link
+          : item is NhentaiDownloadedComic
+              ? item.comicID.replaceFirst(RegExp(r'^nhentai'), '')
+              : getComicId(item);
+      return await _fetchCustom(
+          source, id, item is CustomDownloadedItem ? item.subId : null);
     } catch (e) {
+      showToast(message: e.toString());
       return null;
     }
-    return null;
-  }
-
-  /// picacg: 分页拉取全部评论
-  static Future<List<Map<String, dynamic>>> _fetchPicacg(String id) async {
-    var comments = pica.Comments([], id, 1, 0);
-    var firstRes = await network.loadMoreCommends(comments);
-    if (firstRes.error) return [];
-    while (comments.loaded != comments.pages) {
-      var res = await network.loadMoreCommends(comments);
-      if (res.error) break;
-    }
-    return comments.comments
-        .map((c) => <String, dynamic>{
-              'userName': c.name,
-              'content': c.text,
-              'time': c.time,
-            })
-        .toList();
-  }
-
-  /// jm: 分页拉取全部评论 (含回复)
-  static Future<List<Map<String, dynamic>>> _fetchJm(String id) async {
-    var allComments = <Map<String, dynamic>>[];
-    var page = 1;
-    var total = -1;
-    while (true) {
-      var res = await jmNetwork.getComment(id, page);
-      if (res.error) break;
-      if (total < 0) total = res.subData ?? 0;
-      for (var c in res.data) {
-        allComments.add({
-          'userName': c.name,
-          'content': c.content,
-          'time': c.time,
-        });
-        for (var r in c.reply) {
-          allComments.add({
-            'userName': r.name,
-            'content': r.content,
-            'time': r.time,
-            'replyTo': c.name,
-          });
-        }
-      }
-      if (res.data.isEmpty) break;
-      if (total > 0 && allComments.length >= total) break;
-      page++;
-    }
-    return allComments;
-  }
-
-  /// ehentai: 一次性拉取全部评论
-  static Future<List<Map<String, dynamic>>> _fetchEh(String url) async {
-    var res = await EhNetwork().getComments(url);
-    if (res.error) return [];
-    return res.data
-        .map((c) => <String, dynamic>{
-              'userName': c.name,
-              'content': c.content,
-              'time': c.time,
-            })
-        .toList();
-  }
-
-  /// nhentai: 一次性拉取全部评论
-  static Future<List<Map<String, dynamic>>> _fetchNhentai(String id) async {
-    var res = await NhentaiNetwork().getComments(id);
-    if (res.error) return [];
-    return res.data
-        .map((c) => <String, dynamic>{
-              'userName': c.userName,
-              'content': c.content,
-              'time': c.date > 0
-                  ? DateTime.fromMillisecondsSinceEpoch(c.date * 1000)
-                      .toIso8601String()
-                  : null,
-            })
-        .toList();
   }
 
   /// 自定义源: 分页拉取全部评论
@@ -170,14 +92,45 @@ class ComicCommentsHelper {
     var page = 1;
     int? maxPage;
     while (true) {
+      if (!identical(source, ComicSource.find(source.key))) {
+        throw '请先添加对应漫画源'.tl;
+      }
       var res = await source.commentsLoader!(comicId, subId, page, null);
-      if (res.error) break;
-      allComments.addAll(res.data.map((c) => <String, dynamic>{
-            'userName': c.userName,
-            'content': c.content,
-            'time': c.time,
-          }));
-      if (maxPage == null) maxPage = res.subData;
+      if (res.error) throw res.errorMessageWithoutNull;
+      for (final c in res.data) {
+        allComments.add(<String, dynamic>{
+          'userName': c.userName,
+          'content': c.content,
+          'time': c.time,
+        });
+        if ((c.replyCount ?? 0) > 0 && (c.id?.isNotEmpty ?? false)) {
+          int replyPage = 1;
+          int received = 0;
+          while (received < c.replyCount!) {
+            if (!identical(source, ComicSource.find(source.key))) {
+              throw '请先添加对应漫画源'.tl;
+            }
+            final replies = await source.commentsLoader!(
+                comicId, subId, replyPage, c.id);
+            if (replies.error) throw replies.errorMessageWithoutNull;
+            for (final reply in replies.data) {
+              allComments.add({
+                'userName': reply.userName,
+                'content': reply.content,
+                'time': reply.time,
+                'replyTo': c.userName,
+              });
+            }
+            received += replies.data.length;
+            if (replies.data.isEmpty ||
+                (replies.subData is int && replyPage >= replies.subData)) {
+              break;
+            }
+            replyPage++;
+          }
+        }
+      }
+      maxPage ??= res.subData;
       if (res.data.isEmpty) break;
       if (maxPage != null && page >= maxPage) break;
       page++;

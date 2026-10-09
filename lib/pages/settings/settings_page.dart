@@ -953,10 +953,10 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> implements PopEntry {
-  static const int _aboutPageIndex = 6;
-  static const int _appUpdaterHistoryIndex = 7;
-  static const int _fileManagerIndex = 8;
-  static const int _debugPageIndex = 9;
+  static const int _aboutPageIndex = 7;
+  static const int _appUpdaterHistoryIndex = 8;
+  static const int _fileManagerIndex = 9;
+  static const int _debugPageIndex = 10;
 
   int currentPage = -1;
 
@@ -969,6 +969,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
   final categories = <String>[
     "浏览",
+    "漫画源",
     "阅读",
     "外观",
     "本地收藏",
@@ -982,6 +983,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
   final icons = <IconData>[
     Icons.explore,
+    Icons.source,
     Icons.book,
     Icons.color_lens,
     Icons.collections_bookmark_rounded,
@@ -1118,11 +1120,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
             ),
             title: Text(categories[currentPage].tl),
           ),
-          content: fluent.ScaffoldPage.scrollable(
-            children: [
-              buildFluentRight(currentPage),
-            ],
-          ),
+          content: _buildFluentPane(currentPage),
         );
       }
     }
@@ -1135,15 +1133,22 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           return fluent.PaneItem(
             icon: Icon(icons[index]),
             title: Text(categories[index].tl),
-            body: fluent.ScaffoldPage.scrollable(
-              children: [
-                buildFluentRight(index),
-              ],
-            ),
+            body: _buildFluentPane(index),
           );
         }),
       ),
     );
+  }
+
+  /// Fluent 模式的面板包装: 完整 Scaffold 页面 (漫画源/文件管理器) 不能放入
+  /// scrollable (ListView 给子项无界高度, 会导致 infinite size 崩溃),
+  /// 需改用有界约束的 ScaffoldPage.content
+  Widget _buildFluentPane(int index) {
+    final content = buildFluentRight(index);
+    if (index == 1 || index == _fileManagerIndex) {
+      return fluent.ScaffoldPage(content: content);
+    }
+    return fluent.ScaffoldPage.scrollable(children: [content]);
   }
 
   Widget buildFluentRight(int index) {
@@ -1151,14 +1156,16 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       case 0:
         return buildExploreSettings(context, false);
       case 1:
-        return const ReadingSettings(false);
+        return const ComicSourceSettings(showHeader: false);
       case 2:
-        return buildFluentAppearanceSettings();
+        return const ReadingSettings(false);
       case 3:
-        return const LocalFavoritesSettings();
+        return buildFluentAppearanceSettings();
       case 4:
-        return buildFluentAppSettings();
+        return const LocalFavoritesSettings();
       case 5:
+        return buildFluentAppSettings();
+      case 6:
         return const NetworkSettings();
       case _aboutPageIndex:
         return buildFluentAbout();
@@ -2744,15 +2751,23 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       return const FileManagerPage();
     }
 
+    // 漫画源设置自带 Scaffold + CustomScrollView, 不能嵌入 SliverToBoxAdapter
+    // (无界高度约束会导致 "infinite size during layout" 崩溃)
+    if (currentPage == 1) {
+      return ComicSourceSettings(
+        onBack: () => setState(() => currentPage = -1),
+      );
+    }
+
     final Widget body = switch (currentPage) {
       -1 => const SizedBox(),
       0 => buildExploreSettings(context, false),
-      // 1 => const ComicSourceSettings(),
-      1 => const ReadingSettings(false),
-      2 => buildAppearanceSettings(),
-      3 => const LocalFavoritesSettings(),
-      4 => buildAppSettings(),
-      5 => const NetworkSettings(),
+      1 => const SizedBox(),
+      2 => const ReadingSettings(false),
+      3 => buildAppearanceSettings(),
+      4 => const LocalFavoritesSettings(),
+      5 => buildAppSettings(),
+      6 => const NetworkSettings(),
       _aboutPageIndex => buildAbout(),
       _appUpdaterHistoryIndex => const AppUpdaterHistoryPage(embedded: true),
       _debugPageIndex => const DebugPage(),

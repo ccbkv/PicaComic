@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'package:pica_comic/base.dart';
-import 'package:pica_comic/foundation/cache_manager.dart';
+import 'package:pica_comic/components/components.dart' show showToast;
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/eh_network/eh_models.dart';
 import 'package:pica_comic/network/download_model.dart';
@@ -14,6 +15,7 @@ import '../download.dart';
 import 'eh_main_network.dart';
 import 'get_gallery_id.dart';
 import 'package:pica_comic/utils/zip_utils.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 class DownloadedGallery extends DownloadedItem{
   Gallery gallery;
@@ -126,11 +128,25 @@ class EhDownloadingItem extends DownloadingItem{
   @override
   Future<void> onStart() async{
     await super.onStart();
-    // clear showKey and imageKey
-    // imageKey is saved through the network cache mechanism
-    gallery.auth?.remove("showKey");
-    await CacheManager().deleteKeyword("exhentai.org");
-    await CacheManager().deleteKeyword("e-hentai.org");
+  }
+
+  @override
+  Future<void> downloadCover() async {
+    final file = File('$path/cover.jpg');
+    if (file.existsSync()) return;
+    final source = ComicSource.find('ehentai');
+    if (source == null || source.isBuiltIn) {
+      throw '请先添加对应漫画源'.tl;
+    }
+    DownloadProgress? result;
+    await for (final progress
+        in ImageManager().getCustomThumbnail(cover, source.key, {})) {
+      if (progress.finished) result = progress;
+    }
+    if (result == null) throw StateError('Cover download did not complete');
+    final bytes = result.data ?? await result.getFile().readAsBytes();
+    await file.create(recursive: true);
+    await file.writeAsBytes(bytes);
   }
 
   int? _currentBytes;
@@ -158,6 +174,7 @@ class EhDownloadingItem extends DownloadingItem{
   _IsolateDownloader? _downloader;
 
   bool _stop = false;
+  int _generation = 0;
 
   String? _downloadLink;
 
@@ -173,17 +190,31 @@ class EhDownloadingItem extends DownloadingItem{
     if(downloadType == 0){
       return super.start();
     } else {
-      await onStart();
+      final generation = ++_generation;
       _stop = false;
+      await Future<void>.value();
+      if (_stop || generation != _generation) return;
       try{
-        await downloadCover();
-        if(gallery.auth?["archiveDownload"] == null){
-          throw "No archive download link";
+        final source = ComicSource.find('ehentai');
+        if (source == null || source.isBuiltIn) {
+          throw '请先添加对应漫画源'.tl;
         }
+        final archive = source.archiveDownloader;
+        if (archive == null) throw '漫画源不支持归档下载'.tl;
+        await onStart();
+        if (_stop || generation != _generation) return;
+        await downloadCover();
+        if (_stop || generation != _generation) return;
         if(_downloadLink == null) {
-          var res = await EhNetwork().getArchiveDownloadLink(
-              gallery.auth!["archiveDownload"]!, downloadType);
-          if (_stop) {
+          final options = await archive.getArchives(gallery.link);
+          if (_stop || generation != _generation) return;
+          if (options.error) throw options.errorMessageWithoutNull;
+          final archiveId = (downloadType - 1).toString();
+          if (!options.data.any((item) => item.id == archiveId)) {
+            throw '漫画源未提供旧任务选定的归档类型'.tl;
+          }
+          final res = await archive.getDownloadUrl(gallery.link, archiveId);
+          if (_stop || generation != _generation) {
             return;
           }
           if (res.error) {
@@ -191,10 +222,14 @@ class EhDownloadingItem extends DownloadingItem{
           }
           _downloadLink = res.data;
         }
+        if (!identical(source, ComicSource.find('ehentai'))) {
+          throw '请先添加对应漫画源'.tl;
+        }
         _downloader = _IsolateDownloader(
             _downloadLink!,
             path,
             (current, total, speed){
+              if (_stop || generation != _generation) return;
               _currentBytes = current;
               _totalBytes = total;
               _currentSpeed = speed;
@@ -209,7 +244,9 @@ class EhDownloadingItem extends DownloadingItem{
         _downloader!.start();
       }
       catch(e, s){
+        if (_stop || generation != _generation) return;
         log("$e\n$s", "Download", LogLevel.error);
+        showToast(message: e.toString());
         onError?.call();
         return;
       }
@@ -226,7 +263,9 @@ class EhDownloadingItem extends DownloadingItem{
       return super.pause();
     } else {
       _stop = true;
+      _generation++;
       _downloader?.pause();
+      _downloader = null;
     }
   }
 
@@ -236,6 +275,7 @@ class EhDownloadingItem extends DownloadingItem{
       return super.stop();
     } else {
       _stop = true;
+      _generation++;
       _downloader?.stop();
       var directory = Directory(path);
       if(await directory.exists()) {
@@ -270,7 +310,8 @@ class _IsolateDownloader{
 
   late ReceivePort port;
 
-  late SendPort sendPort;
+  SendPort? sendPort;
+  bool _stopped = false;
 
   final void Function(int current, int total, int speed) updateInfo;
 
@@ -282,9 +323,12 @@ class _IsolateDownloader{
   Isolate? isolate;
 
   void stop(){
-    sendPort.send("stop");
-    isolate = null;
-    port.close();
+    _stopped = true;
+    if (sendPort != null) {
+      sendPort!.send("stop");
+      isolate = null;
+      port.close();
+    }
   }
 
   void pause(){
@@ -299,7 +343,9 @@ class _IsolateDownloader{
     port.listen((message) {
       if(message is SendPort){
         sendPort = message;
+        if (_stopped) stop();
       } else if(message is DownloadingStatus){
+        if (_stopped) return;
         updateInfo(message.downloadedBytes, message.totalBytes+1, message.bytesPerSecond);
         total = message.totalBytes;
       } else if(message == "finish"){

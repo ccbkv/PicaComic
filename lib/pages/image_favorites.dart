@@ -11,22 +11,14 @@ import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/image_loader/base_image_provider.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
-import 'package:pica_comic/network/eh_network/eh_models.dart';
-import 'package:pica_comic/network/hitomi_network/hitomi_models.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/components/components.dart';
 
-import 'ehentai/eh_gallery_page.dart';
-import 'hitomi/hitomi_comic_page.dart';
-import 'htmanga/ht_comic_page.dart';
 import 'image_favorites/image_favorites_comic.dart';
 import 'image_favorites/type.dart';
-import 'jm/jm_comic_page.dart';
 import 'local_add_comic.dart';
 import 'reader/comic_reading_page.dart';
-import 'picacg/comic_page.dart';
-import 'nhentai/comic_page.dart';
 import 'comic_page.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
@@ -881,6 +873,10 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                                           .solidBackgroundFillColorBase,
                                       child: Image(
                                         image: _ImageProvider(image),
+                                        errorBuilder: (context, error, stack) =>
+                                            Center(child: Text(error.toString(),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 3)),
                                         fit: BoxFit.cover,
                                         width: itemWidth,
                                         height: itemHeight,
@@ -1107,6 +1103,10 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                                 color: Colors.grey[200], // 添加背景色，避免加载时闪烁
                                 child: Image(
                                   image: _ImageProvider(image),
+                                  errorBuilder: (context, error, stack) =>
+                                      Center(child: Text(error.toString(),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 3)),
                                   fit: BoxFit.cover,
                                   width: itemWidth,
                                   height: itemHeight,
@@ -1170,31 +1170,6 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
   void _goToComicDetail(
       String type, String id, String title, Map<String, dynamic> otherInfo) {
     switch (type) {
-      case "picacg":
-        Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => PicacgComicPage(id, otherInfo["cover"])));
-        break;
-      case "ehentai":
-        Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => EhGalleryPage.fromLink(id)));
-        break;
-      case "jm":
-        Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => JmComicPage(id)));
-        break;
-      case "hitomi":
-        Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => HitomiComicPage.fromLink(id)));
-        break;
-      case "htmanga":
-      case "htManga":
-        Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => HtComicPage(id)));
-        break;
-      case "nhentai":
-        Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => NhentaiComicPage(id)));
-        break;
       case "local-folder":
         LocalLibraryController.instance.loadComicByPath(id).then((comic) {
           if (comic == null) {
@@ -1212,15 +1187,17 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
         });
         break;
       default:
-        if (ComicSource.sources.any((s) => s.key == type)) {
+        final key = type == 'htManga' ? 'htmanga' : type;
+        final source = ComicSource.find(key);
+        if (source != null && !source.isBuiltIn) {
           Navigator.of(context).push(MaterialPageRoute(
               builder: (context) => ComicPage(
-                    sourceKey: type,
+                    sourceKey: key,
                     id: id,
                     cover: otherInfo["cover"],
                   )));
         } else {
-          showToast(message: "Unknown source $type");
+          showToast(message: "${'请先添加对应漫画源'.tl}: $key");
         }
     }
   }
@@ -1276,56 +1253,6 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
   void _readWithKey(String key, String target, int ep, int page, String title,
       Map<String, dynamic> otherInfo) async {
     switch (key) {
-      case "picacg":
-        App.globalTo(() => ComicReadingPage.picacg(
-            target, ep, List.from(otherInfo["eps"]), title,
-            initialPage: page));
-      case "ehentai":
-        App.globalTo(
-          () => ComicReadingPage.ehentai(
-            Gallery.fromJson(otherInfo["gallery"]),
-            initialPage: page,
-          ),
-        );
-      case "jm":
-        App.globalTo(
-          () => ComicReadingPage(
-            JmReadingData(
-              title,
-              target,
-              List.from(otherInfo["eps"]),
-              List.from(
-                otherInfo["jmEpNames"],
-              ),
-            ),
-            page,
-            ep,
-          ),
-        );
-      case "hitomi":
-        App.globalTo(
-          () => ComicReadingPage(
-            HitomiReadingData(
-              title,
-              target,
-              (otherInfo["hitomi"] as List)
-                  .map((e) => HitomiFile.fromMap(e))
-                  .toList(),
-              target,
-            ),
-            page,
-            0,
-          ),
-        );
-      case "htManga":
-      case "htmanga":
-        App.globalTo(
-          () => ComicReadingPage.htmanga(target, title, initialPage: page),
-        );
-      case "nhentai":
-        App.globalTo(
-          () => ComicReadingPage.nhentai(target, title, initialPage: page),
-        );
       case "local-folder":
         final comic = await LocalLibraryController.instance.loadComicByPath(
           target,
@@ -1336,20 +1263,38 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
         }
         await openLocalComicReader(comic, ep: ep, page: page);
       default:
-        var source = ComicSource.find(key);
-        if (source == null) throw "Unknown source $key";
-        App.globalTo(
-          () => ComicReadingPage(
-            CustomReadingData(
-              target,
-              title,
-              source,
-              ComicChapters.fromJsonOrNull(otherInfo["eps"]),
-            ),
-            page,
-            ep,
-          ),
-        );
+        final source = ComicSource.find(key == 'htManga' ? 'htmanga' : key);
+        if (source == null || source.isBuiltIn) {
+          showToast(message: '请先添加对应漫画源'.tl);
+          return;
+        }
+        if (source.loadComicInfo == null || source.loadComicPages == null) {
+          showToast(message: '漫画源不支持阅读'.tl);
+          return;
+        }
+        bool cancelled = false;
+        final dialog = showLoadingDialog(App.globalContext!,
+            onCancel: () => cancelled = true);
+        try {
+          final res = await source.loadComicInfo!(target);
+          if (cancelled) return;
+          if (res.error) throw res.errorMessageWithoutNull;
+          if (!identical(source, ComicSource.find(source.key))) {
+            throw '请先添加对应漫画源'.tl;
+          }
+          dialog.close();
+          App.globalTo(() => ComicReadingPage(
+            CustomReadingData(target, res.data.title, source, res.data.chapters,
+                historySubTitle: res.data.subTitle ?? '',
+                historyCover: res.data.cover),
+            page > 0 ? page : 1,
+            ep > 0 ? ep : 1,
+          ));
+        } catch (e) {
+          if (!cancelled) showToast(message: e.toString());
+        } finally {
+          if (!cancelled) dialog.close();
+        }
     }
   }
 
@@ -1407,6 +1352,9 @@ class FavoriteImageTile extends StatelessWidget {
                   children: [
                     Image(
                       image: _ImageProvider(image),
+                      errorBuilder: (context, error, stack) =>
+                          Center(child: Text(error.toString(),
+                              textAlign: TextAlign.center, maxLines: 3)),
                       fit: BoxFit.cover, // 保持图片比例
                       width: 120,
                       height: 120,
@@ -1481,56 +1429,6 @@ class FavoriteImageTile extends StatelessWidget {
   void _readWithKey(String key, String target, int ep, int page, String title,
       Map<String, dynamic> otherInfo) async {
     switch (key) {
-      case "picacg":
-        App.globalTo(() => ComicReadingPage.picacg(
-            target, ep, List.from(otherInfo["eps"]), title,
-            initialPage: page));
-      case "ehentai":
-        App.globalTo(
-          () => ComicReadingPage.ehentai(
-            Gallery.fromJson(otherInfo["gallery"]),
-            initialPage: page,
-          ),
-        );
-      case "jm":
-        App.globalTo(
-          () => ComicReadingPage(
-            JmReadingData(
-              title,
-              target,
-              List.from(otherInfo["eps"]),
-              List.from(
-                otherInfo["jmEpNames"],
-              ),
-            ),
-            page,
-            ep,
-          ),
-        );
-      case "hitomi":
-        App.globalTo(
-          () => ComicReadingPage(
-            HitomiReadingData(
-              title,
-              target,
-              (otherInfo["hitomi"] as List)
-                  .map((e) => HitomiFile.fromMap(e))
-                  .toList(),
-              target,
-            ),
-            page,
-            0,
-          ),
-        );
-      case "htManga":
-      case "htmanga":
-        App.globalTo(
-          () => ComicReadingPage.htmanga(target, title, initialPage: page),
-        );
-      case "nhentai":
-        App.globalTo(
-          () => ComicReadingPage.nhentai(target, title, initialPage: page),
-        );
       case "local-folder":
         final comic = await LocalLibraryController.instance.loadComicByPath(
           target,
@@ -1541,20 +1439,38 @@ class FavoriteImageTile extends StatelessWidget {
         }
         await openLocalComicReader(comic, ep: ep, page: page);
       default:
-        var source = ComicSource.find(key);
-        if (source == null) throw "Unknown source $key";
-        App.globalTo(
-          () => ComicReadingPage(
-            CustomReadingData(
-              target,
-              title,
-              source,
-              ComicChapters.fromJsonOrNull(otherInfo["eps"]),
-            ),
-            page,
-            ep,
-          ),
-        );
+        final source = ComicSource.find(key == 'htManga' ? 'htmanga' : key);
+        if (source == null || source.isBuiltIn) {
+          showToast(message: '请先添加对应漫画源'.tl);
+          return;
+        }
+        if (source.loadComicInfo == null || source.loadComicPages == null) {
+          showToast(message: '漫画源不支持阅读'.tl);
+          return;
+        }
+        bool cancelled = false;
+        final dialog = showLoadingDialog(App.globalContext!,
+            onCancel: () => cancelled = true);
+        try {
+          final res = await source.loadComicInfo!(target);
+          if (cancelled) return;
+          if (res.error) throw res.errorMessageWithoutNull;
+          if (!identical(source, ComicSource.find(source.key))) {
+            throw '请先添加对应漫画源'.tl;
+          }
+          dialog.close();
+          App.globalTo(() => ComicReadingPage(
+            CustomReadingData(target, res.data.title, source, res.data.chapters,
+                historySubTitle: res.data.subTitle ?? '',
+                historyCover: res.data.cover),
+            page > 0 ? page : 1,
+            ep > 0 ? ep : 1,
+          ));
+        } catch (e) {
+          if (!cancelled) showToast(message: e.toString());
+        } finally {
+          if (!cancelled) dialog.close();
+        }
     }
   }
 
@@ -1598,18 +1514,6 @@ class _ImageProvider extends BaseImageProvider<_ImageProvider> {
       final type = _resolveImageFavoriteSourceKey(image);
       Stream<DownloadProgress> stream;
       switch (type) {
-        case "ehentai":
-          stream = ImageManager().getEhImageNew(
-              Gallery.fromJson(image.otherInfo["gallery"]), image.page);
-        case "jm":
-          stream = ImageManager().getJmImage(image.otherInfo["url"], null,
-              epsId: image.otherInfo["epsId"],
-              scrambleId: "220980",
-              bookId: image.otherInfo["bookId"]);
-        case "hitomi":
-          stream = ImageManager().getHitomiImage(
-              HitomiFile.fromMap(image.otherInfo["hitomi"][image.page - 1]),
-              image.otherInfo["galleryId"]);
         case "local-folder":
           final file = File(image.otherInfo["url"].toString());
           if (!file.existsSync()) {
@@ -1617,20 +1521,31 @@ class _ImageProvider extends BaseImageProvider<_ImageProvider> {
           }
           return await file.readAsBytes();
         default:
-          var sourceKey = type;
-          var comicId = _resolveImageFavoriteTarget(image, type);
-          var eps = image.otherInfo["eps"];
-          String epId;
-          if (eps is Map) {
-            epId =
-                (eps.keys.elementAtOrNull(image.ep - 1)?.toString()) ?? comicId;
-          } else if (eps is List) {
-            epId = (eps.elementAtOrNull(image.ep - 1)?.toString()) ?? comicId;
-          } else {
-            epId = comicId;
+          final sourceKey = type == 'htManga' ? 'htmanga' : type;
+          final source = ComicSource.find(sourceKey);
+          if (source == null || source.isBuiltIn) {
+            throw '请先添加对应漫画源'.tl;
           }
-          stream = ImageManager()
-              .getCustomImage(image.otherInfo["url"], comicId, epId, sourceKey);
+          if (source.loadComicInfo == null || source.loadComicPages == null) {
+            throw '漫画源不支持加载图片'.tl;
+          }
+          final comicId = _resolveImageFavoriteTarget(image, type);
+          final info = await source.loadComicInfo!(comicId);
+          if (info.error) throw info.errorMessageWithoutNull;
+          final ep = image.ep > 0 ? image.ep : 1;
+          final epId = info.data.chapters?.ids.elementAtOrNull(ep - 1);
+          if (info.data.chapters != null && epId == null) {
+            throw '收藏图片对应的章节不存在'.tl;
+          }
+          final pages = await source.loadComicPages!(comicId, epId);
+          if (pages.error) throw pages.errorMessageWithoutNull;
+          final url = pages.data.elementAtOrNull(image.page - 1);
+          if (url == null) throw '收藏图片对应的页码不存在'.tl;
+          if (!identical(source, ComicSource.find(sourceKey))) {
+            throw '请先添加对应漫画源'.tl;
+          }
+          stream = ImageManager().getCustomImage(
+              url, comicId, epId ?? comicId, sourceKey);
       }
       DownloadProgress? finishProgress;
       await for (var progress in stream) {
@@ -1641,8 +1556,9 @@ class _ImageProvider extends BaseImageProvider<_ImageProvider> {
             cumulativeBytesLoaded: progress.currentBytes,
             expectedTotalBytes: progress.expectedBytes));
       }
-      var file = finishProgress!.getFile();
-      var data = await file.readAsBytes();
+      if (finishProgress == null) throw '图片加载未完成'.tl;
+      var data = finishProgress.data ??
+          await finishProgress.getFile().readAsBytes();
       var file2 = File("${App.dataPath}/images/${image.imagePath}");
       if (!file2.existsSync()) {
         await file2.create(recursive: true);

@@ -8,7 +8,6 @@ import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 import '../foundation/app.dart';
 import '../pages/comic_page.dart';
-import '../pages/hitomi/hitomi_comic_page.dart';
 
 bool canHandle(String text){
   if(!text.isURL){
@@ -29,16 +28,21 @@ bool handleAppLinks(Uri uri, {bool showMessageWhenError = true}){
     case "exhentai.org":
     case "nhentai.net":
     case "nhentai.xxx":
+    case "hitomi.la":
       final isEh = uri.host == 'e-hentai.org' || uri.host == 'exhentai.org';
+      final isHitomi = uri.host == 'hitomi.la';
       final match = (isEh
           ? RegExp(r'^/g/(\d+)/(\w+)/?$')
+          : isHitomi
+          ? RegExp(r'^/(?:doujinshi|cg|manga|artistcg|gamecg|imageset|anime|galleries)/[^/]*?(\d+)\.html$')
           : RegExp(r'^/g/(\d+)(?:/|$)')).firstMatch(uri.path);
       if (match == null) return false;
-      final sourceKey = isEh ? 'ehentai' : 'nhentai';
+      final sourceKey = isEh ? 'ehentai' : isHitomi ? 'hitomi' : 'nhentai';
       final source = ComicSource.find(sourceKey);
-      if (source == null) {
-        if (showMessageWhenError) showToast(message: '请先添加对应漫画源'.tl);
-        return false;
+      if (source == null || source.isBuiltIn) {
+        showToast(message: '请先添加对应漫画源'.tl);
+        // The link is recognized: keep WebViews from falling through to it.
+        return true;
       }
       String? id = isEh
           ? 'https://${uri.host}/g/${match[1]}/${match[2]}/'
@@ -62,13 +66,6 @@ bool handleAppLinks(Uri uri, {bool showMessageWhenError = true}){
       if (id == null || id.isEmpty) return false;
       final comicId = id;
       context.to(() => ComicPage(sourceKey: sourceKey, id: comicId));
-    case "hitomi.la":
-      if(["doujinshi", "cg", "manga"].contains(uri.pathSegments[0])){
-        context.to(() => HitomiComicPage.fromLink("https://${uri.host}${uri.path}"));
-      }else{
-        showToast(message: "Unknown Link");
-        return false;
-      }
     default:
       return false;
   }

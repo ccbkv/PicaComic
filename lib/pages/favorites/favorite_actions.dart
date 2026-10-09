@@ -152,6 +152,16 @@ void addFavorite(List<BaseComic> comics, String sourceKey) {
 
 Future<List<FavoriteItem>> updateComicsInfo(String folder) async {
   var comics = LocalFavoritesManager().getAllComics(folder);
+  try {
+    for (final comic in comics) {
+      final source = comic.type.comicSource;
+      if (source.isBuiltIn) throw "请先添加对应漫画源".tl;
+      if (source.loadComicInfo == null) throw "漫画源不支持加载详情".tl;
+    }
+  } catch (e) {
+    showToast(message: e.toString());
+    return comics;
+  }
 
   Future<void> updateSingleComic(int index) async {
     int retry = 3;
@@ -160,7 +170,7 @@ Future<List<FavoriteItem>> updateComicsInfo(String folder) async {
       try {
         var c = comics[index];
         var comicSource = c.type.comicSource;
-        if (comicSource == null) return;
+        if (comicSource.isBuiltIn) throw "请先添加对应漫画源".tl;
 
         var newInfo = (await comicSource.loadComicInfo!(c.target)).data;
 
@@ -378,7 +388,12 @@ Future<void> importNetworkFolder(
   String? folderID,
 ) async {
   var comicSource = ComicSource.find(source);
-  if (comicSource == null) {
+  if (comicSource == null || comicSource.isBuiltIn) {
+    showToast(message: "请先添加对应漫画源".tl);
+    return;
+  }
+  if (comicSource.favoriteData == null) {
+    showToast(message: "漫画源不支持网络收藏".tl);
     return;
   }
   if (folder != null && folder.isEmpty) {

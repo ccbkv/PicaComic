@@ -5,7 +5,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/base.dart';
+import 'package:pica_comic/components/components.dart' show showToast;
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/comic_comments_helper.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
@@ -285,8 +287,15 @@ class DownloadManager with _DownloadDb implements Listenable {
     if (comicSource.matchBriefIdReg != null) {
       id = RegExp(comicSource.matchBriefIdReg!).firstMatch(id)!.group(1)!;
     }
-    id = "$source-$id";
-    return id;
+    return switch (source) {
+      'picacg' => id,
+      'ehentai' => RegExp(r'/g/(\d+)/').firstMatch(id)?.group(1) ?? id,
+      'jm' => 'jm${id.replaceFirst(RegExp(r'^jm'), '')}',
+      'hitomi' => 'hitomi${RegExp(r'(\d+)\.html').firstMatch(id)?.group(1) ?? id}',
+      'htmanga' => 'Ht$id',
+      'nhentai' => 'nhentai${id.replaceFirst(RegExp(r'^(?:nhentai|nh)'), '')}',
+      _ => "$source-$id",
+    };
   }
 
   ///当一个下载任务完成时, 调用此函数
@@ -481,23 +490,24 @@ DownloadingItem downloadingItemFromMap(
     Future<void> Function() updateInfo) {
   switch (map["type"]) {
     case 0:
-      return PicDownloadingItem.fromMap(
-          map, whenFinish, whenError, updateInfo, map["id"]);
+      return _LegacyScriptDownloading(PicDownloadingItem.fromMap(
+          map, whenFinish, whenError, updateInfo, map["id"]));
     case 1:
-      return EhDownloadingItem.fromMap(
+      final task = EhDownloadingItem.fromMap(
           map, whenFinish, whenError, updateInfo, map["id"]);
+      return task.downloadType == 0 ? _LegacyScriptDownloading(task) : task;
     case 2:
-      return JmDownloadingItem.fromMap(
-          map, whenFinish, whenError, updateInfo, map["id"]);
+      return _LegacyScriptDownloading(JmDownloadingItem.fromMap(
+          map, whenFinish, whenError, updateInfo, map["id"]));
     case 3:
-      return HitomiDownloadingItem.fromMap(
-          map, whenFinish, whenError, updateInfo, map["id"]);
+      return _LegacyScriptDownloading(HitomiDownloadingItem.fromMap(
+          map, whenFinish, whenError, updateInfo, map["id"]));
     case 4:
-      return DownloadingHtComic.fromMap(
-          map, whenFinish, whenError, updateInfo, map["id"]);
+      return _LegacyScriptDownloading(DownloadingHtComic.fromMap(
+          map, whenFinish, whenError, updateInfo, map["id"]));
     case 5:
-      return NhentaiDownloadingItem.fromMap(
-          map, whenFinish, whenError, updateInfo, map["id"]);
+      return _LegacyScriptDownloading(NhentaiDownloadingItem.fromMap(
+          map, whenFinish, whenError, updateInfo, map["id"]));
     case 6:
       if (map['archiveUrl'] is String) {
         return CustomArchiveDownloadingItem.fromMap(
@@ -510,6 +520,184 @@ DownloadingItem downloadingItemFromMap(
           map, whenFinish, whenError, updateInfo, map["id"]);
     default:
       throw UnimplementedError();
+  }
+}
+
+// Keep legacy IDs, directories and progress; only network loading uses scripts.
+class _LegacyScriptDownloading extends DownloadingItem {
+  _LegacyScriptDownloading(this._legacy)
+      : super.fromMap(_legacy.toMap(), _legacy.onFinish, _legacy.onError,
+            _legacy.updateInfo);
+
+  DownloadingItem _legacy;
+  ComicSource? _source;
+  ComicInfoData? _info;
+  final _chapterIds = <int, String?>{};
+  int _generation = 0;
+
+  String get sourceKey => type.name;
+
+  String get comicId => switch (_legacy) {
+        PicDownloadingItem item => item.comic.id,
+        EhDownloadingItem item => item.gallery.link,
+        JmDownloadingItem item => item.comic.id,
+        HitomiDownloadingItem item => item.comic.id,
+        DownloadingHtComic item => item.comic.id,
+        NhentaiDownloadingItem item => item.comic.id,
+        _ => throw StateError('Unsupported legacy download'),
+      };
+
+  @override
+  String get title => _legacy.title;
+
+  @override
+  String get cover => _info?.cover ?? _legacy.cover;
+
+  @override
+  void start() async {
+    final generation = ++_generation;
+    // The manager sets its running flag after calling start().
+    await Future<void>.value();
+    if (generation != _generation) return;
+    final source = ComicSource.find(sourceKey);
+    if (source == null || source.isBuiltIn) {
+      showToast(message: '${'请先添加对应漫画源'.tl}: $sourceKey');
+      onError?.call();
+      return;
+    }
+    super.start();
+  }
+
+  @override
+  void pause() {
+    _generation++;
+    super.pause();
+  }
+
+  @override
+  void stop() {
+    _generation++;
+    super.stop();
+  }
+
+  @override
+  Future<void> onStart() async {
+    final generation = _generation;
+    final source = ComicSource.find(sourceKey);
+    if (source == null || source.isBuiltIn) {
+      throw '请先添加对应漫画源'.tl;
+    }
+    if (source.loadComicInfo == null || source.loadComicPages == null) {
+      throw '漫画源不支持下载'.tl;
+    }
+    final res = await source.loadComicInfo!(comicId);
+    if (generation != _generation) return;
+    if (res.error) throw res.errorMessageWithoutNull;
+    final info = res.data;
+    final chapters = info.chapters?.allChapters;
+    final oldMap = _legacy.toMap();
+    final oldLinks = links;
+    final slots = oldLinks?.keys.toList() ??
+        (haveEps
+            ? List<int>.from(oldMap['_downloadEps']).map((i) => i + 1).toList()
+            : [0]);
+    final refreshed = <int, List<String>>{};
+    final ids = <int, String?>{};
+    for (final slot in slots) {
+      String? epId;
+      if (haveEps) {
+        if (_legacy case JmDownloadingItem item) {
+          epId = item.comic.series[slot] ?? item.comic.id;
+          if (chapters != null && !chapters.containsKey(epId)) {
+            throw '旧下载章节与漫画源不匹配，已保留下载进度'.tl;
+          }
+        } else {
+          epId = slot.toString();
+          if (chapters == null || !chapters.containsKey(epId)) {
+            throw '旧下载章节与漫画源不匹配，已保留下载进度'.tl;
+          }
+        }
+      } else if (chapters != null) {
+        if (chapters.length != 1) {
+          throw '旧下载章节与漫画源不匹配，已保留下载进度'.tl;
+        }
+        epId = chapters.keys.single;
+      }
+      final pages = await source.loadComicPages!(comicId, epId);
+      if (generation != _generation) return;
+      if (pages.error) throw pages.errorMessageWithoutNull;
+      // Existing page offsets must not silently point at a different page list.
+      final hasProgress = downloadedPages > 0 ||
+          (toBaseMap()['finishedTasks'] as List).isNotEmpty;
+      if (oldLinks != null && hasProgress &&
+          oldLinks[slot]?.length != pages.data.length) {
+        throw '漫画页数已变化，已保留旧下载文件和进度'.tl;
+      }
+      refreshed[slot] = pages.data;
+      ids[slot] = epId;
+    }
+    if (!identical(source, ComicSource.find(sourceKey))) {
+      throw '请先添加对应漫画源'.tl;
+    }
+    if (_legacy is PicDownloadingItem) {
+      final titles = List.generate(chapters!.length,
+          (i) => chapters[(i + 1).toString()]);
+      if (titles.any((title) => title == null)) {
+        throw '旧下载章节与漫画源不匹配，已保留下载进度'.tl;
+      }
+      _legacy = PicDownloadingItem.fromMap(
+          {...oldMap, '_eps': titles.cast<String>()},
+          onFinish!, onError!, updateInfo!, id);
+    } else if (_legacy case JmDownloadingItem item) {
+      if (item.comic.series.isEmpty) item.comic.series[1] = comicId;
+    }
+    _source = source;
+    _info = info;
+    _chapterIds
+      ..clear()
+      ..addAll(ids);
+    links = refreshed;
+    await super.onStart();
+    await updateInfo?.call();
+  }
+
+  @override
+  Future<Map<int, List<String>>> getLinks() async => links!;
+
+  @override
+  Future<Stream<DownloadProgress>> downloadImage(String link) async {
+    if (!identical(_source, ComicSource.find(sourceKey))) {
+      throw '请先添加对应漫画源'.tl;
+    }
+    final slot = links!.keys.elementAt(downloadingEp);
+    return ImageManager().getCustomImage(
+        link, comicId, _chapterIds[slot] ?? comicId, sourceKey);
+  }
+
+  @override
+  Future<void> downloadCover() async {
+    final file = File('$path/cover.jpg');
+    if (file.existsSync()) return;
+    DownloadProgress? result;
+    await for (final progress
+        in ImageManager().getCustomThumbnail(cover, sourceKey, headers)) {
+      if (progress.finished) result = progress;
+    }
+    if (result == null) {
+      throw StateError('Cover download did not complete');
+    }
+    final bytes = result.data ?? await result.getFile().readAsBytes();
+    await file.create(recursive: true);
+    await file.writeAsBytes(bytes);
+  }
+
+  @override
+  Map<String, dynamic> toMap() => {..._legacy.toMap(), ...toBaseMap()};
+
+  @override
+  Future<DownloadedItem> toDownloadedItem() async {
+    _legacy.directory = directory;
+    return await _legacy.toDownloadedItem();
   }
 }
 
@@ -586,6 +774,7 @@ extension AddDownloadExt on DownloadManager {
   void addCustomDownload(ComicInfoData comic, List<int> downloadEps,
       {String? archiveUrl}) {
     var id = generateId(comic.sourceKey, comic.comicId);
+    if (downloading.any((item) => item.id == id)) return;
     if (archiveUrl != null) {
       final uri = Uri.tryParse(archiveUrl);
       if (uri == null || uri.host.isEmpty ||
@@ -607,16 +796,9 @@ extension AddDownloadExt on DownloadManager {
   }
 
   void addFavoriteDownload(FavoriteItem comic) {
-    var id = switch (comic.type.comicSource.key) {
-      "picacg" => comic.target,
-      "ehentai" => getGalleryId(comic.target),
-      "jm" => "jm${comic.target}",
-      "hitomi" =>
-        "hitomi${RegExp(r"\d+(?=\.html)").firstMatch(comic.target)![0]!}",
-      "htmanga" => "Ht${comic.target}",
-      "nhentai" => "nhentai${comic.target}",
-      _ => generateId(comic.type.comicSource.key, comic.target)
-    };
+    final source = comic.type.comicSource;
+    if (source.isBuiltIn) throw "Comic Source Not Found: ${source.key}";
+    var id = generateId(source.key, comic.target);
     downloading.addLast(
         FavoriteDownloading(comic, _onFinish, _onError, _saveInfo, id));
     _saveInfo();
@@ -631,8 +813,11 @@ DownloadedItem? _getComicFromJson(String id, String json, DateTime time,
     [String? directory]) {
   DownloadedItem comic;
   try {
-    if (id.contains('-')) {
-      comic = CustomDownloadedItem.fromJson(jsonDecode(json));
+    final data = jsonDecode(json);
+    if (data is Map && data['sourceKey'] is String && data['comicId'] is String) {
+      comic = CustomDownloadedItem.fromJson(Map<String, dynamic>.from(data));
+    } else if (id.contains('-')) {
+      comic = CustomDownloadedItem.fromJson(data);
     } else if (id.startsWith("jm")) {
       comic = DownloadedJmComic.fromMap(jsonDecode(json));
     } else if (id.startsWith("hitomi")) {

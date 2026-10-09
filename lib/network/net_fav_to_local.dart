@@ -140,7 +140,16 @@ void startFolderSync<T extends Object>(
   final maxValue = LocalFavoritesManager().maxValue(folderName);
   int addValue = 0;
   final loadComicObj = LoadComicClass();
-  final fData = getFavoriteData(key);
+  final source = ComicSource.find(key);
+  if (source == null || source.isBuiltIn) {
+    showToast(message: "请先添加对应漫画源".tl);
+    return;
+  }
+  final fData = source.favoriteData;
+  if (fData == null) {
+    showToast(message: "漫画源不支持网络收藏".tl);
+    return;
+  }
   final total = int.parse(appdata.settings[71]);
   List<BaseComic> comics = await getFavorites(
       context,

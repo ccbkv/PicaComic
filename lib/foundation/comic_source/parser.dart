@@ -1018,16 +1018,29 @@ class ComicSourceParser {
 
     final bool multiFolder = _getValue("favorites.multiFolder");
 
+    final favoritePages = <String, List<List<BaseComic>>>{};
+    final favoriteTokens = <String, List<String?>>{};
+    Future<void> favoriteQueue = Future.value();
+
     Future<Res<T>> retryZone<T>(Future<Res<T>> Function() func) async{
-      if(!ComicSource.find(_key!)!.isLogin){
+      final source = ComicSource.find(_key!);
+      if (source == null || source.isBuiltIn) {
+        return const Res.error("Comic Source Not Found");
+      }
+      if(!source.isLogin){
         return const Res.error("Not login");
       }
       var res = await func();
       if (res.error && res.errorMessage!.contains("Login expired")) {
-        var reLoginRes = await ComicSource.find(_key!)!.reLogin();
+        if (!identical(ComicSource.find(_key!), source)) {
+          return const Res.error("Comic Source Not Found");
+        }
+        var reLoginRes = await source.reLogin();
         if (!reLoginRes) {
           return const Res.error("Login expired and re-login failed");
         } else {
+          favoritePages.clear();
+          favoriteTokens.clear();
           return func();
         }
       }
@@ -1054,6 +1067,39 @@ class ComicSourceParser {
     Future<Res<List<BaseComic>>> loadComic(int page, [String? folder]) async {
       Future<Res<List<BaseComic>>> func() async{
         try {
+          if (!_checkExists("favorites.loadComics") &&
+              _checkExists("favorites.loadNext")) {
+            if (page < 1) return const Res.error("Invalid page");
+            final query = jsonEncode([ComicSource.find(_key!)?.data["account"], folder]);
+            if (page == 1 || !favoritePages.containsKey(query)) {
+              if (!favoritePages.containsKey(query) && favoritePages.length >= 8) {
+                final oldest = favoritePages.keys.first;
+                favoritePages.remove(oldest);
+                favoriteTokens.remove(oldest);
+              }
+              favoritePages[query] = <List<BaseComic>>[];
+              favoriteTokens[query] = <String?>[null];
+            }
+            final loaded = favoritePages[query]!;
+            final tokens = favoriteTokens[query]!;
+            while (loaded.length < page && loaded.length < tokens.length) {
+              final result = await JsEngine().runCode("""
+                ComicSource.sources.$_key.favorites.loadNext(
+                  ${jsonEncode(tokens[loaded.length])}, ${jsonEncode(folder)})
+              """);
+              if (result is! Map || result["comics"] is! List) {
+                return const Res.error("Invalid response from favorites.loadNext");
+              }
+              final next = result["next"]?.toString();
+              loaded.add((result["comics"] as List)
+                  .map<BaseComic>((e) => CustomComic.fromJson(e, _key!)).toList());
+              if (next != null && !tokens.contains(next)) tokens.add(next);
+            }
+            return Res<List<BaseComic>>(
+              page <= loaded.length ? List.of(loaded[page - 1]) : <BaseComic>[],
+              subData: loaded.length == tokens.length ? loaded.length : null,
+            );
+          }
           var res = await JsEngine().runCode("""
             ComicSource.sources.$_key.favorites.loadComics(
               ${jsonEncode(page)}, ${jsonEncode(folder)})
@@ -1067,7 +1113,16 @@ class ComicSourceParser {
           return Res.error(e.toString());
         }
       }
-      return retryZone(func);
+      // A refresh and an import can share the same folder cursor.
+      final previous = favoriteQueue;
+      final completed = Completer<void>();
+      favoriteQueue = completed.future;
+      await previous;
+      try {
+        return await retryZone(func);
+      } finally {
+        completed.complete();
+      }
     }
 
     Future<Res<Map<String, String>>> Function([String? comicId])? loadFolders;

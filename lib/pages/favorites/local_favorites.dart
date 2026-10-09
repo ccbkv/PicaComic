@@ -1,6 +1,7 @@
 import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/history.dart';
+import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/pages/comic_page.dart';
@@ -16,12 +17,6 @@ import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/components/components.dart';
 import 'dart:io';
 import '../../foundation/app.dart';
-import '../../network/eh_network/eh_main_network.dart';
-import '../../network/hitomi_network/hitomi_main_network.dart';
-import '../../network/htmanga_network/htmanga_main_network.dart';
-import '../../network/jm_network/jm_network.dart';
-import '../../network/nhentai_network/nhentai_main_network.dart';
-import '../../network/picacg_network/methods.dart';
 import '../../utils/io_tools.dart';
 
 Widget _buildFavoritesDialogField({
@@ -61,62 +56,39 @@ Widget _buildFavoritesDialogTextAction({
 }
 
 extension LocalFavoritesExt on FavoriteItem {
-  void addDownload() {
-    if (DownloadManager().isExists(toDownloadId())) {
-      return;
-    }
+  bool addDownload() {
     try {
+      final source = type.comicSource;
+      if (source.isBuiltIn) throw "请先添加对应漫画源".tl;
+      final id = DownloadManager().generateId(source.key, target);
+      if (DownloadManager().isExists(toDownloadId()) ||
+          DownloadManager().isExists(id) ||
+          DownloadManager().downloading.any((item) => item.id == id)) {
+        return false;
+      }
       DownloadManager().addFavoriteDownload(this);
+      return true;
     } catch (e) {
       log("Failed to add a download.\n Missing comic source config file.",
           "Download", LogLevel.error);
+      showToast(message: e.toString());
+      return false;
     }
   }
 
   Future<bool> updateInfo(String folder) async {
-    if (type == FavoriteType.picacg) {
-      var res = await PicacgNetwork().getComicInfo(target);
-      if (res.error) return false;
-      name = res.data.title;
-      author = res.data.author;
-      tags = res.data.tags;
-      coverPath = res.data.cover;
-    } else if (type == FavoriteType.ehentai) {
-      var res = await EhNetwork().getGalleryInfo(target);
-      if (res.error) return false;
-      name = res.data.title;
-      coverPath = res.data.cover;
-    } else if (type == FavoriteType.jm) {
-      var res = await JmNetwork().getComicInfo(target);
-      if (res.error) return false;
-      name = res.data.title;
-      author = res.data.author.firstOrNull ?? '';
-      tags = res.data.tags;
-      coverPath = res.data.cover;
-    } else if (type == FavoriteType.nhentai) {
-      var res = await NhentaiNetwork().getComicInfo(target);
-      if (res.error) return false;
-      name = res.data.title;
-      coverPath = res.data.cover;
-    } else if (type == FavoriteType.htManga) {
-      var res = await HtmangaNetwork().getComicInfo(target);
-      if (res.error) return false;
-      name = res.data.title;
-      author = res.data.uploader;
-      coverPath = res.data.cover;
-    } else if (type == FavoriteType.hitomi) {
-      var res = await HiNetwork().getComicInfo(target);
-      if (res.error) return false;
-      name = res.data.title;
-      author = res.data.subTitle;
-      coverPath = res.data.cover;
-    } else {
+    try {
       var comicSource = type.comicSource;
+      if (comicSource.isBuiltIn) throw "请先添加对应漫画源".tl;
+      if (comicSource.loadComicInfo == null) throw "漫画源不支持加载详情".tl;
       var res = await comicSource.loadComicInfo!(target);
       if (res.error) return false;
       name = res.data.title;
       author = res.data.subTitle ?? '';
       coverPath = res.data.cover;
+    } catch (e) {
+      showToast(message: e.toString());
+      return false;
     }
     LocalFavoritesManager().updateInfo(folder, this);
     return true;
@@ -455,12 +427,14 @@ class LocalFavoriteTile extends ComicTile {
   BuildContext get context => App.mainNavigatorKey!.currentContext!;
 
   void showInfo() {
-    context.to(
-      () => ComicPage(
-          sourceKey: comic.type.comicSource.key,
-          id: comic.target,
-          cover: comic.coverPath),
-    );
+    try {
+      final source = comic.type.comicSource;
+      if (source.isBuiltIn) throw "请先添加对应漫画源".tl;
+      context.to(() => ComicPage(
+          sourceKey: source.key, id: comic.target, cover: comic.coverPath));
+    } catch (e) {
+      showToast(message: e.toString());
+    }
   }
 
   @override
@@ -551,8 +525,9 @@ class LocalFavoriteTile extends ComicTile {
         DesktopMenuEntry(
           text: "下载".tl,
           onClick: () {
-            comic.addDownload();
-            showToast(message: "已添加下载任务".tl);
+            if (comic.addDownload()) {
+              showToast(message: "已添加下载任务".tl);
+            }
           },
         ),
         DesktopMenuEntry(
@@ -638,8 +613,9 @@ class LocalFavoriteTile extends ComicTile {
                       title: Text("下载".tl),
                       onTap: () {
                         App.globalBack();
-                        comic.addDownload();
-                        showToast(message: "已添加下载任务".tl);
+                        if (comic.addDownload()) {
+                          showToast(message: "已添加下载任务".tl);
+                        }
                       },
                     ),
                     ListTile(
@@ -668,158 +644,44 @@ class LocalFavoriteTile extends ComicTile {
         return;
       }
     }
+    late final ComicSource source;
+    try {
+      source = comic.type.comicSource;
+      if (source.isBuiltIn) throw "请先添加对应漫画源".tl;
+      if (source.loadComicInfo == null || source.loadComicPages == null) {
+        throw "漫画源不支持阅读".tl;
+      }
+    } catch (e) {
+      showToast(message: e.toString());
+      return;
+    }
     bool cancel = false;
     var controller = showLoadingDialog(
       App.globalContext!,
       onCancel: () => cancel = true,
       barrierDismissible: false,
     );
-    switch (comic.type.comicType) {
-      case ComicType.picacg:
-        {
-          var res = await network.getEps(comic.target);
-          if (cancel) return;
-          controller.close();
-          if (res.error) {
-            showToast(message: res.errorMessage ?? "Error");
-          } else {
-            var history = await HistoryManager().find(comic.target);
-            if (history == null) {
-              history = History(
-                HistoryType.picacg,
-                DateTime.now(),
-                comic.name,
-                comic.author,
-                comic.coverPath,
-                0,
-                0,
-                comic.target,
-              );
-              await HistoryManager().addHistory(history);
-            }
-            App.globalTo(
-              () => ComicReadingPage.picacg(
-                comic.target,
-                history!.ep,
-                res.data,
-                comic.name,
-                initialPage: history.page,
-              ),
-            );
-          }
-        }
-      case ComicType.ehentai:
-        {
-          var res = await EhNetwork().getGalleryInfo(comic.target);
-          if (cancel) return;
-          controller.close();
-          if (res.error) {
-            showToast(message: res.errorMessage ?? "Error");
-          } else {
-            var history = await History.findOrCreate(res.data);
-            App.globalTo(
-              () => ComicReadingPage.ehentai(
-                res.data,
-                initialPage: history.page,
-              ),
-            );
-          }
-        }
-      case ComicType.jm:
-        {
-          var res = await JmNetwork().getComicInfo(comic.target);
-          if (cancel) return;
-          controller.close();
-          if (res.error) {
-            showToast(message: res.errorMessage ?? "Error");
-          } else {
-            var history = await History.findOrCreate(res.data);
-            App.globalTo(
-              () => ComicReadingPage.jmComic(
-                res.data,
-                history.ep,
-                initialPage: history.page,
-              ),
-            );
-          }
-        }
-      case ComicType.hitomi:
-        {
-          var res = await HiNetwork().getComicInfo(comic.target);
-          if (cancel) return;
-          controller.close();
-          if (res.error) {
-            showToast(message: res.errorMessage ?? "Error");
-          } else {
-            var history = await History.findOrCreate(res.data);
-            App.globalTo(
-              () => ComicReadingPage.hitomi(
-                res.data,
-                comic.target,
-                initialPage: history.page,
-              ),
-            );
-          }
-        }
-      case ComicType.htManga:
-        {
-          var res = await HtmangaNetwork().getComicInfo(comic.target);
-          if (cancel) return;
-          controller.close();
-          if (res.error) {
-            showToast(message: res.errorMessage ?? "Error");
-          } else {
-            var history = await History.findOrCreate(res.data);
-            App.globalTo(
-              () => ComicReadingPage.htmanga(
-                res.data.id,
-                comic.name,
-                initialPage: history.page,
-              ),
-            );
-          }
-        }
-      case ComicType.nhentai:
-        {
-          var res = await NhentaiNetwork().getComicInfo(comic.target);
-          if (cancel) return;
-          controller.close();
-          if (res.error) {
-            showToast(message: res.errorMessage ?? "Error");
-          } else {
-            var history = await History.findOrCreate(res.data);
-            App.globalTo(
-              () => ComicReadingPage.nhentai(
-                res.data.id,
-                res.data.title,
-                initialPage: history.page,
-              ),
-            );
-          }
-        }
-      default:
-        {
-          var res = await comic.type.comicSource.loadComicInfo!(comic.target);
-          if (cancel) return;
-          controller.close();
-          if (res.error) {
-            showToast(message: res.errorMessage ?? "Error");
-          } else {
-            var history = await History.findOrCreate(res.data);
-            App.globalTo(
-              () => ComicReadingPage(
-                CustomReadingData(
-                  res.data.target,
-                  res.data.title,
-                  comic.type.comicSource,
-                  res.data.chapters,
-                ),
-                history.page,
-                history.ep,
-              ),
-            );
-          }
-        }
+    try {
+      final res = await source.loadComicInfo!(comic.target);
+      if (cancel) return;
+      controller.close();
+      if (res.error) {
+        showToast(message: res.errorMessageWithoutNull);
+        return;
+      }
+      final history = await HistoryManager().find(comic.target);
+      App.globalTo(() => ComicReadingPage(
+            CustomReadingData(comic.target, res.data.title, source,
+                res.data.chapters,
+                historySubTitle: res.data.subTitle ?? '',
+                historyCover: res.data.cover),
+            history?.page ?? 1,
+            history?.ep ?? 1,
+          ));
+    } catch (e) {
+      if (!cancel) showToast(message: e.toString());
+    } finally {
+      if (!cancel) controller.close();
     }
   }
 
@@ -1167,6 +1029,18 @@ class _LocalFavoritesFolderState extends State<LocalFavoritesFolder> {
 /// Check the availability of comics in folder
 Future<void> checkFolder(String name) async {
   var comics = LocalFavoritesManager().getAllComics(name);
+  final sources = <FavoriteType, ComicSource>{};
+  try {
+    for (final comic in comics) {
+      final source = comic.type.comicSource;
+      if (source.isBuiltIn) throw "请先添加对应漫画源".tl;
+      if (source.loadComicInfo == null) throw "漫画源不支持加载详情".tl;
+      sources[comic.type] = source;
+    }
+  } catch (e) {
+    showToast(message: e.toString());
+    return;
+  }
   int unavailableNum = 0;
   int networkError = 0;
   int checked = 0;
@@ -1174,56 +1048,15 @@ Future<void> checkFolder(String name) async {
   Stream<(int current, int total)> check() async* {
     for (var comic in comics) {
       bool available = true;
-      switch (comic.type.comicType) {
-        case ComicType.picacg:
-          var res = await PicacgNetwork().getComicInfo(comic.target);
-          if (res.error && !res.errorMessageWithoutNull.contains("404")) {
-            networkError++;
-          } else if (res.error) {
-            available = false;
-          }
-        case ComicType.ehentai:
-          var res = await EhNetwork().getGalleryInfo(comic.target);
-          if (res.error && !res.errorMessageWithoutNull.contains("404")) {
-            networkError++;
-          } else if (res.error) {
-            available = false;
-          }
-        case ComicType.jm:
-          var res = await JmNetwork().getComicInfo(comic.target);
-          if (res.error && !res.errorMessageWithoutNull.contains("404")) {
-            networkError++;
-          } else if (res.error) {
-            available = false;
-          }
-        case ComicType.hitomi:
-          var res = await HiNetwork().getComicInfo(comic.target);
-          if (res.error && !res.errorMessageWithoutNull.contains("404")) {
-            networkError++;
-          } else if (res.error) {
-            available = false;
-          }
-        case ComicType.htManga:
-          var res = await HtmangaNetwork().getComicInfo(comic.target);
-          if (res.error && !res.errorMessageWithoutNull.contains("404")) {
-            networkError++;
-          } else if (res.error) {
-            available = false;
-          }
-        case ComicType.nhentai:
-          var res = await NhentaiNetwork().getComicInfo(comic.target);
-          if (res.error && !res.errorMessageWithoutNull.contains("404")) {
-            networkError++;
-          } else if (res.error) {
-            available = false;
-          }
-        default:
-          var res = await comic.type.comicSource.loadComicInfo!(comic.target);
-          if (res.error && !res.errorMessageWithoutNull.contains("404")) {
-            networkError++;
-          } else if (res.error) {
-            available = false;
-          }
+      try {
+        final res = await sources[comic.type]!.loadComicInfo!(comic.target);
+        if (res.error && !res.errorMessageWithoutNull.contains("404")) {
+          networkError++;
+        } else if (res.error) {
+          available = false;
+        }
+      } catch (_) {
+        networkError++;
       }
       if (!available) {
         unavailableNum++;

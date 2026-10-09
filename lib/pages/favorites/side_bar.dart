@@ -520,9 +520,12 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
   }
 
   void _addDownload(String folder) {
+    bool added = false;
     for (var comic in LocalFavoritesManager().getAllComics(folder)) {
-      comic.addDownload();
+      if (comic.addDownload()) added = true;
     }
-    showToast(message: "已添加下载任务".tl);
+    if (added) {
+      showToast(message: "已添加下载任务".tl);
+    }
   }
 }

@@ -72,11 +72,17 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
       return;
     }
     final c = sourceComics[Random().nextInt(sourceComics.length)];
-    App.globalTo(() => ComicPage(
-          id: c.target,
-          sourceKey: c.type.comicSource.key,
-          cover: c.coverPath,
-        ));
+    try {
+      final source = c.type.comicSource;
+      if (source.isBuiltIn) throw "请先添加对应漫画源".tl;
+      App.globalTo(() => ComicPage(
+            id: c.target,
+            sourceKey: source.key,
+            cover: c.coverPath,
+          ));
+    } catch (e) {
+      showToast(message: e.toString());
+    }
   }
 
   void updateSearchResult() {
@@ -306,20 +312,7 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
   }
 
   bool downloadComic(FavoriteItem c) {
-    var source = c.type.comicSource;
-    if (source != null) {
-      bool isDownloaded = DownloadManager().isExists(c.toDownloadId());
-      if (isDownloaded) {
-        return false;
-      }
-      try {
-        DownloadManager().addFavoriteDownload(c);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
-    return false;
+    return c.addDownload();
   }
 
   void downloadSelected() {
@@ -685,10 +678,16 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                     text: "查看详情".tl,
                     onClick: () {
                       final c = selectedComics.keys.first;
-                      App.mainNavigatorKey?.currentContext?.to(() => ComicPage(
-                            id: c.target,
-                            sourceKey: c.type.comicSource?.key ?? '',
-                          ));
+                      try {
+                        final source = c.type.comicSource;
+                        if (source.isBuiltIn) throw "请先添加对应漫画源".tl;
+                        App.mainNavigatorKey?.currentContext?.to(() => ComicPage(
+                              id: c.target,
+                              sourceKey: source.key,
+                            ));
+                      } catch (e) {
+                        showToast(message: e.toString());
+                      }
                     },
                   ),
               ]),
@@ -1055,14 +1054,22 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
     if (DownloadManager().isExists(c.toDownloadId())) {
       var download = await DownloadManager().getComicOrNull(c.toDownloadId());
       if (download != null) {
-        // For downloaded comics, navigate to comic page
-        App.globalTo(() => ComicPage(
-          id: c.target,
-          sourceKey: c.type.comicSource.key,
-          cover: c.coverPath,
-        ));
+        download.read();
         return;
       }
+    }
+
+    late final ComicSource comicSource;
+    try {
+      comicSource = c.type.comicSource;
+      if (comicSource.isBuiltIn) throw "请先添加对应漫画源".tl;
+      if (comicSource.loadComicInfo == null ||
+          comicSource.loadComicPages == null) {
+        throw "漫画源不支持阅读".tl;
+      }
+    } catch (e) {
+      showToast(message: e.toString());
+      return;
     }
 
     bool cancel = false;
@@ -1072,42 +1079,33 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
       barrierDismissible: false,
     );
 
-    var comicSource = c.type.comicSource;
-    if (comicSource?.loadComicInfo != null) {
-      var res = await comicSource!.loadComicInfo!(c.target);
+    try {
+      var res = await comicSource.loadComicInfo!(c.target);
       if (cancel) return;
       dialog.close();
       if (res.error) {
         showToast(message: res.errorMessage ?? "Error");
       } else {
         var history = await HistoryManager().find(c.target);
-        if (history == null) {
-          history = History(
-            HistoryType(c.type.key),
-            DateTime.now(),
-            c.name,
-            c.author,
-            c.coverPath,
-            0,
-            0,
-            c.target,
-          );
-          await HistoryManager().addHistory(history);
-        }
-        // Navigate to reader using CustomReadingData
         App.globalTo(
           () => ComicReadingPage(
             CustomReadingData(
-              res.data.target,
+              c.target,
               res.data.title,
               comicSource,
               res.data.chapters,
+              historySubTitle: res.data.subTitle ?? '',
+              historyCover: res.data.cover,
             ),
-            history?.page ?? 0,
-            history?.ep ?? 0,
+            history?.page ?? 1,
+            history?.ep ?? 1,
           ),
         );
       }
+    } catch (e) {
+      if (!cancel) showToast(message: e.toString());
+    } finally {
+      if (!cancel) dialog.close();
     }
   }
 

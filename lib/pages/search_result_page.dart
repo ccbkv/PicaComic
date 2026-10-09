@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
-import 'package:pica_comic/foundation/comic_source/built_in/picacg.dart';
-import 'package:pica_comic/network/picacg_network/methods.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/components/category_selector.dart';
 import 'package:pica_comic/foundation/history.dart';
@@ -64,17 +62,23 @@ class _SearchPageComicList extends ComicsPage<BaseComic> {
       String keyword, int page, ComicSource source) async {
     final loader = source.searchPageData!.loadPage!;
 
-    // 对于Picacg源，传递分类参数
+    // The script owns the request, including category filters.
     if (sourceKey == "picacg" && selectedCategories.isNotEmpty) {
-      return await PicacgNetwork().search(keyword, options[0], page,
-          categories: selectedCategories, addToHistory: true);
+      return await loader(keyword, page,
+          [options.firstOrNull ?? 'dd', jsonEncode(selectedCategories)]);
     }
     return await loader(keyword, page, options);
   }
 
   @override
   Future<Res<List<BaseComic>>> getComics(int i) async {
-    final source = ComicSource.find(sourceKey)!;
+    final source = ComicSource.find(sourceKey);
+    if (source == null || source.isBuiltIn) {
+      return Res.error("请先添加对应漫画源".tl);
+    }
+    if (source.searchPageData?.loadPage == null) {
+      return Res.error("漫画源不支持搜索".tl);
+    }
 
     final res = await _searchSingleKeyword(keyword, i, source);
 
@@ -110,8 +114,14 @@ class SearchResultPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var comicSource =
-        ComicSource.find(sourceKey) ?? (throw "source $sourceKey not found");
+    var comicSource = ComicSource.find(sourceKey);
+    if (comicSource == null || comicSource.isBuiltIn) {
+      return Scaffold(body: NetworkError(
+        message: "请先添加对应漫画源".tl,
+        retry: () => Navigator.of(context).maybePop(),
+        buttonText: "返回".tl,
+      ));
+    }
     var options = this.options;
     if (comicSource.searchPageData?.searchOptions != null) {
       var searchOptions = comicSource.searchPageData!.searchOptions!;

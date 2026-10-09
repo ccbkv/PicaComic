@@ -59,7 +59,7 @@ final class FavoriteType {
   ComicSource get comicSource {
     if (key <= 6) {
       var key = comicType.name.toLowerCase();
-      return ComicSource.find(key)!;
+      return ComicSource.find(key) ?? (throw "Comic Source Not Found: $key");
     }
     return ComicSource.sources
             .firstWhereOrNull((element) => element.intKey == key) ??
@@ -107,7 +107,13 @@ class FavoriteItem {
 
   String toDownloadId() {
     try {
-      return switch (type.comicSource.key) {
+      // Local files remain accessible after uninstalling their source.
+      final key = type.comicType != ComicType.other
+          ? type.comicType.name.toLowerCase()
+          : const ['picacg', 'ehentai', 'jm', 'hitomi', 'htmanga', 'nhentai']
+                  .firstWhereOrNull((key) => key.hashCode == type.key) ??
+              type.comicSource.key;
+      final legacyId = switch (key) {
         "picacg" => target,
         "ehentai" => getGalleryId(target),
         "jm" => "jm$target",
@@ -116,8 +122,15 @@ class FavoriteItem {
             : target,
         "htmanga" => "Ht$target",
         "nhentai" => "nhentai$target",
-        _ => DownloadManager().generateId(type.comicSource.key, target)
+        _ => "$key-$target"
       };
+      final downloads = DownloadManager();
+      if (downloads.isExists(legacyId)) return legacyId;
+      final source = ComicSource.find(key);
+      final customId = source == null
+          ? "$key-$target"
+          : downloads.generateId(key, target);
+      return downloads.isExists(customId) ? customId : legacyId;
     } catch (e) {
       return "**Invalid ID**";
     }
@@ -519,15 +532,26 @@ class LocalFavoritesManager {
       LogManager.addLog(LogLevel.info, "LocalFavoritesManager.readData",
           "read folders from local database $folders");
       var folderToOrder = <String, int>{};
-      for (var folder in folders) {
-        var res = tmp_db.select("""
+      if (!tmp_db
+          .select("SELECT name FROM sqlite_master WHERE type='table';")
+          .map((element) => element["name"] as String)
+          .contains('folder_order')) {
+        LogManager.addLog(LogLevel.info, "LocalFavoritesManager.readData",
+            "temp local favorites db has no folder_order table, fallback to default order");
+        for (var folder in folders) {
+          folderToOrder[folder] = 0;
+        }
+      } else {
+        for (var folder in folders) {
+          var res = tmp_db.select("""
         select * from folder_order
         where folder_name == ?;
       """, [folder]);
-        if (res.isNotEmpty) {
-          folderToOrder[folder] = res.first["order_value"];
-        } else {
-          folderToOrder[folder] = 0;
+          if (res.isNotEmpty) {
+            folderToOrder[folder] = res.first["order_value"];
+          } else {
+            folderToOrder[folder] = 0;
+          }
         }
       }
       folders.sort((a, b) {

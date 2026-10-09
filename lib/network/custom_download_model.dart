@@ -5,11 +5,15 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show compute;
 import 'package:pica_comic/base.dart';
+import 'package:pica_comic/components/components.dart' show showToast;
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/app_dio.dart';
 import 'package:pica_comic/network/download_model.dart';
+import 'package:pica_comic/network/jm_network/jm_download.dart';
+import 'package:pica_comic/network/picacg_network/picacg_download_model.dart';
+import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/utils/zip_utils.dart';
 
 import '../utils/io_tools.dart';
@@ -43,6 +47,8 @@ class CustomDownloadedItem extends DownloadedItem {
   @override
   final List<String> tags;
 
+  final List<String> categories;
+
   @override
   DownloadType get type => DownloadType.other;
 
@@ -64,7 +70,7 @@ class CustomDownloadedItem extends DownloadedItem {
       this.sourceName,
       this.cover,
       this.comicId,
-      [this.subId]);
+      [this.subId, this.categories = const []]);
 
   @override
   Map<String, dynamic> toJson() => {
@@ -75,6 +81,7 @@ class CustomDownloadedItem extends DownloadedItem {
         "name": name,
         "subTitle": subTitle,
         "tags": tags,
+        "categories": categories,
         "sourceKey": sourceKey,
         "sourceName": sourceName,
         "cover": cover,
@@ -90,6 +97,7 @@ class CustomDownloadedItem extends DownloadedItem {
         name = json["name"],
         subTitle = json["subTitle"],
         tags = List<String>.from(json["tags"]),
+        categories = List<String>.from(json["categories"] ?? const <String>[]),
         sourceKey = json["sourceKey"],
         sourceName = json["sourceName"],
         cover = json["cover"],
@@ -100,14 +108,73 @@ class CustomDownloadedItem extends DownloadedItem {
 class CustomDownloadingItem extends DownloadingItem {
   CustomDownloadingItem(this.comic, this._downloadEps, super.whenFinish,
       super.whenError, super.updateInfo, super.id,
-      {super.type = DownloadType.other})
-      : source = ComicSource.find(comic.sourceKey)!;
+      {super.type = DownloadType.other});
 
   final ComicInfoData comic;
 
   final List<int> _downloadEps;
 
-  late final ComicSource source;
+  ComicSource get source {
+    final source = ComicSource.find(comic.sourceKey);
+    if (source == null || source.isBuiltIn) {
+      throw '请先添加对应漫画源'.tl;
+    }
+    return source;
+  }
+
+  @override
+  void start() {
+    final current = ComicSource.find(comic.sourceKey);
+    if (current == null || current.isBuiltIn) {
+      Future.microtask(() {
+        if (!identical(DownloadManager().downloading.firstOrNull, this)) return;
+        showToast(message: '请先添加对应漫画源'.tl);
+        onError?.call();
+      });
+      return;
+    }
+    super.start();
+  }
+
+  @override
+  Future<void> onStart() async {
+    if (this is! CustomArchiveDownloadingItem && source.loadComicPages == null) {
+      throw '漫画源不支持下载'.tl;
+    }
+    final previous = await DownloadManager().getComicOrNull(id);
+    if (previous != null) {
+      final previousHasEps = previous is CustomDownloadedItem
+          ? previous.chapters != null
+          : previous is DownloadedComic || previous is DownloadedJmComic;
+      if (previousHasEps != haveEps) {
+        throw '章节目录格式已变化，已保留旧下载文件'.tl;
+      }
+      final ids = comic.chapters?.ids.toList() ?? <String>[];
+      if (previous is DownloadedJmComic) {
+        final oldIds = previous.comic.series.isEmpty
+            ? {1: previous.comic.id}
+            : previous.comic.series;
+        for (final ep in oldIds.entries) {
+          if (ids.elementAtOrNull(ep.key - 1) != ep.value) {
+            throw '章节顺序已变化，已保留旧下载文件'.tl;
+          }
+        }
+      } else if (previous is DownloadedComic) {
+        if (ids.length < previous.eps.length ||
+            ids.indexed.any((entry) => entry.$2 != '${entry.$1 + 1}')) {
+          throw '章节顺序已变化，已保留旧下载文件'.tl;
+        }
+      } else if (previous is CustomDownloadedItem) {
+        final oldIds = previous.chapters?.ids.toList() ?? <String>[];
+        for (int i = 0; i < oldIds.length; i++) {
+          if (ids.elementAtOrNull(i) != oldIds[i]) {
+            throw '章节顺序已变化，已保留旧下载文件'.tl;
+          }
+        }
+      }
+    }
+    await super.onStart();
+  }
 
   @override
   String get cover => comic.cover;
@@ -129,6 +196,30 @@ class CustomDownloadingItem extends DownloadingItem {
   Map<String, String> get headers => {
         "User-Agent": webUA,
       };
+
+  @override
+  Future<void> downloadCover() async {
+    if (source.getThumbnailLoadingConfig == null) {
+      return super.downloadCover();
+    }
+    final file = File("$path/cover.jpg");
+    if (file.existsSync()) return;
+
+    DownloadProgress? result;
+    await for (final progress
+        in ImageManager().getCustomThumbnail(cover, source.key, headers)) {
+      if (progress.currentBytes == progress.expectedBytes) {
+        result = progress;
+      }
+    }
+    if (result == null) {
+      throw StateError("Cover download did not complete");
+    }
+    final bytes = result.data ?? await result.getFile().readAsBytes();
+    if (file.existsSync()) return;
+    await file.create(recursive: true);
+    await file.writeAsBytes(bytes);
+  }
 
   Future<void> getOneEp(int i, Map<int, List<String>> links) async {
     if (links[i + 1] != null) return;
@@ -189,23 +280,48 @@ class CustomDownloadingItem extends DownloadingItem {
       String id)
       : comic = ComicInfoData.fromJson(map["comic"]),
         _downloadEps = List<int>.from(map["_downloadEps"]),
-        super.fromMap(map, whenFinish, whenError, updateInfo) {
-    source = ComicSource.find(comic.sourceKey)!;
-  }
+        super.fromMap(map, whenFinish, whenError, updateInfo);
 
   @override
   Future<DownloadedItem> toDownloadedItem() async {
-    var previous = <int>[];
-    if (DownloadManager().isExists(id)) {
-      var comic = await DownloadManager().getComicOrNull(id);
-      previous = comic!.downloadedEps;
-    }
+    final existing = await DownloadManager().getComicOrNull(id);
+    final previous = existing?.downloadedEps ?? <int>[];
     var downloaded = (_downloadEps + previous).toSet().toList();
     downloaded.sort();
+    final size = await getFolderSize(Directory(path));
+    // Retain the legacy record format as well as its ID and chapter directory.
+    if (existing is DownloadedComic) {
+      existing.chapters = comic.chapters!.titles.toList();
+      existing.downloadedChapters = downloaded;
+      existing.comicSize = size;
+      return existing;
+    }
+    if (existing is DownloadedJmComic) {
+      final ids = comic.chapters!.ids.toList();
+      existing.comic.series = {
+        for (int i = 0; i < ids.length; i++) i + 1: ids[i],
+      };
+      existing.comic.epNames = comic.chapters!.titles.toList();
+      existing.downloadedChapters = downloaded;
+      existing.comicSize = size;
+      return existing;
+    }
+    if (existing != null && existing is! CustomDownloadedItem) {
+      existing.comicSize = size;
+      return existing;
+    }
     var tags = <String>[];
     comic.tags.forEach((key, value) => tags.addAll(value));
+    final categories = comic.tags.entries
+        .where((entry) => const {
+              '分类', '分類', '类别', '類別', 'category', 'categories',
+            }.contains(entry.key.trim().toLowerCase()))
+        .expand((entry) => entry.value)
+        .where((value) => value.trim().isNotEmpty)
+        .toSet()
+        .toList();
     return CustomDownloadedItem(
-      await getFolderSize(Directory(path)),
+      size,
       downloaded,
       haveEps ? comic.chapters : null,
       id,
@@ -217,6 +333,7 @@ class CustomDownloadingItem extends DownloadingItem {
       comic.cover,
       comic.comicId,
       comic.subId,
+      categories,
     );
   }
 

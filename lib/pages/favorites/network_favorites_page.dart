@@ -7,7 +7,8 @@ Future<bool> _deleteComic(
   String? favId,
 ) async {
   var source = ComicSource.find(sourceKey);
-  if (source == null) {
+  if (source == null || source.isBuiltIn) {
+    showToast(message: "请先添加对应漫画源".tl);
     return false;
   }
 
@@ -81,6 +82,7 @@ class _NormalFavoritePage extends StatefulWidget {
 }
 
 class _NormalFavoritePageState extends State<_NormalFavoritePage> {
+  bool _loadingRandom = false;
   void showFolders() {
     context
         .findAncestorStateOfType<_FavoritesPageState>()!
@@ -88,15 +90,60 @@ class _NormalFavoritePageState extends State<_NormalFavoritePage> {
   }
 
   Future<void> openRandomFavorite() async {
-    final dialog = showLoadingDialog(context);
-    final res = await NhentaiNetwork().getRandomFavoriteId();
-    dialog.close();
-    if (!mounted) return;
-    if (res.error || res.data == null || res.data!.isEmpty) {
-      showToast(message: res.errorMessage ?? 'Error');
+    if (_loadingRandom) return;
+    final source = ComicSource.find(widget.data.key);
+    if (source == null || source.isBuiltIn) {
+      showToast(message: "请先添加对应漫画源".tl);
       return;
     }
-    context.to(() => ComicPage(sourceKey: 'nhentai', id: res.data!));
+    final favorites = source.favoriteData;
+    if (favorites == null) {
+      showToast(message: "漫画源不支持网络收藏".tl);
+      return;
+    }
+    _loadingRandom = true;
+    bool cancelled = false;
+    final dialog = showLoadingDialog(context, onCancel: () => cancelled = true);
+    try {
+      var res = await favorites.loadComic(1);
+      if (cancelled || !mounted) return;
+      if (res.error) throw res.errorMessageWithoutNull;
+      BaseComic? selected;
+      final random = Random();
+      final maxPage = res.subData;
+      if (maxPage is int && maxPage > 0) {
+        final page = random.nextInt(maxPage) + 1;
+        if (page != 1) res = await favorites.loadComic(page);
+        if (res.error) throw res.errorMessageWithoutNull;
+        if (res.data.isNotEmpty) selected = res.data[random.nextInt(res.data.length)];
+      } else {
+        // Cursor-only sources have no page count; sample while paging through.
+        int count = 0;
+        int page = 1;
+        while (res.data.isNotEmpty) {
+          for (final comic in res.data) {
+            if (random.nextInt(++count) == 0) selected = comic;
+          }
+          if (res.subData is int && page >= (res.subData as int)) break;
+          if (cancelled || !mounted) return;
+          res = await favorites.loadComic(++page);
+          if (res.error) throw res.errorMessageWithoutNull;
+        }
+      }
+      if (cancelled || !mounted) return;
+      dialog.close();
+      if (selected == null) {
+        showToast(message: "收藏夹为空".tl);
+        return;
+      }
+      final comic = selected;
+      context.to(() => ComicPage(sourceKey: source.key, id: comic.id));
+    } catch (e) {
+      if (!cancelled && mounted) showToast(message: e.toString());
+    } finally {
+      if (!cancelled) dialog.close();
+      _loadingRandom = false;
+    }
   }
 
   @override
@@ -140,7 +187,12 @@ class _NormalFavoriteComicsPage extends ComicsPage<BaseComic> {
 
   @override
   Future<Res<List<BaseComic>>> getComics(int i) {
-    return data.loadComic(i);
+    final source = ComicSource.find(data.key);
+    if (source == null || source.isBuiltIn) {
+      return Future.value(Res.error("请先添加对应漫画源".tl));
+    }
+    return source.favoriteData?.loadComic(i) ??
+        Future.value(Res.error("漫画源不支持网络收藏".tl));
   }
 
   @override
@@ -280,8 +332,19 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
   }
 
   void loadPage() async {
-    if (widget.data.loadFolders != null) {
-      var res = await widget.data.loadFolders!();
+    await Future<void>.value();
+    if (!mounted) return;
+    final source = ComicSource.find(widget.data.key);
+    if (source == null || source.isBuiltIn) {
+      setState(() {
+        _loading = false;
+        _errorMessage = "请先添加对应漫画源".tl;
+      });
+      return;
+    }
+    final loadFolders = source.favoriteData?.loadFolders;
+    if (loadFolders != null) {
+      var res = await loadFolders();
       if (!mounted) return;
       _loading = false;
       if (res.error) {
@@ -293,6 +356,11 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
           folders = res.data;
         });
       }
+    } else {
+      setState(() {
+        _loading = false;
+        _errorMessage = "漫画源不支持网络收藏文件夹".tl;
+      });
     }
   }
 
@@ -683,7 +751,12 @@ class _FavoriteFolderComicsPage extends ComicsPage<BaseComic> {
 
   @override
   Future<Res<List<BaseComic>>> getComics(int i) {
-    return data.loadComic(i, folderID);
+    final source = ComicSource.find(data.key);
+    if (source == null || source.isBuiltIn) {
+      return Future.value(Res.error("请先添加对应漫画源".tl));
+    }
+    return source.favoriteData?.loadComic(i, folderID) ??
+        Future.value(Res.error("漫画源不支持网络收藏".tl));
   }
 
   @override

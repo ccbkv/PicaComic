@@ -81,9 +81,9 @@ class MePage extends StatelessWidget {
           buildHistory(context),
           buildFollowUpdates(context),
           buildAccount(1000), // width not critical for Fluent layout here
+          buildComicSource(context, 1000),
           buildDownload(context, 1000),
           buildLocalAddComic(context, 1000),
-          buildComicSource(context, 1000),
           buildImageFavorite(context, 1000),
           buildTools(context, 1000),
           buildSyncData(context, 1000),
@@ -115,9 +115,9 @@ class MePage extends StatelessWidget {
                         child: Column(
                           children: [
                             buildAccount(width),
+                            buildComicSource(context, width),
                             buildDownload(context, width),
                             buildLocalAddComic(context, width),
-                            buildComicSource(context, width),
                           ],
                         ),
                       ),
@@ -137,9 +137,9 @@ class MePage extends StatelessWidget {
                 else
                   ...[
                     buildAccount(width),
+                    buildComicSource(context, width),
                     buildDownload(context, width),
                     buildLocalAddComic(context, width),
-                    buildComicSource(context, width),
                     buildImageFavorite(context, width),
                     buildTools(context, width),
                   ],
@@ -513,6 +513,7 @@ class MePage extends StatelessWidget {
       },
     );
   }
+
 
   Widget buildDownload(BuildContext context, double width) {
     return StateBuilder<SimpleController>(

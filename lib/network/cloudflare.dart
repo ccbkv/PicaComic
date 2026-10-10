@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' as io;
 
 import 'package:dio/dio.dart';
@@ -162,63 +163,61 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
     webview.open();
   } else {
     bool success = false;
-    void check(InAppWebViewController controller) async {
-      var head = await controller.evaluateJavascript(
-          source: "document.head.innerHTML") as String;
-      var body = await controller.evaluateJavascript(
-          source: "document.body.innerHTML") as String;
-      Log.info("Cloudflare", "Checking head: $head");
-      var isChallenging = head.contains('#challenge-success-text') ||
-          head.contains("#challenge-error-text") ||
-          head.contains("#challenge-form") ||
-          body.contains("challenge-platform") ||
-          body.contains("window._cf_chl_opt");
-      if (!isChallenging) {
-        Log.info(
-          "Cloudflare",
-          "Cloudflare is passed due to there is no challenge css",
-        );
-        var ua = await controller.getUA();
+    bool closed = false;
+    bool checking = false;
+    Timer? timer;
+    Future<void> check(InAppWebViewController controller) async {
+      if (closed || success || checking) return;
+      checking = true;
+      try {
+        final currentUrl = await controller.getUrl();
+        if (currentUrl == null ||
+            Uri.parse(currentUrl.toString()).origin != uri.origin) return;
+        // Background challenge scripts can remain on the normal website.
+        // Check active challenge UI, not script URLs in the page's HTML.
+        final ready = await controller.evaluateJavascript(source: """
+          document.readyState !== 'loading' &&
+          !document.querySelector('#challenge-form, #challenge-running') &&
+          !window._cf_chl_opt
+        """);
+        if (ready != true || closed) return;
+        var cookies = await controller.getCookies(url) ?? [];
+        if (!cookies.any((cookie) =>
+            cookie.name == 'cf_clearance' && cookie.value.isNotEmpty)) return;
+        final ua = await controller.getUA();
+        if (closed || success) return;
         if (ua != null) {
           appdata.implicitData[3] = ua;
           appdata.writeImplicitData();
         }
-        var cookies = await controller.getCookies(url) ?? [];
-        if (cookies.firstWhereOrNull(
-                (element) => element.name == 'cf_clearance') ==
-            null) {
-          return;
-        }
         SingleInstanceCookieJar.instance?.saveFromResponse(uri, cookies);
-        if (!success) {
-          App.globalBack();
-          success = true;
-        }
+        success = true;
+        timer?.cancel();
+        App.globalBack();
+      } catch (error) {
+        if (!closed) Log.error("Cloudflare", error.toString());
+      } finally {
+        checking = false;
       }
     }
 
-    await App.globalTo(
-      () => AppWebview(
-        initialUrl: url,
-        singlePage: true,
-        onTitleChange: (title, controller) async {
-          check(controller);
-        },
-        onLoadStop: (controller) async {
-          check(controller);
-        },
-        onStarted: (controller) async {
-          var ua = await controller.getUA();
-          if (ua != null) {
-            appdata.implicitData[3] = ua;
-            appdata.writeImplicitData();
-          }
-          var cookies = await controller.getCookies(url) ?? [];
-          SingleInstanceCookieJar.instance?.saveFromResponse(uri, cookies);
-        },
-      ),
-    );
-    onFinished();
-
+    try {
+      await App.globalTo(
+        () => AppWebview(
+          initialUrl: url,
+          singlePage: true,
+          onTitleChange: (title, controller) => unawaited(check(controller)),
+          onLoadStop: (controller) => unawaited(check(controller)),
+          onStarted: (controller) {
+            timer = Timer.periodic(const Duration(milliseconds: 750),
+                (_) => unawaited(check(controller)));
+          },
+        ),
+      );
+    } finally {
+      closed = true;
+      timer?.cancel();
+      onFinished();
+    }
   }
 }

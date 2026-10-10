@@ -31,7 +31,10 @@ extension WebviewExtension on InAppWebViewController {
       url = url.substring(0, url.length - 1);
     }
     CookieManager cookieManager = CookieManager.instance();
-    final cookies = await cookieManager.getCookies(url: WebUri(url));
+    final cookies = await cookieManager.getCookies(
+      url: WebUri(url),
+      webViewController: io.Platform.isWindows ? this : null,
+    );
     var res = <io.Cookie>[];
     for (var cookie in cookies) {
       var c = io.Cookie(cookie.name, cookie.value);

@@ -559,6 +559,28 @@ class MePage extends StatelessWidget {
     return StateBuilder<SimpleController>(
       tag: "me_page_sources",
       init: SimpleController(),
+      initState: (controller) {
+        if (appdata.settings[2] != "1") {
+          return;
+        }
+        () async {
+          var last = await appdata.readLastComicSourceCheck();
+          if (last != null &&
+              DateTime.now()
+                      .difference(DateTime.fromMillisecondsSinceEpoch(last)) <
+                  const Duration(hours: 12)) {
+            return;
+          }
+          try {
+            var count = await checkComicSourceUpdate();
+            if (count >= 0) {
+              appdata.writeLastComicSourceCheck(
+                  DateTime.now().millisecondsSinceEpoch);
+            }
+          } catch (_) {}
+          controller.update();
+        }();
+      },
       builder: (controller) {
         var comicSources = ComicSource.sources;
         Widget buildItem(String name) {
@@ -590,17 +612,38 @@ class MePage extends StatelessWidget {
           );
         }
 
+        var updateCount = comicSources
+            .where((e) =>
+                !e.isBuiltIn &&
+                ComicSource.updates[e.key] != null &&
+                ComicSource.updates[e.key] != e.version)
+            .length;
+
         return _MePageCard(
           icon: const Icon(Icons.dashboard_customize),
           title: "漫画源".tl,
           badge: comicSources.length.toString(),
           onTap: () => App.mainNavigatorKey?.currentContext
               ?.to(() => const ComicSourceSettings()),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: comicSources.map((e) => buildItem(e.name.tl)).toList(),
-          ).paddingHorizontal(12).paddingBottom(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (updateCount > 0)
+                Text(
+                  "有@a个可更新".tlParams({"a": updateCount.toString()}),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.green),
+                ).paddingHorizontal(12).paddingBottom(8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    comicSources.map((e) => buildItem(e.name.tl)).toList(),
+              ).paddingHorizontal(12).paddingBottom(12),
+            ],
+          ),
         );
       },
     );

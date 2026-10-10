@@ -344,6 +344,33 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   }
 }
 
+Future<int> checkComicSourceUpdate() async {
+  if (ComicSource.sources.isEmpty) {
+    return 0;
+  }
+  var dio = logDio();
+  var res = await dio.get<String>(
+      "https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/index.json");
+  if (res.statusCode != 200) {
+    return -1;
+  }
+  var list = jsonDecode(res.data!) as List;
+  var versions = <String, String>{};
+  for (var source in list) {
+    versions[source['key']] = source['version'];
+  }
+  var shouldUpdate = <String>[];
+  for (var source in ComicSource.sources.where((e) => !e.isBuiltIn)) {
+    if (versions.containsKey(source.key) &&
+        versions[source.key] != source.version) {
+      shouldUpdate.add(source.key);
+    }
+  }
+  ComicSource.updates = {for (var key in shouldUpdate) key: versions[key]!};
+  StateController.findOrNull(tag: "me_page_sources")?.update();
+  return shouldUpdate.length;
+}
+
 class _CheckUpdatesButton extends StatefulWidget {
   const _CheckUpdatesButton();
 
@@ -408,32 +435,6 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
       }
       loadingController.close();
     }
-  }
-
-  static Future<int> checkComicSourceUpdate() async {
-    if (ComicSource.sources.isEmpty) {
-      return 0;
-    }
-    var dio = logDio();
-    var res = await dio.get<String>(
-        "https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/index.json");
-    if (res.statusCode != 200) {
-      return -1;
-    }
-    var list = jsonDecode(res.data!) as List;
-    var versions = <String, String>{};
-    for (var source in list) {
-      versions[source['key']] = source['version'];
-    }
-    var shouldUpdate = <String>[];
-    for (var source in ComicSource.sources.where((e) => !e.isBuiltIn)) {
-      if (versions.containsKey(source.key) &&
-          versions[source.key] != source.version) {
-        shouldUpdate.add(source.key);
-      }
-    }
-    ComicSource.updates = {for (var key in shouldUpdate) key: versions[key]!};
-    return shouldUpdate.length;
   }
 
   @override
@@ -792,7 +793,7 @@ class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
 
   Future<void> _checkForUpdates() async {
     try {
-      await _CheckUpdatesButtonState.checkComicSourceUpdate();
+      await checkComicSourceUpdate();
       if (mounted) setState(() {});
     } catch (e) {
       LogManager.addLog(LogLevel.error, 'ComicSourceSettings', e.toString());

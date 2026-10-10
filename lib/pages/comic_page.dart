@@ -358,11 +358,13 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
 
   @override
   Future<bool> loadFavorite(ComicInfoData data) async {
-    return data.isFavorite ?? false;
+    final folders = await LocalFavoritesManager()
+        .find(id, FavoriteType(sourceKey.hashCode));
+    return folders.isNotEmpty || (data.isFavorite ?? false);
   }
 
   @override
-  int? get pages => null;
+  int? get pages => data?.pages;
 
   @override
   void read(History? history) async {
@@ -453,6 +455,37 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
         sourceKey: sourceKey,
       ),
     );
+  }
+
+  @override
+  ActionFunc? get searchSimilar {
+    if (data == null) {
+      return null;
+    }
+    try {
+      final keyword = JsEngine().runCode("""
+        (() => {
+          const comic = ComicSource.sources[${jsonEncode(sourceKey)}]?.comic;
+          return typeof comic?.searchSimilar === 'function'
+            ? comic.searchSimilar(${jsonEncode(data!.title)}, ${jsonEncode(data!.subTitle)})
+            : null;
+        })()
+      """);
+      if (keyword is! String || keyword.trim().isEmpty) {
+        return null;
+      }
+      return () {
+        context.to(
+          () => SearchResultPage(
+            keyword: keyword,
+            sourceKey: sourceKey,
+          ),
+        );
+      };
+    } catch (e) {
+      Log.error(sourceKey, 'Failed to handle searchSimilar: $e');
+      return null;
+    }
   }
 
   @override

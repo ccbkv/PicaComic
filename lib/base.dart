@@ -244,6 +244,51 @@ class Appdata {
     }
   }
 
+  Future<int?> readLastComicSourceCheck() async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file =
+              File("${externalDirectory.path}/lastComicSourceCheck.txt");
+          if (await file.exists()) {
+            var content = await file.readAsString();
+            return int.tryParse(content);
+          }
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.readLastComicSourceCheck",
+            "Failed to read lastComicSourceCheck: $e");
+      }
+      return null;
+    } else {
+      var s = await SharedPreferences.getInstance();
+      return s.getInt("lastComicSourceCheck");
+    }
+  }
+
+  void writeLastComicSourceCheck(int time) async {
+    if (Platform.isAndroid) {
+      try {
+        var externalDirectory = await getExternalStorageDirectory();
+        if (externalDirectory != null) {
+          var file =
+              File("${externalDirectory.path}/lastComicSourceCheck.txt");
+          if (!await file.exists()) {
+            await file.create();
+          }
+          await file.writeAsString(time.toString());
+        }
+      } catch (e) {
+        LogManager.addLog(LogLevel.error, "Appdata.writeLastComicSourceCheck",
+            "Failed to write lastComicSourceCheck: $e");
+      }
+    } else {
+      var s = await SharedPreferences.getInstance();
+      await s.setInt("lastComicSourceCheck", time);
+    }
+  }
+
   void writeSearchHistory() async {
     if (Platform.isAndroid) {
       try {

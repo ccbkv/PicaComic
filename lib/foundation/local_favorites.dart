@@ -49,6 +49,25 @@ final class FavoriteType {
 
   static FavoriteType get nhentai => const FavoriteType(6);
 
+  // Recognize both legacy and script records without changing stored types.
+  List<int> get _compatibleKeys {
+    const legacyKeys = {
+      'picacg': 0,
+      'ehentai': 1,
+      'jm': 2,
+      'hitomi': 3,
+      'htmanga': 4,
+      'nhentai': 6,
+    };
+    for (final entry in legacyKeys.entries) {
+      final scriptKey = entry.key.hashCode;
+      if (key == entry.value || key == scriptKey) {
+        return {key, entry.value, scriptKey}.toList();
+      }
+    }
+    return [key];
+  }
+
   ComicType get comicType {
     if (key >= 0 && key <= 6) {
       return ComicType.values[key];
@@ -452,11 +471,12 @@ class LocalFavoritesManager {
 
   Future<List<String>> find(String target, FavoriteType type) async {
     var res = <String>[];
+    final keys = type._compatibleKeys;
     for (var folder in folderNames) {
       var rows = _db.select("""
         select * from "$folder"
-        where target == ? and type == ?;
-      """, [target, type.key]);
+        where target == ? and type in (${List.filled(keys.length, '?').join(',')});
+      """, [target, ...keys]);
       if (rows.isNotEmpty) {
         res.add(folder);
       }
@@ -465,17 +485,7 @@ class LocalFavoritesManager {
   }
 
   Future<List<String>> findWithModel(FavoriteItem item) async {
-    var res = <String>[];
-    for (var folder in folderNames) {
-      var rows = _db.select("""
-        select * from "$folder"
-        where target == ? and type == ?;
-      """, [item.target, item.type.key]);
-      if (rows.isNotEmpty) {
-        res.add(folder);
-      }
-    }
-    return res;
+    return find(item.target, item.type);
   }
 
   Future<void> saveData() async {
@@ -983,10 +993,11 @@ class LocalFavoritesManager {
       return; // 如果表不存在，直接返回
     }
 
+    final keys = type._compatibleKeys;
     _db.execute("""
       delete from "$folder"
-      where target == ? and type == ?;
-    """, [target, type.key]);
+      where target == ? and type in (${List.filled(keys.length, '?').join(',')});
+    """, [target, ...keys]);
     saveData();
   }
 

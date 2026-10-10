@@ -736,6 +736,8 @@ class ComicInfoData with HistoryMixin {
   /// uploader info card data (JS sources)
   final UploaderInfo? uploader;
 
+  final int? pages;
+
   const ComicInfoData(
       this.title,
       this.subTitle,
@@ -752,7 +754,8 @@ class ComicInfoData with HistoryMixin {
       {this.isFavorite,
       this.subId,
       this.stars,
-      this.uploader});
+      this.uploader,
+      this.pages});
 
   Map<String, dynamic> toJson() {
     return {
@@ -768,6 +771,7 @@ class ComicInfoData with HistoryMixin {
       "subId": subId,
       "stars": stars,
       "uploader": uploader?.toJson(),
+      "pages": pages,
     };
   }
 
@@ -795,6 +799,11 @@ class ComicInfoData with HistoryMixin {
         isFavorite = json["isFavorite"],
         subId = json["subId"],
         stars = json["stars"] != null ? (json["stars"] as num).toDouble() : null,
+        pages = switch (json["pages"] ?? json["maxPage"]) {
+          num value when value.isFinite => value.toInt(),
+          String value => int.tryParse(value),
+          _ => null,
+        },
         uploader = json["uploader"] is Map
             ? UploaderInfo.fromJson(Map<String, dynamic>.from(json["uploader"]))
             : null;

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:pica_comic/foundation/app.dart';
+import 'package:pica_comic/network/cloudflare.dart';
 import 'package:pica_comic/network/cookie_jar.dart';
 import 'package:pica_comic/pages/webview.dart';
 import 'package:pica_comic/utils/translations.dart';
@@ -50,8 +51,29 @@ class _EhScriptLoginPageState extends State<EhScriptLoginPage> {
       _error = null;
     });
     try {
-      final success = await widget
-          .validateCookies(_controllers.map((c) => c.text).toList());
+      final values = _controllers.map((c) => c.text).toList();
+      bool success;
+      try {
+        success = await widget.validateCookies(values);
+      } catch (e) {
+        final challenge = CloudflareException.fromString(e.toString());
+        if (challenge == null || !mounted) rethrow;
+        final verified = Completer<void>();
+        passCloudflare(challenge, () {
+          if (!verified.isCompleted) verified.complete();
+        });
+        await verified.future;
+        if (!mounted) return;
+        final cookies = SingleInstanceCookieJar.instance!
+            .loadForRequest(Uri.parse(challenge.url));
+        if (!cookies.any(
+            (cookie) => cookie.name == 'cf_clearance' && cookie.value.isNotEmpty)) {
+          setState(() => _error = 'Cloudflare 验证未完成'.tl);
+          return;
+        }
+        // Retry once; a challenge must never count as a successful login.
+        success = await widget.validateCookies(values);
+      }
       if (!mounted) return;
       if (success) {
         Navigator.of(context).pop(true);

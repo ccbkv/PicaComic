@@ -984,6 +984,11 @@ class ComicSourceParser {
             isFavorite: res["isFavorite"],
             subId: res["subId"],
             stars: res["stars"] != null ? (res["stars"] as num).toDouble() : null,
+            pages: switch (res["pages"] ?? res["maxPage"]) {
+              num value when value.isFinite => value.toInt(),
+              String value => int.tryParse(value),
+              _ => null,
+            },
             uploader: uploader));
       } catch (e, s) {
         log("$e\n$s", "Network", LogLevel.error);

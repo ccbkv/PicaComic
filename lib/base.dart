@@ -651,7 +651,20 @@ class Appdata {
     }
   }
 
-  Future<void> updateSettings([bool syncData = true]) async {
+  /// 把 `settings` 写入本机文件。
+  ///
+  /// [syncData] 默认 **false** —— 只写本机，**不触发上传**。
+  ///
+  /// 为什么改掉原来的默认值：全项目有 30+ 处调用 `updateSettings()`（用户每拨
+  /// 动一个设置开关都会调到），旧默认值是 true，于是「改任一设置 = 立刻把整份
+  /// 数据上传覆盖服务器」。由此带来两个真实困扰：
+  /// 1. 两台机器各改一个设置 → 后改的那台把前一台的设置覆盖掉；
+  /// 2. 启动时 main.dart 的「Fluent UI 与液态玻璃互斥」自检也会顺带上传，
+  ///    把本机被清零的开关推给服务器，导致另一台设置莫名其妙变回去。
+  ///
+  /// 现在改为：设置只写本机，要同步由用户手动点「上传」。
+  /// 需要「改完就同步」的场景请显式传 `true`。
+  Future<void> updateSettings([bool syncData = false]) async {
     var settingsFile = File("${App.dataPath}/settings");
 
     await settingsFile.writeAsString(jsonEncode(settings));
@@ -670,7 +683,15 @@ class Appdata {
     var s = await SharedPreferences.getInstance();
   }
 
-  Future<void> writeData([bool sync = true]) async {
+  /// 写入全部数据（settings / 隐式数据等）。
+  ///
+  /// [sync] 默认 **false** —— 只写本机，**不触发上传**。
+  ///
+  /// 与 [updateSettings] 同理：全项目有 30+ 处调用 `writeData()`，散布在
+  /// 阅读设置、收藏、更新提醒等各个角落，其中多数只是「顺手存一下」。
+  /// 旧默认值 true 会让这些零散的写入点**每次都把整份数据推上服务器**，
+  /// 在多设备下表现为「什么都没点，另一台就变了」。需要立即同步的场景请显式传 `true`。
+  Future<void> writeData([bool sync = false]) async {
     writeImplicitData();
     if (sync) {
       Webdav.uploadData();
@@ -774,16 +795,51 @@ class Appdata {
         "favoriteTags": favoriteTags.toList(),
       };
 
-  bool readDataFromJson(Map<String, dynamic> json) {
+  /// 那些「属于本机身份、绝不能被其它设备覆盖」的设置项索引。
+  ///
+  /// 这类设置描述的是**当前这台设备自己**的状态，同步到别的设备上会出乱子：
+  /// - 13 需要生物识别（本机是否录入过指纹/面容，各机不同）
+  /// - 22 下载目录（各平台的绝对路径，各机不同）
+  /// - 45 WebDAV 配置（url;用户名;密码;路径 —— 覆盖了会把 A 机的密码写到 B 机）
+  /// - 46 本机数据版本号（覆盖了会让同步被静默跳过）
+  ///
+  /// 注意：**开关型设置（如 103 液态玻璃底栏）不在白名单内**，它们应当从备份
+  /// 同步过来，否则「A 机开了悬浮底栏、B 机同步后没生效」。
+  static const _deviceLocalSettingIndexes = <int>{13, 22, 45, 46};
+
+  /// 从备份 json 恢复数据。
+  ///
+  /// [mergeSettings] 为 true 时使用「合并式导入」：只保留 [_deviceLocalSettingIndexes]
+  /// 里列出的「本机身份」设置，其余设置一律采用备份值 —— 这样在已引导的设备上
+  /// 也能正确同步「悬浮底栏」等开关型设置。
+  /// 为 false 时保留旧行为（逐位覆盖），用于新设备首次从 WebDAV 恢复配置。
+  ///
+  /// [skipSettings] 为 true 时**完全不动** `settings`，只合并收藏/历史等数据。
+  /// 用于「上传前的预合并」：那一刻本机设置才是权威值（用户刚改的），
+  /// 拉服务器备份只是为了合并收藏，绝不能让它把设置盖回去。
+  bool readDataFromJson(Map<String, dynamic> json,
+      {bool mergeSettings = false, bool skipSettings = false}) {
     try {
       var newSettings = List<String>.from(json["settings"]);
-      var downloadPath = settings[22];
-      var authRequired = settings[13];
+      // 先记下本机身份类设置的现值，稍后原样写回。
+      var preserved = <int, String>{};
+      if (mergeSettings) {
+        for (var i in _deviceLocalSettingIndexes) {
+          if (i < settings.length) preserved[i] = settings[i];
+        }
+      }
       for (var i = 0; i < settings.length && i < newSettings.length; i++) {
+        if (skipSettings) {
+          // 预合并模式：设置完全保留本机值，一个字节都不改。
+          break;
+        }
+        if (mergeSettings && preserved.containsKey(i)) {
+          // 合并式导入：本机身份类设置 -> 保留本机值。
+          continue;
+        }
+        // 其余设置（含 103 液态玻璃底栏等开关）一律采用备份值。
         settings[i] = newSettings[i];
       }
-      settings[22] = downloadPath;
-      settings[13] = authRequired;
       var newFirstUse = List<String>.from(json["firstUse"]);
       for (var i = 0; i < firstUse.length && i < newFirstUse.length; i++) {
         firstUse[i] = newFirstUse[i];

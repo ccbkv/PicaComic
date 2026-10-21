@@ -52,7 +52,15 @@ class DataSync extends StateController {
     }
   }
 
-  Future<void> downloadData() async {
+  /// 下载/导入备份数据。
+  ///
+  /// [force] 为 true 时表示这是**用户主动点按**的下载，必须无条件覆盖本机
+  /// 数据；否则（后台自动同步）在服务器版本号与本机相同时会直接跳过。
+  ///
+  /// [pullSettings] 为 true 时把服务器上的设置也拉过来覆盖本机。本类的调用方
+  /// 是「我的」页面的手动下载按钮，语义就是「以服务器为准」，故默认为 true。
+  /// 后台自动同步请走 [Webdav.syncData]，它会显式传 false。
+  Future<void> downloadData({bool force = true, bool pullSettings = true}) async {
     if (_isUploading || _isDownloading) return;
 
     _isDownloading = true;
@@ -60,7 +68,7 @@ class DataSync extends StateController {
     update();
 
     try {
-      var result = await Webdav.downloadData();
+      var result = await Webdav.downloadData(null, force, pullSettings);
       if (!result) {
         _lastError = 'Download failed';
       }

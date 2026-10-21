@@ -1007,10 +1007,9 @@ void syncDataSettings(BuildContext context) {
                       appdata.implicitData[15] = autoSync ? '1' : '0';
                       appdata.writeImplicitData();
 
-                      if (!autoSync) {
-                        App.globalBack();
-                        return;
-                      }
+                      // NOTE: manual upload/download is intentionally performed
+                      // even when auto-sync is off. Previously the button did
+                      // nothing at all in that case, which looked like a hang.
 
                       setState(() {
                         isTesting = true;
@@ -1023,9 +1022,14 @@ void syncDataSettings(BuildContext context) {
                         setState(() {
                           isTesting = false;
                         });
-                        showToast(message: "Failed to sync data");
+                        showToast(
+                            message: (Webdav.lastError ??
+                                    (upload ? "上传失败" : "下载失败"))
+                                .tl);
                       } else {
                         App.globalBack();
+                        showToast(
+                            message: (upload ? "上传成功" : "下载成功").tl);
                       }
                     },
             ),
@@ -1194,10 +1198,8 @@ void syncDataSettings(BuildContext context) {
                           appdata.implicitData[15] = autoSync ? '1' : '0';
                           appdata.writeImplicitData();
 
-                          if (!autoSync) {
-                            App.globalBack();
-                            return;
-                          }
+                          // Manual upload/download runs regardless of the
+                          // auto-sync switch.
 
                           setState(() {
                             isTesting = true;
@@ -1210,9 +1212,14 @@ void syncDataSettings(BuildContext context) {
                             setState(() {
                               isTesting = false;
                             });
-                            showToast(message: "Failed to sync data");
+                            showToast(
+                                message: (Webdav.lastError ??
+                                        (upload ? "上传失败" : "下载失败"))
+                                    .tl);
                           } else {
                             App.globalBack();
+                            showToast(
+                                message: (upload ? "上传成功" : "下载成功").tl);
                           }
                         },
                 ),

@@ -3,6 +3,7 @@ import "package:pica_comic/foundation/comic_source/comic_source.dart";
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/components/category_selector.dart';
 import "package:pica_comic/foundation/app.dart";
+import "package:pica_comic/base.dart";
 import 'package:pica_comic/network/base_comic.dart';
 import "package:pica_comic/network/res.dart";
 import 'package:pica_comic/pages/nhentai/nhentai_category_filter_dialog.dart';
@@ -90,6 +91,13 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
         this.source = source;
         data = source.categoryComicsData!;
         options = data.options.where((element) {
+          if (source.key == "nhentai" &&
+              appdata.settings[69] != "0" &&
+              element.options.containsKey("chinese") &&
+              element.options.containsKey("japanese") &&
+              element.options.containsKey("english")) {
+            return false;
+          }
           if (element.notShowWhen.contains(widget.category)) {
             return false;
           } else if (element.showWhen != null) {

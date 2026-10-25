@@ -80,6 +80,9 @@ typedef GetImageLoadingConfigFunc = Future<Map<String, dynamic>> Function(
 typedef GetThumbnailLoadingConfigFunc = Future<Map<String, dynamic>> Function(
     String imageKey)?;
 
+const copyMangaReLoginFailedMessage =
+    'copy_manga: Login expired and re-login failed';
+
 class ArchiveInfo {
   final String id;
   final String title;

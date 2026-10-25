@@ -7,6 +7,7 @@ class NetworkError extends StatelessWidget {
     this.retry,
     this.withAppbar = true,
     this.buttonText,
+    this.onCopyRepairComplete,
   });
 
   final String message;
@@ -17,9 +18,59 @@ class NetworkError extends StatelessWidget {
 
   final String? buttonText;
 
+  final VoidCallback? onCopyRepairComplete;
+
   @override
   Widget build(BuildContext context) {
-    var cfe = CloudflareException.fromString(message);
+    final isCopy210 = message.contains('Invalid status code: 210') ||
+        RegExp(r'"code"\s*:\s*210(?!\d)').hasMatch(message);
+    final isCopyReLoginFailure = message == copyMangaReLoginFailedMessage;
+    final copySource = ComicSource.find('copy_manga');
+    final clearSetting = copySource?.veneraSettings['clear_device_info'];
+    final canRepair = clearSetting is Map &&
+        clearSetting['type'] == 'callback';
+    final showCopyRepair = (isCopy210 || isCopyReLoginFailure) && canRepair;
+    var cfe = showCopyRepair ? null : CloudflareException.fromString(message);
+    final displayMessage = isCopy210 && showCopyRepair
+        ? "拷贝漫画版本认证\n"
+        : isCopyReLoginFailure
+            ? "Login expired and re-login failed"
+            : cfe == null
+                ? message
+                : "需要进行Cloudflare验证".tl;
+    void Function()? effectiveRetry = retry;
+    String? effectiveButtonText = buttonText;
+    if (showCopyRepair) {
+      effectiveButtonText = "修复".tl;
+      effectiveRetry = () async {
+        try {
+          onCopyRepairComplete?.call();
+          await JsEngine().runCode(
+            'ComicSource.sources["copy_manga"].settings["clear_device_info"].callback()',
+            'copy_manga_clear_device_info',
+          );
+          final source = copySource;
+          if (source != null && source.isLogin) {
+            final success = await source.reLogin();
+            if (!success) {
+              showToast(message: "重新登录失败".tl);
+              return;
+            }
+            StateController.findOrNull(tag: "me_page_accounts")?.update();
+            final favoriteTitle = source.favoriteData?.title;
+            if (favoriteTitle != null) {
+              StateController.findOrNull<ComicsPageLogic>(
+                tag: "Network Comics Page: $favoriteTitle",
+              )?.refresh();
+            }
+          }
+          retry?.call();
+        } catch (e, s) {
+          log("$e\n$s", "Comic source settings", LogLevel.error);
+          showToast(message: e.toString());
+        }
+      };
+    }
     Widget body = Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -43,7 +94,7 @@ class NetworkError extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            cfe == null ? message : "需要进行Cloudflare验证".tl,
+            displayMessage,
             textAlign: TextAlign.center,
             maxLines: 3,
           ),
@@ -57,14 +108,14 @@ class NetworkError extends StatelessWidget {
             child: Text("导出日志".tl),
           ),
           const SizedBox(height: 8),
-          if (retry != null)
+          if (effectiveRetry != null)
             if (cfe != null)
               FilledButton(
-                onPressed: () => passCloudflare(CloudflareException.fromString(message)!, retry!),
+                onPressed: () => passCloudflare(CloudflareException.fromString(message)!, effectiveRetry!),
                 child: Text('继续'.tl),
               )
             else
-              FilledButton(onPressed: retry, child: Text(buttonText ?? '重试'.tl))
+              FilledButton(onPressed: effectiveRetry, child: Text(effectiveButtonText ?? '重试'.tl))
         ],
       ),
     );

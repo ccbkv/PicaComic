@@ -47,7 +47,9 @@ bool handleAppLinks(Uri uri, {bool showMessageWhenError = true}){
       String? id = isEh
           ? 'https://${uri.host}/g/${match[1]}/${match[2]}/'
           : match[1];
-      if (!source.isBuiltIn) {
+      // EH IDs are full gallery URLs. Its converter rewrites the host to the
+      // configured site, which can make an EX-only gallery inaccessible.
+      if (!isEh) {
         try {
           id = JsEngine().runCode("""
             (() => {

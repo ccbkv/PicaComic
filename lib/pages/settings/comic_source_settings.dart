@@ -769,6 +769,1235 @@ class SliverHtSettings extends StatelessWidget {
   }
 }
 
+/// COPY (拷贝漫画) 高级设置：自动更新开关 + 数据 API / 登录域名节点选择(带测速)
+/// + App 版本 / 版本号内联输入框。所有配置项(默认值、选项列表、节点列表)
+/// 均由 copy_manga.js 的 `copy_advanced` 元数据下发，改 JS 即可改配置，无需重编译 App。
+class SliverCopySettings extends StatefulWidget {
+  const SliverCopySettings({super.key, required this.source, required this.meta});
+
+  final ComicSource source;
+
+  /// copy_manga.js `settings.copy_advanced` 元数据。
+  final Map<dynamic, dynamic> meta;
+
+  @override
+  State<SliverCopySettings> createState() => _SliverCopySettingsState();
+}
+
+class _SliverCopySettingsState extends State<SliverCopySettings> {
+  late String _defaultApiHost;
+  late String _defaultAppVersion;
+  late String _defaultVersionCode;
+  late String _defaultLoginHost;
+  late String _defaultContentHost;
+  late List<String> _loginHostOptions;
+  late List<List<String>> _contentRoutes;
+  late List<String> _selectionModeOptions;
+  late String _selectionMode;
+  late int _contentRoute;
+  late String _contentHost;
+  bool _autoFillBusy = false;
+  bool _testingLatency = false;
+
+  ComicSource get source => widget.source;
+
+  late final TextEditingController _apiHostController;
+  late final TextEditingController _appVersionController;
+  late final TextEditingController _versionCodeController;
+  late final TextEditingController _customLoginController;
+
+  late List<String> _customApiHosts;
+  late List<String> _customLoginHosts;
+  late String _loginHost;
+  late bool _autoUpdate;
+
+  final Map<String, int?> _latency = {};
+  final Set<String> _pending = {};
+
+  String _metaStr(String key, String fallback) {
+    final text = widget.meta[key]?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  List<String> _metaList(String key, List<String> fallback) {
+    final value = widget.meta[key];
+    if (value is List) {
+      final out = value
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (out.isNotEmpty) return out;
+    }
+    return fallback;
+  }
+
+  List<List<String>> _metaRoutes(String key) {
+    final value = widget.meta[key];
+    if (value is List) {
+      final routes = <List<String>>[];
+      for (final route in value) {
+        if (route is List) {
+          final hosts = route
+              .map((e) => e.toString())
+              .where((e) => e.isNotEmpty)
+              .toList();
+          if (hosts.isNotEmpty) routes.add(hosts);
+        }
+      }
+      if (routes.isNotEmpty) return routes;
+    }
+    return const <List<String>>[];
+  }
+
+  String _readSetting(String key, String fallback) {
+    final settings = source.data['settings'];
+    final value = settings is Map ? settings[key] : null;
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  bool _readBool(String key) {
+    final settings = source.data['settings'];
+    final value = settings is Map ? settings[key] : null;
+    if (value is bool) return value;
+    if (value is String) return value == 'true';
+    return false;
+  }
+
+  void _writeSetting(String key, dynamic value) {
+    final settings = source.data['settings'] ??= <String, dynamic>{};
+    settings[key] = value;
+    source.saveData();
+  }
+
+  void _writeApiHost(String host) {
+    final settings = source.data['settings'] ??= <String, dynamic>{};
+    if (host.isEmpty || host == _defaultApiHost) {
+      settings.remove('base_url');
+      settings.remove('base_url_override');
+    } else {
+      settings['base_url'] = host;
+      settings['base_url_override'] = true;
+    }
+    source.saveData();
+  }
+
+  List<String> _readStringList(String key) {
+    final settings = source.data['settings'];
+    final raw = settings is Map ? settings[key] : null;
+    return raw is List
+        ? raw.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
+        : <String>[];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _defaultApiHost = _metaStr('defaultApiHost', '');
+    _defaultAppVersion = _metaStr('defaultAppVersion', '');
+    _defaultVersionCode = _metaStr('defaultVersionCode', '');
+    _defaultLoginHost = _metaStr('defaultLoginHost', '');
+    _defaultContentHost = _metaStr('defaultContentHost', '');
+    _loginHostOptions = _metaList('loginHostOptions', const <String>[]);
+    _contentRoutes = _metaRoutes('contentRoutes');
+    if (_contentRoutes.isEmpty) {
+      _contentRoutes = <List<String>>[[_defaultContentHost]];
+    }
+    _selectionModeOptions =
+        _metaList('selectionModeOptions', const ['线路', '节点']);
+    final defaultMode = _metaStr('defaultSelectionMode', 'route');
+    _selectionMode =
+        _readSetting('content_selection_mode', defaultMode) == 'node'
+            ? 'node'
+            : 'route';
+    _contentRoute = int.tryParse(_readSetting('content_route', '0')) ?? 0;
+    if (_contentRoute >= _contentRoutes.length) _contentRoute = 0;
+    _contentHost =
+        _readSetting('content_host', _contentRoutes.first.first);
+
+    _appVersionController = TextEditingController(
+        text: _readSetting('app_version', _defaultAppVersion));
+    _versionCodeController = TextEditingController(
+        text: _readSetting('version_code', _defaultVersionCode));
+    _customLoginController = TextEditingController();
+
+    _customApiHosts = _readStringList('custom_api_hosts');
+    _customLoginHosts = _readStringList('custom_login_hosts');
+    final savedApiHost = _readSetting('base_url', '');
+    final hasApiOverride = _readBool('base_url_override') ||
+        _customApiHosts.contains(savedApiHost);
+    final apiHost = hasApiOverride && savedApiHost.isNotEmpty
+        ? savedApiHost
+        : _defaultApiHost;
+    _apiHostController = TextEditingController(text: apiHost);
+    _loginHost = _readSetting('login_url', _defaultLoginHost);
+    _autoUpdate = _readBool('copy_auto_update');
+  }
+
+  @override
+  void dispose() {
+    _apiHostController.dispose();
+    _appVersionController.dispose();
+    _versionCodeController.dispose();
+    _customLoginController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'COPY 高级设置',
+            style: tt.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('自动更新配置', style: tt.bodyMedium),
+              value: _autoUpdate,
+              onChanged: (v) {
+                setState(() => _autoUpdate = v);
+                _writeSetting('copy_auto_update', v);
+              },
+            ),
+            _buildNetworkStatusSection(cs, tt),
+            const SizedBox(height: 16),
+            _buildContentNodesSection(cs, tt),
+            const SizedBox(height: 16),
+            _buildFixedNodeStatus(
+              '拷贝节点',
+              _normalizeHost(_apiHostController.text, ''),
+              cs,
+              tt,
+            ),
+            const SizedBox(height: 8),
+            _buildFixedNodeStatus('拷贝登录', _loginHost, cs, tt),
+            const SizedBox(height: 8),
+            _buildNodeGroup(
+              title: '登录域名',
+              hint: '拷贝账号登录接口使用的域名，登录失败时可切换重试',
+              builtin: _loginHostOptions,
+              custom: _customLoginHosts,
+              selected: _loginHost,
+              onSelect: _selectLoginHost,
+              addController: _customLoginController,
+              onAdd: _addCustomLogin,
+              onEdit: _editCustomLogin,
+              onRemove: _removeCustomLogin,
+              addHint: '自定义登录域名',
+              cs: cs,
+              tt: tt,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiHostController,
+              decoration: InputDecoration(
+                labelText: 'COPY API URL',
+                hintText: _defaultApiHost,
+                border: const OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _appVersionController,
+              decoration: InputDecoration(
+                labelText: 'COPY 请求版本号',
+                hintText: _defaultAppVersion,
+                border: const OutlineInputBorder(),
+              ),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _versionCodeController,
+              decoration: InputDecoration(
+                labelText: 'COPY versionCode',
+                hintText: _defaultVersionCode,
+                border: const OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _save(),
+            ),
+            const SizedBox(height: 16),
+            _buildActions(),
+          ],
+        ),
+    );
+  }
+
+  String get _routeModeLabel =>
+      _selectionModeOptions.isNotEmpty ? _selectionModeOptions.first : '线路';
+
+  String get _nodeModeLabel => _selectionModeOptions.length > 1
+      ? _selectionModeOptions[1]
+      : '节点';
+
+  String _selectedContentHost() {
+    if (_selectionMode == 'node') return _contentHost;
+    if (_contentRoutes.isEmpty) return '';
+    return _contentRoutes[_contentRoute].first;
+  }
+
+  List<String> _allContentHosts() {
+    final out = <String>[];
+    for (final route in _contentRoutes) {
+      for (final host in route) {
+        if (host.isNotEmpty && !out.contains(host)) out.add(host);
+      }
+    }
+    return out;
+  }
+
+  List<String> _allTestHosts() {
+    final hosts = <String>{
+      ..._allContentHosts(),
+      _selectedContentHost(),
+      _normalizeHost(_apiHostController.text, ''),
+      ..._loginHostOptions,
+      ..._customLoginHosts,
+      _loginHost,
+    };
+    hosts.removeWhere((host) => host.trim().isEmpty);
+    return hosts.toList();
+  }
+
+  int _contentNodeNumber(int routeIndex, int localIndex) =>
+      _contentRoutes.take(routeIndex).fold<int>(
+            0,
+            (sum, route) => sum + route.length,
+          ) +
+      localIndex +
+      1;
+
+  double? _averageContentLatency(List<String> hosts) {
+    final values = hosts.map((h) => _latency[h]).whereType<int>().toList();
+    if (values.isEmpty) return null;
+    return values.reduce((a, b) => a + b) / values.length;
+  }
+
+  int? _bestNumericLatency() {
+    int? best;
+    for (final host in _allTestHosts()) {
+      final ms = _latency[host];
+      if (ms != null && (best == null || ms < best)) best = ms;
+    }
+    return best;
+  }
+
+  ({String primary, String secondary, Color color}) _networkStatus(
+      ColorScheme cs) {
+    if (_testingLatency) {
+      return (
+        primary: '正在检测',
+        secondary: '正在检测各节点...',
+        color: cs.primary,
+      );
+    }
+    final average = _contentRoute >= 0 && _contentRoute < _contentRoutes.length
+        ? _averageContentLatency(_contentRoutes[_contentRoute])
+        : null;
+    final best = _bestNumericLatency();
+    if (average == null) {
+      return (
+        primary: '尚未检测',
+        secondary: '点击下方按钮测速，了解各节点延迟',
+        color: cs.onSurfaceVariant,
+      );
+    }
+    if (average <= 800) {
+      return (
+        primary: '网络通畅',
+        secondary: best == null ? '连接正常，状态良好' : '当前最佳延迟 $best ms，状态良好',
+        color: Colors.green,
+      );
+    }
+    if (average <= 2000) {
+      return (
+        primary: '延迟偏高',
+        secondary: best == null ? '当前延迟较大，建议开启代理' : '当前延迟约 $best ms，建议开启代理',
+        color: Colors.orange,
+      );
+    }
+    return (
+      primary: '连接异常',
+      secondary: '当前延迟较大，建议开启代理',
+      color: cs.error,
+    );
+  }
+
+  Widget _buildNetworkStatusSection(ColorScheme cs, TextTheme tt) {
+    final status = _networkStatus(cs);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          status.color.withValues(alpha: 0.10),
+          cs.surfaceBright,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: status.color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: status.color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  status.primary,
+                  style: tt.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: status.color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  status.secondary,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonalIcon(
+            onPressed: _testingLatency
+                ? null
+                : () => _testHosts(_allTestHosts()),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: _testingLatency
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.primary,
+                    ),
+                  )
+                : const Icon(Icons.bolt_rounded, size: 18),
+            label: const Text('测速'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _contentHostDotColor(String host, ColorScheme cs) {
+    if (_pending.contains(host)) return cs.primary;
+    if (!_latency.containsKey(host)) return cs.onSurfaceVariant;
+    final ms = _latency[host];
+    return ms == null ? cs.error : _latencyColor(ms, cs);
+  }
+
+  /// 线路与节点：模式选择（线路 / 节点）+ 线路卡片，对应正文 CDN 域名。
+  Widget _buildContentNodesSection(ColorScheme cs, TextTheme tt) {
+    final isFixed = _selectionMode == 'node';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '线路与节点',
+                style: tt.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: Text(_routeModeLabel),
+                  selected: !isFixed,
+                  onSelected: (_) => _setSelectionMode(_routeModeLabel),
+                ),
+                ChoiceChip(
+                  label: Text(_nodeModeLabel),
+                  selected: isFixed,
+                  onSelected: (_) => _setSelectionMode(_nodeModeLabel),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Column(
+          children: [
+            for (var i = 0; i < _contentRoutes.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              _buildContentRouteCard(i, cs, tt),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContentRouteCard(int index, ColorScheme cs, TextTheme tt) {
+    final hosts = _contentRoutes[index];
+    final isFixed = _selectionMode == 'node';
+    final isSelected = !isFixed && _contentRoute == index;
+    final average = _averageContentLatency(hosts);
+
+    return Material(
+      color: isSelected
+          ? cs.primary.withValues(alpha: 0.08)
+          : cs.surfaceContainerHighest.withValues(alpha: 0.25),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: isSelected
+              ? cs.primary
+              : cs.outlineVariant.withValues(alpha: 0.7),
+          width: 2,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: isFixed ? null : () => _setContentRoute(index),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '线路 ${index + 1}',
+                    style: tt.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? cs.primary : cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      average == null ? '—' : '平均 ${average.round()} ms',
+                      style: tt.labelMedium?.copyWith(
+                        color: average == null
+                            ? cs.onSurfaceVariant
+                            : _latencyColor(average.round(), cs),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '使用中',
+                        style: tt.labelSmall?.copyWith(
+                          color: cs.onPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (isFixed)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (var localIndex = 0;
+                        localIndex < hosts.length;
+                        localIndex++)
+                      _buildContentNodeChip(
+                        hosts[localIndex],
+                        _contentNodeNumber(index, localIndex),
+                        cs,
+                        tt,
+                      ),
+                  ],
+                )
+              else
+                for (var localIndex = 0;
+                    localIndex < hosts.length;
+                    localIndex++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 8,
+                          color: _contentHostDotColor(hosts[localIndex], cs),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '节点 ${_contentNodeNumber(index, localIndex)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tt.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        _buildLatencyText(hosts[localIndex], cs, tt),
+                      ],
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContentNodeChip(
+      String host, int nodeNumber, ColorScheme cs, TextTheme tt) {
+    final isSelected = _selectedContentHost() == host;
+    return Material(
+      color: isSelected
+          ? cs.primary.withValues(alpha: 0.12)
+          : cs.surfaceContainerHighest.withValues(alpha: 0.35),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: isSelected ? cs.primary : cs.outlineVariant,
+          width: 1.5,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _setContentHost(host),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSelected) ...[
+                Icon(Icons.check_rounded, size: 14, color: cs.primary),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                '节点 $nodeNumber',
+                style: tt.labelMedium?.copyWith(
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? cs.primary : cs.onSurface,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildLatencyText(host, cs, tt),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _setSelectionMode(String mode) {
+    final next = mode == _nodeModeLabel ? 'node' : 'route';
+    if (next == _selectionMode) return;
+    setState(() => _selectionMode = next);
+    _writeSetting('content_selection_mode', next);
+  }
+
+  void _setContentRoute(int index) {
+    if (index < 0 || index >= _contentRoutes.length) return;
+    setState(() => _contentRoute = index);
+    _writeSetting('content_route', index);
+  }
+
+  void _setContentHost(String host) {
+    setState(() => _contentHost = host);
+    _writeSetting('content_host', host);
+  }
+
+  Widget _buildFixedNodeStatus(
+      String label, String host, ColorScheme cs, TextTheme tt) {
+    final hasResult = _latency.containsKey(host);
+    final latency = _latency[host];
+    final color = _pending.contains(host)
+        ? cs.primary
+        : !hasResult
+            ? cs.onSurfaceVariant
+            : latency == null
+                ? cs.error
+                : _latencyColor(latency, cs);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lan_outlined, size: 16, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Icon(Icons.circle, size: 8, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          _buildLatencyText(host, cs, tt),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNodeGroup({
+    required String title,
+    required String hint,
+    required List<String> builtin,
+    required List<String> custom,
+    required String selected,
+    required void Function(String) onSelect,
+    required TextEditingController addController,
+    required VoidCallback onAdd,
+    required void Function(String) onEdit,
+    required void Function(String) onRemove,
+    required String addHint,
+    required ColorScheme cs,
+    required TextTheme tt,
+  }) {
+    final hosts = <String>{...builtin, ...custom}.toList();
+    final customSet = custom.toSet();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: tt.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          hint,
+          style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: cs.outline),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Column(
+              children: [
+                for (var i = 0; i < hosts.length; i++)
+                  _buildHostRow(
+                    hosts[i],
+                    isCustom: customSet.contains(hosts[i]),
+                    isSelected: hosts[i] == selected,
+                    showDivider: i > 0,
+                    onTap: () => onSelect(hosts[i]),
+                    onEdit: () => onEdit(hosts[i]),
+                    onRemove: () => onRemove(hosts[i]),
+                    cs: cs,
+                    tt: tt,
+                  ),
+                _buildAddHostRow(addController, onAdd, addHint, cs),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHostRow(
+    String host, {
+    required bool isCustom,
+    required bool isSelected,
+    required bool showDivider,
+    required VoidCallback onTap,
+    required VoidCallback onEdit,
+    required VoidCallback onRemove,
+    required ColorScheme cs,
+    required TextTheme tt,
+  }) {
+    return Column(
+      children: [
+        if (showDivider)
+          Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.6)),
+        Material(
+          color: isSelected
+              ? cs.primary.withValues(alpha: 0.08)
+              : Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+              child: Row(
+                children: [
+                  Icon(
+                    isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    size: 20,
+                    color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      host,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodyMedium?.copyWith(
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: isSelected ? cs.primary : cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  _buildLatencyText(host, cs, tt),
+                  if (isCustom) ...[
+                    IconButton(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      tooltip: '编辑',
+                      visualDensity: VisualDensity.compact,
+                      color: cs.onSurfaceVariant,
+                      constraints:
+                          const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                    ),
+                    IconButton(
+                      onPressed: onRemove,
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      tooltip: '删除',
+                      visualDensity: VisualDensity.compact,
+                      color: cs.error,
+                      constraints:
+                          const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLatencyText(String host, ColorScheme cs, TextTheme tt) {
+    if (_pending.contains(host)) {
+      return SizedBox(
+        width: 14,
+        height: 14,
+        child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+      );
+    }
+    if (!_latency.containsKey(host)) {
+      return Text('—',
+          style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant));
+    }
+    final ms = _latency[host];
+    return Text(
+      ms == null ? '超时' : '$ms ms',
+      style: tt.labelMedium?.copyWith(
+        color: ms == null ? cs.error : _latencyColor(ms, cs),
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+
+  Color _latencyColor(int ms, ColorScheme cs) {
+    if (ms < 150) return Colors.green;
+    if (ms < 400) return Colors.orange;
+    return cs.error;
+  }
+
+  Widget _buildAddHostRow(
+    TextEditingController controller,
+    VoidCallback onAdd,
+    String hint,
+    ColorScheme cs,
+  ) {
+    return Column(
+      children: [
+        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.6)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                    hintText: hint,
+                  ),
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => onAdd(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('添加'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActions() {
+    return SizedBox(
+      width: double.infinity,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          FilledButton.tonalIcon(
+            onPressed: _autoFillBusy ? null : _autoFill,
+            icon: _autoFillBusy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.auto_fix_high),
+            label: const Text('填充'),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: _reset,
+            icon: const Icon(Icons.restart_alt),
+            label: const Text('重置'),
+          ),
+          FilledButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  dynamic _decodeJson(dynamic data) {
+    if (data is String && data.isNotEmpty) {
+      try {
+        return jsonDecode(data);
+      } catch (_) {
+        return data;
+      }
+    }
+    return data;
+  }
+
+  String get _autoFillApiHost =>
+      _normalizeHost(_apiHostController.text, _defaultApiHost);
+
+  Future<void> _autoFill() async {
+    if (_autoFillBusy) return;
+    setState(() => _autoFillBusy = true);
+    try {
+      final apiHost = await _fetchCopyApiHost();
+      final version = await _fetchCopyLatestVersion();
+      if (!mounted) return;
+      if (apiHost != null && apiHost.isNotEmpty) {
+        _apiHostController.text = apiHost;
+      }
+      if (version != null && version.isNotEmpty) {
+        _appVersionController.text = version;
+      }
+      setState(() {});
+      showToast(
+        message: '已填充 COPY API 地址：${apiHost ?? '—'}，版本号：${version ?? '—'}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showToast(message: '填充失败：$e');
+    } finally {
+      if (mounted) setState(() => _autoFillBusy = false);
+    }
+  }
+
+  Future<String?> _fetchCopyApiHost() async {
+    final version =
+        _trimOrFallback(_appVersionController.text, _defaultAppVersion);
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 5),
+      validateStatus: (_) => true,
+      headers: {
+        'User-Agent': 'COPY/$version',
+        'Accept': 'application/json',
+        'source': 'copyApp',
+        'platform': '3',
+        'version': version,
+      },
+    ));
+    final resp = await dio.get(
+      'https://$_autoFillApiHost/api/v3/system/network2',
+      queryParameters: {'platform': 3},
+      options: Options(responseType: ResponseType.plain),
+    );
+    final data = _decodeJson(resp.data);
+    if (data is Map && data['code']?.toString() == '200') {
+      final results = data['results'];
+      if (results is Map) {
+        final api = results['api'];
+        if (api is List && api.isNotEmpty) {
+          final firstRoute = api.first;
+          if (firstRoute is List && firstRoute.isNotEmpty) {
+            final host = firstRoute.first?.toString().trim() ?? '';
+            if (host.isNotEmpty) return host;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<String?> _fetchCopyLatestVersion() async {
+    final version =
+        _trimOrFallback(_appVersionController.text, _defaultAppVersion);
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 5),
+      validateStatus: (_) => true,
+      headers: {
+        'User-Agent': 'COPY/$version',
+        'Accept': 'application/json',
+        'source': 'copyApp',
+        'platform': '3',
+        'version': version,
+      },
+    ));
+    final resp = await dio.get(
+      'https://$_autoFillApiHost/api/v3/system/appVersion/last',
+      queryParameters: {'platform': 3},
+      options: Options(responseType: ResponseType.plain),
+    );
+    final data = _decodeJson(resp.data);
+    if (data is Map && data['code']?.toString() == '200') {
+      final results = data['results'];
+      if (results is Map) {
+        final android = results['android'];
+        if (android is Map) {
+          final v = android['version']?.toString().trim() ?? '';
+          if (v.isNotEmpty) return v;
+        }
+        final direct = results['version']?.toString().trim() ?? '';
+        if (direct.isNotEmpty) return direct;
+        for (final value in results.values) {
+          if (value is Map) {
+            final v = value['version']?.toString().trim() ?? '';
+            if (v.isNotEmpty) return v;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  void _selectLoginHost(String host) {
+    setState(() => _loginHost = host);
+    _writeSetting('login_url', host);
+  }
+
+  void _addCustomLogin() {
+    final host = _normalizeHost(_customLoginController.text, '');
+    if (host.isEmpty ||
+        _loginHostOptions.contains(host) ||
+        _customLoginHosts.contains(host)) {
+      _customLoginController.clear();
+      return;
+    }
+    setState(() => _customLoginHosts = [..._customLoginHosts, host]);
+    _writeSetting('custom_login_hosts', _customLoginHosts);
+    _customLoginController.clear();
+  }
+
+  void _editCustomLogin(String oldHost) {
+    showInputDialog(
+      context: context,
+      title: '编辑登录域名',
+      initialValue: oldHost,
+      onConfirm: (value) {
+        final host = _normalizeHost(value.toString(), '');
+        if (host.isEmpty ||
+            _loginHostOptions.contains(host) ||
+            (_customLoginHosts.contains(host) && host != oldHost)) {
+          return null;
+        }
+        setState(() {
+          final index = _customLoginHosts.indexOf(oldHost);
+          if (index >= 0) {
+            _customLoginHosts[index] = host;
+          }
+          if (_loginHost == oldHost) {
+            _loginHost = host;
+            _writeSetting('login_url', host);
+          }
+          _writeSetting('custom_login_hosts', _customLoginHosts);
+        });
+        return null;
+      },
+    );
+  }
+
+  void _removeCustomLogin(String host) {
+    showConfirmDialog(
+      context: context,
+      title: '删除',
+      content: '删除登录域名 "$host" ?',
+      onConfirm: () {
+        setState(() => _customLoginHosts.remove(host));
+        _writeSetting('custom_login_hosts', _customLoginHosts);
+        if (_loginHost == host) {
+          _loginHost = _defaultLoginHost;
+          _writeSetting('login_url', _defaultLoginHost);
+        }
+      },
+    );
+  }
+
+  void _save() {
+    final apiHost = _normalizeHost(_apiHostController.text, _defaultApiHost);
+    final appVersion =
+        _trimOrFallback(_appVersionController.text, _defaultAppVersion);
+    final versionCode = _normalizeVersionCode(_versionCodeController.text);
+
+    _apiHostController.text = apiHost;
+    _appVersionController.text = appVersion;
+    _versionCodeController.text = versionCode;
+
+    _writeApiHost(apiHost);
+    _writeSetting('app_version', appVersion);
+    _writeSetting('version_code', versionCode);
+    _writeSetting('login_url', _loginHost);
+    _writeSetting('copy_auto_update', _autoUpdate);
+    setState(() {});
+    showToast(message: '已保存');
+  }
+
+  void _reset() {
+    _appVersionController.text = _defaultAppVersion;
+    _versionCodeController.text = _defaultVersionCode;
+    _apiHostController.text = _defaultApiHost;
+    _loginHost = _defaultLoginHost;
+    _autoUpdate = false;
+    _customApiHosts = <String>[];
+    _customLoginHosts = <String>[];
+
+    _writeApiHost(_defaultApiHost);
+    _writeSetting('app_version', _defaultAppVersion);
+    _writeSetting('version_code', _defaultVersionCode);
+    _writeSetting('login_url', _defaultLoginHost);
+    _writeSetting('copy_auto_update', false);
+    _writeSetting('custom_api_hosts', <String>[]);
+    _writeSetting('custom_login_hosts', <String>[]);
+    setState(() {});
+    showToast(message: '已重置');
+  }
+
+  Future<void> _testHosts(List<String> hosts) async {
+    if (_testingLatency || hosts.isEmpty) return;
+    final targets = hosts.toSet().toList();
+    setState(() {
+      _testingLatency = true;
+      _pending
+        ..clear()
+        ..addAll(targets);
+    });
+    try {
+      await Future.wait(targets.map((host) async {
+        final ms = await _measureLatency(host);
+        if (!mounted) return;
+        setState(() {
+          _pending.remove(host);
+          _latency[host] = ms;
+        });
+      }));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _testingLatency = false;
+          _pending.clear();
+        });
+      }
+    }
+  }
+
+  Future<int?> _measureLatency(String host) async {
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 3),
+      receiveTimeout: const Duration(seconds: 3),
+    ));
+    final sw = Stopwatch()..start();
+    try {
+      await dio.get(
+        'https://$host/',
+        options: Options(
+          responseType: ResponseType.plain,
+          followRedirects: false,
+          validateStatus: (_) => true,
+        ),
+      );
+      return sw.elapsedMilliseconds;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 去协议、去端口两侧空白，保留主机 + 端口；空值时回落 fallback。
+  String _normalizeHost(String value, String fallback) {
+    var trimmed = value.trim();
+    if (trimmed.isEmpty) return fallback;
+    if (trimmed.contains('://')) {
+      final uri = Uri.tryParse(trimmed);
+      if (uri == null || uri.host.isEmpty) return fallback;
+      trimmed = uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
+    }
+    return trimmed.toLowerCase();
+  }
+
+  String _trimOrFallback(String value, String fallback) {
+    final text = value.trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  String _normalizeVersionCode(String value) {
+    final digits = value.trim().replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.isEmpty ? _defaultVersionCode : digits;
+  }
+}
+
 class _SliverBuiltInSources extends StatefulWidget {
   const _SliverBuiltInSources({
     required this.onAdd,
@@ -1026,7 +2255,7 @@ class _SliverComicSource extends StatefulWidget {
 
 class _SliverComicSourceState extends State<_SliverComicSource> {
   ComicSource get source => widget.source;
-  bool _jmCallbackRunning = false;
+  bool _callbackRunning = false;
 
   @override
   void initState() {
@@ -1169,6 +2398,22 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
       var type = setting['type'] as String?;
       var title = setting['title'] as String? ?? key;
 
+      // COPY 源的高级配置由一个 copy_advanced 组件整体渲染，
+      // 这里跳过它本身以及由该组件接管的四个 input 项，避免重复渲染。
+      if (source.key == 'copy_manga' &&
+          (type == 'copy_advanced' ||
+              key == 'base_url' ||
+              key == 'app_version' ||
+              key == 'version_code' ||
+              key == 'login_url')) {
+        if (type == 'copy_advanced') {
+          widgets.add(SliverToBoxAdapter(
+            child: SliverCopySettings(source: source, meta: setting),
+          ));
+        }
+        continue;
+      }
+
       // saveTo == 'data' 时直接读写源数据顶层字段 (与内置哔咔设置页共享)
       bool saveToData = setting['saveTo'] == 'data';
       bool isJmCheckIn = source.key == 'jm' && key == 'dailyCheckInTask';
@@ -1200,33 +2445,35 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
             source.key == 'htmanga' &&
             setting['page'] == 'htmanga') {
           widgets.add(const SliverToBoxAdapter(child: HtSettings(false)));
-        } else if (source.key == 'jm' && type == 'callback') {
+        } else if (type == 'callback') {
           widgets.add(SliverToBoxAdapter(
             child: ListTile(
               leading: Icon(key == 'refreshDomains'
                   ? Icons.update_outlined
-                  : Icons.today),
+                  : key == 'clear_device_info'
+                      ? Icons.delete_outline
+                      : Icons.today),
               title: Text(title),
-              trailing: _jmCallbackRunning
+              trailing: _callbackRunning
                   ? const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.arrow_right),
-              onTap: _jmCallbackRunning
+              onTap: _callbackRunning
                   ? null
                   : () async {
-                      setState(() => _jmCallbackRunning = true);
+                      setState(() => _callbackRunning = true);
                       try {
                         await JsEngine().runCode(
-                            "ComicSource.sources.jm.settings[${jsonEncode(key)}].callback()");
+                            "ComicSource.sources[${jsonEncode(source.key)}].settings[${jsonEncode(key)}].callback()");
                       } catch (e, s) {
-                        log("$e\n$s", "JM settings", LogLevel.error);
+                        log("$e\n$s", "Comic source settings", LogLevel.error);
                         showToast(message: e.toString());
                       } finally {
                         if (mounted) {
-                          setState(() => _jmCallbackRunning = false);
+                          setState(() => _callbackRunning = false);
                         }
                       }
                     },

@@ -24,6 +24,7 @@ import 'package:pica_comic/foundation/platform_utils.dart';
 import 'package:pica_comic/foundation/image_loader/cached_image.dart';
 import 'package:pica_comic/foundation/image_loader/stream_image_provider.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
+import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/network/base_comic.dart';
 import 'package:pica_comic/network/cloudflare.dart';

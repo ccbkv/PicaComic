@@ -1306,6 +1306,11 @@ class _SearchOptionsState extends State<_SearchOptions> {
       final searchOptions = data.searchOptions ?? <SearchOptions>[];
       for (int i = 0; i < searchOptions.length; i++) {
         final option = searchOptions[i];
+        if (data.enableLanguageFilter &&
+            appdata.settings[69] != "0" &&
+            option.label == "语言") {
+          continue;
+        }
         final optionContent = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

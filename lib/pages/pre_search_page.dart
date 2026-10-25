@@ -862,6 +862,11 @@ class PreSearchPage extends StatelessWidget {
               logic.searchPageData.searchOptions ?? <SearchOptions>[];
           for (int i = 0; i < searchOptions.length; i++) {
             final option = searchOptions[i];
+            if (logic.searchPageData.enableLanguageFilter &&
+                appdata.settings[69] != "0" &&
+                option.label == "语言") {
+              continue;
+            }
             children.add(ListTile(
               title: Text(option.label.tl),
             ));

@@ -842,6 +842,10 @@ class ComicSourceParser {
     final ehTokens = <String, List<String?>>{};
     return SearchPageData.named(
       searchOptions: options,
+      enableLanguageFilter: switch (_getValue("search.enableLanguageFilter")) {
+        bool value => value,
+        _ => _key == "ehentai" || _key == "nhentai",
+      },
       enableTagsSuggestions: switch (_getValue("search.enableTagsSuggestions")) {
         bool value => value,
         _ => _key == "ehentai" || _key == "nhentai",
@@ -1102,7 +1106,9 @@ class ComicSourceParser {
         }
         var reLoginRes = await source.reLogin();
         if (!reLoginRes) {
-          return const Res.error("Login expired and re-login failed");
+          return Res.error(_key == 'copy_manga'
+              ? copyMangaReLoginFailedMessage
+              : 'Login expired and re-login failed');
         } else {
           favoritePages.clear();
           favoriteTokens.clear();
@@ -1317,7 +1323,9 @@ class ComicSourceParser {
       if(res.error && res.errorMessage!.contains("Login expired")){
         var reLoginRes = await ComicSource.find(_key!)!.reLogin();
         if (!reLoginRes) {
-          return const Res.error("Login expired and re-login failed");
+          return Res.error(_key == 'copy_manga'
+              ? copyMangaReLoginFailedMessage
+              : 'Login expired and re-login failed');
         } else {
           return func();
         }

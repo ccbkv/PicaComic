@@ -11,6 +11,25 @@ import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/utils/app_url_launcher.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart' show CookieManager, WebUri;
 
+Future<void> _showCopy210RepairDialog(BuildContext context, String message) {
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) => Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: NetworkError(
+            message: message,
+            withAppbar: false,
+            onCopyRepairComplete: () => Navigator.of(dialogContext).pop(),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class AccountsPageLogic extends StateController {
   final _reLogin = <String, bool>{};
 }
@@ -123,7 +142,15 @@ class AccountsPage extends StatelessWidget {
             final List account = element.data["account"];
             var res = await element.account!.login!(account[0], account[1]);
             if (res.error) {
-              showToast(message: res.errorMessage!);
+              final errorMessage = res.errorMessage ?? "Network Error";
+              final isCopy210 = element.key == 'copy_manga' &&
+                  (errorMessage.contains('Invalid status code: 210') ||
+                      RegExp(r'"code"\s*:\s*210(?!\d)').hasMatch(errorMessage));
+              if (isCopy210 && context.mounted) {
+                await _showCopy210RepairDialog(context, errorMessage);
+              } else {
+                showToast(message: errorMessage);
+              }
             } else {
               showToast(message: "重新登录成功".tl);
             }
@@ -224,7 +251,8 @@ class _LoginPageState extends State<_LoginPage> {
           child: Text("继续".tl),
         ),
         const SizedBox(height: 16),
-        if (widget.loginWebsite != null || widget.source != null)
+        if ((widget.loginWebsite != null || widget.source != null) &&
+            widget.source?.key != "copy_manga")
           TextButton(
             onPressed: loginWithWebview,
             child: Row(
@@ -274,10 +302,18 @@ class _LoginPageState extends State<_LoginPage> {
     });
     widget.login(username, password).then((value) {
       if (value.error) {
-        showToast(message: value.errorMessage!);
+        final errorMessage = value.errorMessage ?? "Network Error";
+        final isCopy210 = widget.source?.key == 'copy_manga' &&
+            (errorMessage.contains('Invalid status code: 210') ||
+                RegExp(r'"code"\s*:\s*210(?!\d)').hasMatch(errorMessage));
         setState(() {
           loading = false;
         });
+        if (isCopy210 && mounted) {
+          _showCopy210RepairDialog(context, errorMessage);
+        } else if (!isCopy210) {
+          showToast(message: errorMessage);
+        }
       } else {
         showToast(message: "登录成功".tl, icon: const Icon(Icons.check));
         StateController.findOrNull(tag: "me_page_accounts")?.update();

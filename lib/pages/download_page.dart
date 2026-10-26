@@ -1935,7 +1935,8 @@ class _DownloadPageState extends State<DownloadPage> {
     }
 
     // 添加排序和下载管理器按钮
-    if (!logic.selecting && !logic.searchMode) {
+    if (!logic.selecting &&
+        !(logic.searchMode || logic.tagSearchMode || logic.categorySearchMode)) {
       actions.add(
         buildActionIcon(
             tooltip: "排序".tl,
@@ -2093,7 +2094,8 @@ class _DownloadPageState extends State<DownloadPage> {
     }
 
     // 添加漫画源筛选按钮
-    if (!logic.selecting && !logic.searchMode) {
+    if (!logic.selecting &&
+        !(logic.searchMode || logic.tagSearchMode || logic.categorySearchMode)) {
       actions.add(
         Builder(
           builder: (buttonContext) => Tooltip(

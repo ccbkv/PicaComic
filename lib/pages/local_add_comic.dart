@@ -272,19 +272,9 @@ class _LocalAddComicPageState extends State<LocalAddComicPage> {
       ),
       if (folder != null) ...[
         IconButton(
-          onPressed: () => _refreshFolderEntry(folder),
-          icon: const Icon(Icons.refresh),
-          tooltip: "刷新文件夹".tl,
-        ),
-        IconButton(
           onPressed: () => _openFolder(folder),
           icon: const Icon(Icons.folder_open_outlined),
           tooltip: "打开文件夹".tl,
-        ),
-        IconButton(
-          onPressed: () => _removeFolderEntry(folder),
-          icon: const Icon(Icons.delete_outline),
-          tooltip: "删除".tl,
         ),
       ],
       IconButton(

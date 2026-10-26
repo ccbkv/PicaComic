@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -2476,10 +2477,10 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
     }
   }
 
-  /// 从网络获取最新的章节列表，使新发布的章节能够显示。
+  /// 从网络获取最新的章节列表，使新发布的章节能够显示
   ///
-  /// 网络列表不会直接覆盖本地列表：已下载章节保持不变，
-  /// 未下载章节按网络列表及分组更新，已下载章节的目录下标不能改变。
+  /// 当网络获取的章节与已存储的不同时，会更新已存储的章节列表，
+  /// 这样在无网时也能看到最新的章节列表。
   Future<void> _fetchLatestEps() async {
     setState(() => _loadingEps = true);
     try {
@@ -2504,77 +2505,75 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
       if (!identical(source, ComicSource.find(source.key))) {
         throw '请先添加对应漫画源'.tl;
       }
-      final latestChapters = res.data.chapters;
-      if (latestChapters == null || latestChapters.length == 0) return;
+      final newChapters = res.data.chapters;
+      if (newChapters == null || newChapters.length == 0) return;
       if (comic is DownloadedComic) {
-        final c = comic as DownloadedComic;
-        final oldEps = c.eps;
-        final mergedEps = _mergePicacgEps(oldEps, latestChapters.titles);
-        if (!_listEquals(mergedEps, oldEps)) {
-          c.chapters = mergedEps;
+        var c = comic as DownloadedComic;
+        var oldEps = c.eps;
+        var newEps = _preserveDownloaded(newChapters.titles.toList(), oldEps);
+        setState(() {
+          _refreshVisibleEpisodes(allEps: newEps);
+        });
+        if (!_listEquals(newEps, oldEps)) {
+          c.chapters = newEps;
           _persistComic(c);
         }
-        setState(() {
-          _refreshVisibleEpisodes(allEps: mergedEps);
-        });
       } else if (comic is DownloadedJmComic) {
-        final c = comic as DownloadedJmComic;
-        final oldEps = c.eps;
-        final oldSeries = c.comic.series;
-        final oldIds = oldSeries.isEmpty
-            ? <String>[c.comic.id]
-            : List<String>.generate(
-                oldSeries.length, (i) => oldSeries[i + 1] ?? '');
-        if (oldIds.length != oldEps.length || oldIds.any((id) => id.isEmpty)) {
-          return;
+        var c = comic as DownloadedJmComic;
+        final ids = newChapters.ids.toList();
+        for (final old in c.comic.series.entries) {
+          if (ids.elementAtOrNull(old.key - 1) != old.value) {
+            throw '章节顺序已变化，已保留旧下载章节'.tl;
+          }
         }
-        final oldChapters = <String, String>{
-          for (int i = 0; i < oldIds.length; i++) oldIds[i]: oldEps[i],
-        };
-        final merged = _mergeChaptersById(
-          oldChapters,
-          latestChapters.allChapters,
-          c.downloadedEps,
-        );
-        final mergedIds = merged.keys.toList();
-        final mergedEps = merged.values.toList();
-        if (!_chapterMapsEqual(oldChapters, merged)) {
-          c.comic.epNames = mergedEps;
+        var oldEps = c.eps;
+        var newEps = _preserveDownloaded(newChapters.titles.toList(), oldEps);
+        setState(() {
+          _refreshVisibleEpisodes(allEps: newEps);
+        });
+        if (!_listEquals(newEps, oldEps) ||
+            c.comic.series.length != ids.length) {
+          c.comic.epNames = newEps;
           c.comic.series = {
-            for (int i = 0; i < mergedIds.length; i++) i + 1: mergedIds[i],
+            for (int i = 0; i < ids.length; i++) i + 1: ids[i],
           };
           _persistComic(c);
         }
-        setState(() {
-          _refreshVisibleEpisodes(allEps: mergedEps);
-        });
       } else if (comic is CustomDownloadedItem) {
-        final c = comic as CustomDownloadedItem;
-        final oldChapters = c.chapters;
-        final mergedChapters = oldChapters == null
-            ? null
-            : _mergeCustomChapters(
-                oldChapters, latestChapters, c.downloadedEps);
-        final mergedEps = mergedChapters?.titles.toList() ?? c.eps;
-        final epsChanged = oldChapters != null &&
-            !_customChaptersEqual(oldChapters, mergedChapters!);
+        var c = comic as CustomDownloadedItem;
+        final merged = _preserveDownloadedChapters(
+            newChapters, c.chapters, c.downloadedEps);
+        final mergedChapters = merged.chapters;
+        final newEps = mergedChapters.titles.toList();
+        final chaptersChanged = c.chapters == null ||
+            jsonEncode(c.chapters!.toJson()) !=
+                jsonEncode(mergedChapters.toJson());
+        final downloadedChanged =
+            !_listEquals(c.downloadedEps, merged.downloadedEps);
         final subIdMissing = c.subId == null && res.data.subId != null;
-        if (epsChanged || subIdMissing) {
+
+        if (downloadedChanged) {
+          _moveDownloadedEpisodes(c, merged.moves);
+        }
+        if (chaptersChanged || downloadedChanged || subIdMissing) {
           final json = c.toJson();
-          if (epsChanged) {
-            json["chapters"] = mergedChapters.toJson();
-          }
+          json["chapters"] = mergedChapters.toJson();
+          json["downloadedEps"] = merged.downloadedEps;
           if (res.data.subId != null) {
             json["subId"] = res.data.subId;
           }
           final updated = CustomDownloadedItem.fromJson(json);
           updated.time = c.time;
           updated.directory = c.directory;
+          DownloadManager().updateComic(updated);
           comic = updated;
-          _persistComic(updated);
+          final index =
+              widget.logic.comics.indexWhere((item) => item.id == updated.id);
+          if (index != -1) widget.logic.comics[index] = updated;
         }
         setState(() {
-          _refreshVisibleEpisodes(allEps: mergedEps, chapters: mergedChapters);
+          downloadedEps = merged.downloadedEps;
+          _refreshVisibleEpisodes(allEps: newEps, chapters: mergedChapters);
           _buildTabController();
         });
       }
@@ -2585,122 +2584,142 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
     }
   }
 
-  /// 保留本地章节的位置，只更新未下载章节并追加网络新增章节。
-  /// 已下载章节的位置与本地图片目录编号绑定，不能删除或重排。
-  Map<String, String> _mergeChaptersById(
-    Map<String, String> oldChapters,
-    Map<String, String> latestChapters,
-    List<int> downloadedEps,
-  ) {
-    final merged = Map<String, String>.from(oldChapters);
-    final oldIds = oldChapters.keys.toList();
-    final downloadedIds = <String>{
-      for (final index in downloadedEps)
-        if (index >= 0 && index < oldIds.length) oldIds[index],
-    };
-    for (final entry in latestChapters.entries) {
-      if (!merged.containsKey(entry.key) ||
-          !downloadedIds.contains(entry.key)) {
-        merged[entry.key] = entry.value;
+  List<T> _preserveDownloaded<T>(List<T> latest, List<T> stored) {
+    final result = latest.toList();
+    for (final index in comic.downloadedEps) {
+      if (index < 0 || index >= stored.length) continue;
+      while (result.length <= index) {
+        result.add(stored[result.length]);
       }
+      result[index] = stored[index];
     }
-    return merged;
+    return result;
   }
 
-  ComicChapters _mergeCustomChapters(
-    ComicChapters oldChapters,
-    ComicChapters latestChapters,
+  ({
+    ComicChapters chapters,
     List<int> downloadedEps,
-  ) {
-    final oldMap = oldChapters.allChapters;
-    if (!latestChapters.isGrouped) {
-      if (oldChapters.isGrouped) return oldChapters;
-      return ComicChapters(_mergeChaptersById(
-          oldMap, latestChapters.allChapters, downloadedEps));
+    Map<int, int> moves,
+  }) _preserveDownloadedChapters(
+      ComicChapters latest, ComicChapters? stored, List<int> downloadedEps) {
+    if (stored == null) {
+      return (
+        chapters: latest,
+        downloadedEps: downloadedEps.toList(),
+        moves: const {},
+      );
     }
 
-    final oldIds = oldMap.keys.toList();
-    final downloadedIds = <String>{
-      for (final index in downloadedEps)
-        if (index >= 0 && index < oldIds.length) oldIds[index],
-    };
-    final grouped = <String, Map<String, String>>{};
-    for (final group in latestChapters.groups) {
-      grouped[group] = {
-        for (final entry in latestChapters.getGroup(group).entries)
-          entry.key:
-              downloadedIds.contains(entry.key) && oldMap.containsKey(entry.key)
-                  ? oldMap[entry.key]!
-                  : entry.value,
-      };
+    List<({String? group, String id, String title})> entries(
+        ComicChapters chapters) {
+      if (!chapters.isGrouped) {
+        return [
+          for (final entry in chapters.allChapters.entries)
+            (group: null, id: entry.key, title: entry.value),
+        ];
+      }
+      return [
+        for (final group in chapters.groups)
+          for (final entry in chapters.getGroup(group).entries)
+            (group: group, id: entry.key, title: entry.value),
+      ];
     }
 
-    // 网络已删除的章节只保留已下载项，并放回其原有的分组。
-    final latestIds = latestChapters.ids.toSet();
-    final oldGroupById = <String, String>{};
-    if (oldChapters.isGrouped) {
-      for (final group in oldChapters.groups) {
-        for (final id in oldChapters.getGroup(group).keys) {
-          oldGroupById[id] = group;
+    final storedEntries = entries(stored);
+    final downloaded = <String, ({String? group, int index, String title})>{};
+    for (final index in downloadedEps) {
+      if (index < 0 || index >= storedEntries.length) continue;
+      final entry = storedEntries[index];
+      downloaded[entry.id] =
+          (group: entry.group, index: index, title: entry.title);
+    }
+
+    final matched = <String>{};
+    final groups = <String, Map<String, String>>{};
+    if (latest.isGrouped) {
+      for (final group in latest.groups) {
+        final chapters = <String, String>{};
+        for (final entry in latest.getGroup(group).entries) {
+          final old = downloaded[entry.key];
+          chapters[entry.key] = old?.title ?? entry.value;
+          if (old != null) matched.add(entry.key);
+        }
+        groups[group] = chapters;
+      }
+      for (final entry in downloaded.entries) {
+        if (matched.contains(entry.key)) continue;
+        final storedGroup = entry.value.group;
+        final group = storedGroup != null && groups.containsKey(storedGroup)
+            ? storedGroup
+            : groups.keys.last;
+        groups[group]![entry.key] = entry.value.title;
+      }
+    } else {
+      final chapters = <String, String>{};
+      for (final entry in latest.allChapters.entries) {
+        final old = downloaded[entry.key];
+        chapters[entry.key] = old?.title ?? entry.value;
+        if (old != null) matched.add(entry.key);
+      }
+      for (final entry in downloaded.entries) {
+        if (!matched.contains(entry.key)) {
+          chapters[entry.key] = entry.value.title;
         }
       }
-    }
-    final fallbackGroup = latestChapters.groups.last;
-    for (int i = 0; i < oldIds.length; i++) {
-      final id = oldIds[i];
-      if (!downloadedEps.contains(i) || latestIds.contains(id)) continue;
-      final group = oldGroupById[id] ?? fallbackGroup;
-      grouped.putIfAbsent(group, () => <String, String>{})[id] = oldMap[id]!;
+      groups[""] = chapters;
     }
 
-    final merged = ComicChapters.grouped(grouped);
-    final mergedIds = merged.ids.toList();
-    for (final index in downloadedEps) {
-      if (index < 0 || index >= oldIds.length) continue;
-      // 未下载章节可以随网络分组移动，已下载章节的目录下标不能改变。
-      if (mergedIds.elementAtOrNull(index) != oldIds[index]) {
-        return oldChapters;
-      }
+    final merged = latest.isGrouped
+        ? ComicChapters.grouped(groups)
+        : ComicChapters(groups[""]!);
+    final ids = merged.ids.toList();
+    final newIndexes = <String, int>{
+      for (int i = 0; i < ids.length; i++) ids[i]: i,
+    };
+    final newDownloadedEps = <int>[];
+    final moves = <int, int>{};
+    for (final entry in downloaded.entries) {
+      final oldIndex = entry.value.index;
+      final newIndex = newIndexes[entry.key];
+      if (newIndex == null) continue;
+      newDownloadedEps.add(newIndex);
+      if (oldIndex != newIndex) moves[oldIndex] = newIndex;
     }
-    return merged;
+    newDownloadedEps.sort();
+    return (
+      chapters: merged,
+      downloadedEps: newDownloadedEps,
+      moves: moves,
+    );
   }
 
-  bool _customChaptersEqual(ComicChapters a, ComicChapters b) {
-    if (a.isGrouped != b.isGrouped) return false;
-    if (!a.isGrouped) {
-      return _chapterMapsEqual(a.allChapters, b.allChapters);
+  void _moveDownloadedEpisodes(
+      CustomDownloadedItem comic, Map<int, int> moves) {
+    if (moves.isEmpty) return;
+    final manager = DownloadManager();
+    final root =
+        "${manager.path}/${comic.directory ?? manager.getDirectory(comic.id)}";
+    final temporary = <int, Directory>{};
+    for (final oldIndex in moves.keys) {
+      final source = Directory("$root/${oldIndex + 1}");
+      final temp = Directory("$root/.chapter_refresh_${oldIndex + 1}");
+      if (!source.existsSync() || temp.existsSync()) {
+        throw '下载章节目录更新失败'.tl;
+      }
+      temporary[oldIndex] = temp;
     }
-    if (!_listEquals(a.groups.toList(), b.groups.toList())) return false;
-    for (final group in a.groups) {
-      if (!_chapterMapsEqual(a.getGroup(group), b.getGroup(group))) {
-        return false;
+    for (final newIndex in moves.values) {
+      if (!moves.containsKey(newIndex) &&
+          Directory("$root/${newIndex + 1}").existsSync()) {
+        throw '下载章节目录更新失败'.tl;
       }
     }
-    return true;
-  }
-
-  List<String> _mergePicacgEps(
-      List<String> oldEps, Iterable<String> latestEps) {
-    final merged = oldEps.toList();
-    // 旧哔咔下载记录没有稳定的章节 ID，只能按标题出现次数识别新增章节。
-    final remainingOldTitles = <String, int>{};
-    for (final title in oldEps) {
-      remainingOldTitles[title] = (remainingOldTitles[title] ?? 0) + 1;
+    for (final oldIndex in moves.keys) {
+      Directory("$root/${oldIndex + 1}").renameSync(temporary[oldIndex]!.path);
     }
-    for (final title in latestEps) {
-      final oldCount = remainingOldTitles[title] ?? 0;
-      if (oldCount > 0) {
-        remainingOldTitles[title] = oldCount - 1;
-      } else {
-        merged.add(title);
-      }
+    for (final entry in moves.entries) {
+      temporary[entry.key]!.renameSync("$root/${entry.value + 1}");
     }
-    return merged;
-  }
-
-  bool _chapterMapsEqual(Map<String, String> a, Map<String, String> b) {
-    return _listEquals(a.keys.toList(), b.keys.toList()) &&
-        _listEquals(a.values.toList(), b.values.toList());
   }
 
   void _refreshVisibleEpisodes({
@@ -2713,7 +2732,7 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
   }
 
   /// 比较两个章节列表是否相同
-  bool _listEquals(List<String> a, List<String> b) {
+  bool _listEquals<T>(List<T> a, List<T> b) {
     if (a.length != b.length) return false;
     for (int i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;

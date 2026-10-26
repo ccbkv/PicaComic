@@ -2060,18 +2060,10 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
                 while (appdata.settings.length <= 103) {
                   appdata.settings.add("0");
                 }
-                final fluentEnabled = appdata.settings[91] == "1";
-                if (fluentEnabled && appdata.settings[103] == "1") {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted) return;
-                    setState(() {
-                      appdata.settings[103] = "0";
-                    });
-                    appdata.updateSettings();
-                    MyApp.updater?.call();
-                  });
-                }
-                return fluentEnabled;
+                // 只读不写（同上）：读取状态不应产生副作用。
+                // 若两者同时为 1，按「103 液态玻璃优先」的规则由启动自检
+                // 把 91 回退掉，而不是在渲染时清 103。
+                return appdata.settings[91] == "1";
               })(),
               onChanged: (b) {
                 setState(() {
@@ -2107,22 +2099,15 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           title: Text("液态玻璃效果和导航栏".tl),
           subtitle: Text("实验性功能,可能存在性能或点击区域问题".tl),
           trailing: AdaptiveSwitch(
+            // 注意：这里**只读不写**。
+            //
+            // 旧实现在这个 value 回调里直接 `settings[103] = "0"` —— 意味着
+            // 用户只要打开设置页扫一眼，「液态玻璃底栏」就被静默关掉了，
+            // 表现为「我明明开了底栏，进设置转一圈回来就没了」。
+            // 读取开关状态时绝不能产生副作用，互斥关系交给 onChanged 处理。
             value: (() {
               while (appdata.settings.length <= 103) {
                 appdata.settings.add("0");
-              }
-              final fluentEnabled =
-                  appdata.settings.length > 91 && appdata.settings[91] == "1";
-              if (fluentEnabled && appdata.settings[103] == "1") {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!mounted) return;
-                  setState(() {
-                    appdata.settings[103] = "0";
-                  });
-                  appdata.updateSettings();
-                  MyApp.updater?.call();
-                });
-                return false;
               }
               return appdata.settings[103] == "1";
             })(),

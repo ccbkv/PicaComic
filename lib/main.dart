@@ -402,12 +402,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       (context as Element).visitChildren(rebuild);
     }
 
+    // Fluent UI(91) 与液态玻璃导航栏(103) 互斥，两者同时为 1 属于非法状态。
+    //
+    // 旧逻辑把**两个都清零**，这在多设备同步场景下是有害的：用户明明想要
+    // 液态玻璃底栏，却因为另一台开了 Fluent UI，同步过来后两个一起被清掉，
+    // 表现为「底栏设置同步失败 / 原来的底栏被覆盖」。
+    //
+    // 按 UI 里的既有取舍（开液态玻璃会自动关 Fluent UI，见 settings_page.dart），
+    // 保留 103、只回退 91 才是符合用户预期的方向。
     if (appdata.settings.length > 91 &&
         appdata.settings[91] == "1" &&
         appdata.settings.length > 103 &&
         appdata.settings[103] == "1") {
       appdata.settings[91] = "0";
-      appdata.settings[103] = "0";
       appdata.updateSettings();
     }
     return DynamicColorBuilder(builder: (light, dark) {

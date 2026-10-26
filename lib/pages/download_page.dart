@@ -2479,7 +2479,7 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
   /// 从网络获取最新的章节列表，使新发布的章节能够显示。
   ///
   /// 网络列表不会直接覆盖本地列表：已下载章节保持不变，
-  /// 新章节追加到末尾，避免章节下标与本地图片目录错位。
+  /// 未下载章节按网络列表及分组更新，已下载章节的目录下标不能改变。
   Future<void> _fetchLatestEps() async {
     setState(() => _loadingEps = true);
     try {
@@ -2557,8 +2557,7 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
                 oldChapters, latestChapters, c.downloadedEps);
         final mergedEps = mergedChapters?.titles.toList() ?? c.eps;
         final epsChanged = oldChapters != null &&
-            !_chapterMapsEqual(
-                oldChapters.allChapters, mergedChapters!.allChapters);
+            !_customChaptersEqual(oldChapters, mergedChapters!);
         final subIdMissing = c.subId == null && res.data.subId != null;
         if (epsChanged || subIdMissing) {
           final json = c.toJson();
@@ -2614,32 +2613,70 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
     List<int> downloadedEps,
   ) {
     final oldMap = oldChapters.allChapters;
-    final latestMap = latestChapters.allChapters;
-    final merged = _mergeChaptersById(oldMap, latestMap, downloadedEps);
-    if (_chapterMapsEqual(oldMap, merged)) return oldChapters;
-
-    final mergedIds = merged.keys.toList();
-    final ComicChapters structure;
-    if (_listEquals(mergedIds, oldMap.keys.toList())) {
-      structure = oldChapters;
-    } else if (_listEquals(mergedIds, latestChapters.ids.toList())) {
-      structure = latestChapters;
-    } else {
-      // 网络章节清理或重排后，沿用旧顺序并在末尾追加，避免本地下标变化。
-      return ComicChapters(merged);
+    if (!latestChapters.isGrouped) {
+      if (oldChapters.isGrouped) return oldChapters;
+      return ComicChapters(_mergeChaptersById(
+          oldMap, latestChapters.allChapters, downloadedEps));
     }
 
-    if (!structure.isGrouped) {
-      return ComicChapters({
-        for (final id in structure.ids) id: merged[id]!,
-      });
+    final oldIds = oldMap.keys.toList();
+    final downloadedIds = <String>{
+      for (final index in downloadedEps)
+        if (index >= 0 && index < oldIds.length) oldIds[index],
+    };
+    final grouped = <String, Map<String, String>>{};
+    for (final group in latestChapters.groups) {
+      grouped[group] = {
+        for (final entry in latestChapters.getGroup(group).entries)
+          entry.key:
+              downloadedIds.contains(entry.key) && oldMap.containsKey(entry.key)
+                  ? oldMap[entry.key]!
+                  : entry.value,
+      };
     }
-    return ComicChapters.grouped({
-      for (final group in structure.groups)
-        group: {
-          for (final id in structure.getGroup(group).keys) id: merged[id]!,
-        },
-    });
+
+    // 网络已删除的章节只保留已下载项，并放回其原有的分组。
+    final latestIds = latestChapters.ids.toSet();
+    final oldGroupById = <String, String>{};
+    if (oldChapters.isGrouped) {
+      for (final group in oldChapters.groups) {
+        for (final id in oldChapters.getGroup(group).keys) {
+          oldGroupById[id] = group;
+        }
+      }
+    }
+    final fallbackGroup = latestChapters.groups.last;
+    for (int i = 0; i < oldIds.length; i++) {
+      final id = oldIds[i];
+      if (!downloadedEps.contains(i) || latestIds.contains(id)) continue;
+      final group = oldGroupById[id] ?? fallbackGroup;
+      grouped.putIfAbsent(group, () => <String, String>{})[id] = oldMap[id]!;
+    }
+
+    final merged = ComicChapters.grouped(grouped);
+    final mergedIds = merged.ids.toList();
+    for (final index in downloadedEps) {
+      if (index < 0 || index >= oldIds.length) continue;
+      // 未下载章节可以随网络分组移动，已下载章节的目录下标不能改变。
+      if (mergedIds.elementAtOrNull(index) != oldIds[index]) {
+        return oldChapters;
+      }
+    }
+    return merged;
+  }
+
+  bool _customChaptersEqual(ComicChapters a, ComicChapters b) {
+    if (a.isGrouped != b.isGrouped) return false;
+    if (!a.isGrouped) {
+      return _chapterMapsEqual(a.allChapters, b.allChapters);
+    }
+    if (!_listEquals(a.groups.toList(), b.groups.toList())) return false;
+    for (final group in a.groups) {
+      if (!_chapterMapsEqual(a.getGroup(group), b.getGroup(group))) {
+        return false;
+      }
+    }
+    return true;
   }
 
   List<String> _mergePicacgEps(

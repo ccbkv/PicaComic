@@ -86,7 +86,7 @@ class _NormalFavoritePageState extends State<_NormalFavoritePage> {
   void showFolders() {
     context
         .findAncestorStateOfType<_FavoritesPageState>()!
-        .showFolderSelector();
+        .backToOverview();
   }
 
   Future<void> openRandomFavorite() async {
@@ -328,7 +328,7 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
   void showFolders() {
     context
         .findAncestorStateOfType<_FavoritesPageState>()!
-        .showFolderSelector();
+        .backToOverview();
   }
 
   void loadPage() async {
@@ -724,7 +724,7 @@ class _FavoriteFolderState extends State<_FavoriteFolder> {
   void showFolders() {
     App.globalContext
         ?.findAncestorStateOfType<_FavoritesPageState>()
-        ?.showFolderSelector();
+        ?.backToOverview();
   }
 
   @override

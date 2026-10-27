@@ -1,19 +1,20 @@
+import 'package:pica_comic/network/update.dart';
+
 class ApiEndpoints {
   static const String githubOwner = 'ccbkv';
   static const String githubRepo = 'PicaComic';
 
   /// 当前版本
-  static const String version = '5.0.3';
+  static const String version = '5.0.5';
 
   /// 规则API级别
   static const int apiLevel = 7;
 
   /// 项目主页
-  static const String projectUrl =
-      "https://github.com/$githubOwner/$githubRepo";
+  static String get projectUrl => kProjectRepoUrl;
 
-  /// Github 项目主页
-  static const String sourceUrl = projectUrl;
+  /// 项目源码主页
+  static String get sourceUrl => projectUrl;
 
   /// 图标作者
   static const String iconUrl = "https://www.pixiv.net/users/66219277";
@@ -23,17 +24,16 @@ class ApiEndpoints {
       'https://raw.githubusercontent.com/Predidit/KazumiRules/main/';
 
   /// 应用 Releases 列表
-  static const String appReleases =
-      'https://api.github.com/repos/$githubOwner/$githubRepo/releases';
+  static String get appReleases => kProjectReleasesApiUrl;
 
   /// 在线升级
-  static const String latestApp = '$appReleases/latest';
+  static String get latestApp => '$appReleases/latest';
 
   /// Github镜像
   static const String gitMirror = 'https://ghfast.top/';
 
   /// 在线升级（镜像，仅用于下载文件，不用于API请求）
-  static const String latestAppMirror = latestApp;
+  static String get latestAppMirror => latestApp;
 
   /// 弹弹官网
   //static const String dandanIndex = 'https://www.dandanplay.com/';

@@ -4,11 +4,44 @@ import 'package:pica_comic/network/app_dio.dart';
 
 String? _updateInfo;
 
-const kProjectRepoUrl = "https://github.com/ccbkv/PicaComic";
-const kProjectIssuesUrl = "$kProjectRepoUrl/issues";
-const kProjectLatestReleaseApiUrl =
-    "https://api.github.com/repos/ccbkv/PicaComic/releases/latest";
-const kProjectLatestReleaseUrl = "$kProjectRepoUrl/releases/latest";
+bool get _useCodeberg =>
+    appdata.settings.length > 105 && appdata.settings[105] == "1";
+
+const _githubComicSourceRepositoryUrl =
+    "https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/";
+const _codebergComicSourceRepositoryUrl =
+    "https://codeberg.org/ccbkv/pica_configs/raw/branch/master/";
+
+String get kProjectRepoUrl => _useCodeberg
+    ? "https://codeberg.org/ccbkv/PicaComic"
+    : "https://github.com/ccbkv/PicaComic";
+String get kProjectIssuesUrl => "$kProjectRepoUrl/issues";
+String get kProjectReleasesApiUrl => _useCodeberg
+    ? "https://codeberg.org/api/v1/repos/ccbkv/PicaComic/releases"
+    : "https://api.github.com/repos/ccbkv/PicaComic/releases";
+String get kProjectLatestReleaseApiUrl => "$kProjectReleasesApiUrl/latest";
+String get kProjectLatestReleaseUrl => "$kProjectRepoUrl/releases/latest";
+String get kComicSourceRepositoryUrl => _useCodeberg
+    ? _codebergComicSourceRepositoryUrl
+    : _githubComicSourceRepositoryUrl;
+String get kComicSourceHelpUrl => _useCodeberg
+    ? "$kProjectRepoUrl/src/branch/master/doc/comic_source.md"
+    : "$kProjectRepoUrl/blob/master/doc/comic_source.md";
+String get kHtApiListUrl => _useCodeberg
+    ? "https://codeberg.org/ccbkv/PicaComicapitxt/raw/branch/main/htmanga_api_list.txt"
+    : "https://raw.githubusercontent.com/ccbkv/PicaComicapitxt/refs/heads/main/htmanga_api_list.txt";
+
+String resolveComicSourceUrl(String url) {
+  if (_useCodeberg && url.startsWith(_githubComicSourceRepositoryUrl)) {
+    return url.replaceFirst(
+        _githubComicSourceRepositoryUrl, _codebergComicSourceRepositoryUrl);
+  }
+  if (!_useCodeberg && url.startsWith(_codebergComicSourceRepositoryUrl)) {
+    return url.replaceFirst(
+        _codebergComicSourceRepositoryUrl, _githubComicSourceRepositoryUrl);
+  }
+  return url;
+}
 
 Future<String> getLatestVersion() async {
   var dio = logDio();

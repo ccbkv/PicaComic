@@ -35,6 +35,7 @@ import '../../foundation/comic_source/comic_source.dart';
 import '../../components/components.dart' hide Select;
 import '../../foundation/app.dart';
 import '../../foundation/local_favorites.dart';
+import '../../foundation/platform_utils.dart';
 import '../../network/cookie_jar.dart';
 import '../../network/download.dart';
 import '../../network/eh_network/eh_main_network.dart';
@@ -2703,6 +2704,17 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
             onPressed: () => findUpdate(context),
           ),
         ),
+        if (!PlatformUtils.isOhos)
+          SwitchListTile(
+            title: Text("切换至codeberg更新漫画源和更新".tl),
+            subtitle: const Text("关闭可切换回github"),
+            value: appdata.settings[105] == "1",
+            onChanged: (value) {
+              appdata.settings[105] = value ? "1" : "0";
+              appdata.updateSettings();
+              setState(() {});
+            },
+          ),
         SwitchListTile(
           title: Text("启动时检查更新".tl),
           value: appdata.settings[2] == "1",

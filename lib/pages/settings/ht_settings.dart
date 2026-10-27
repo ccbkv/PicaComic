@@ -31,7 +31,7 @@ class _HtSettingsState extends State<HtSettings> {
   Future<List<String>> _getApiList() async {
     try {
       var res = await Dio().get<String>(
-        "https://raw.githubusercontent.com/ccbkv/PicaComicapitxt/refs/heads/main/htmanga_api_list.txt",
+        kHtApiListUrl,
         options: Options(responseType: ResponseType.plain)
       );
       if (res.data != null) {

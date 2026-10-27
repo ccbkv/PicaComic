@@ -160,7 +160,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
   }
 
   static Future<void> update(ComicSource source, {String? url}) async {
-    final downloadUrl = url ?? source.url;
+    final downloadUrl = resolveComicSourceUrl(url ?? source.url);
     if (!downloadUrl.isURL) {
       showToast(message: "Invalid url config");
       return;
@@ -305,7 +305,7 @@ class _ComicSourceSettingsState extends State<ComicSourceSettings> {
 
   void help() {
     AppUrlLauncher.launchExternalUrl(
-      "$kProjectRepoUrl/blob/master/doc/comic_source.md",
+      kComicSourceHelpUrl,
     );
   }
 
@@ -350,7 +350,7 @@ Future<int> checkComicSourceUpdate() async {
   }
   var dio = logDio();
   var res = await dio.get<String>(
-      "https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/index.json");
+      "${kComicSourceRepositoryUrl}index.json");
   if (res.statusCode != 200) {
     return -1;
   }
@@ -505,7 +505,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
   void initState() {
     super.initState();
     controller.text =
-        "https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/index.json";
+        "${kComicSourceRepositoryUrl}index.json";
     load();
   }
 
@@ -576,7 +576,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
                     TextButton(
                       onPressed: () {
                         AppUrlLauncher.launchExternalUrl(
-                          "$kProjectRepoUrl/blob/master/doc/comic_source.md",
+                          kComicSourceHelpUrl,
                         );
                       },
                       child: Text("帮助".tl),
@@ -2036,8 +2036,7 @@ class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
     }
     setState(() => _addingKey = key);
     try {
-      const repository =
-          'https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/';
+      final repository = kComicSourceRepositoryUrl;
       String url;
       final response = await logDio().get<String>(
         '${repository}index.json',
@@ -2050,7 +2049,7 @@ class _SliverBuiltInSourcesState extends State<_SliverBuiltInSources> {
       }
       final configuredUrl = entry['url']?.toString();
       if (configuredUrl != null && configuredUrl.isURL) {
-        url = configuredUrl;
+        url = resolveComicSourceUrl(configuredUrl);
       } else {
         final fileName = entry['fileName']?.toString();
         if (fileName == null || fileName.isEmpty) {

@@ -12,6 +12,7 @@ import 'package:pica_comic/pages/main_page.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/app_dio.dart';
+import 'package:pica_comic/network/update.dart';
 import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/utils/io_tools.dart';
@@ -521,8 +522,7 @@ class _ComicSourceState extends State<_ComicSource>
       allowCancel: false,
     );
     try {
-      const repository =
-          'https://raw.githubusercontent.com/ccbkv/pica_configs/refs/heads/master/';
+      final repository = kComicSourceRepositoryUrl;
       final response = await logDio().get<String>(
         '${repository}index.json',
         options: Options(responseType: ResponseType.plain),
@@ -535,7 +535,7 @@ class _ComicSourceState extends State<_ComicSource>
       String url;
       final configuredUrl = entry['url']?.toString();
       if (configuredUrl != null && configuredUrl.isURL) {
-        url = configuredUrl;
+        url = resolveComicSourceUrl(configuredUrl);
       } else {
         final fileName = entry['fileName']?.toString();
         if (fileName == null || fileName.isEmpty) {

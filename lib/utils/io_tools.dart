@@ -22,6 +22,7 @@ import 'package:pica_comic/network/cookie_jar.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/network/download_model.dart';
 import 'package:pica_comic/utils/io_extensions.dart';
+import 'package:pica_comic/utils/sync_merge.dart';
 import 'package:pica_comic/utils/zip_utils.dart';
 
 import '../foundation/app.dart';
@@ -496,8 +497,37 @@ Future<bool> runExportData(bool includeDownload) async {
 }
 
 /// import data, filePath is used for webdav
-Future<bool> importData([String? filePath]) async {
-  final enableCheck = filePath != null;
+/// Human-readable reason for the most recent [importData] failure.
+/// Used to surface a concrete error instead of a generic "sync failed".
+String? _lastImportError;
+
+String? get lastImportError => _lastImportError;
+
+/// 最近一次导入实际发生的收藏变更数（新增或更新的条目）。
+/// 大于 0 说明本次导入让本机收藏变多了，需要把合并结果回传服务器，
+/// 否则下次其它设备同步时又会用旧备份覆盖掉这些新增收藏。
+int _lastMergeChanges = 0;
+
+/// 本次导入是否确实合并进了新数据（需要回传）。
+bool get lastImportMergedSomething => _lastMergeChanges > 0;
+
+/// Import user data from a backup file.
+///
+/// [filePath]  - the .picadata file to import. When null a file picker is shown.
+/// [force]     - when true, skip the version check entirely and always import.
+///               Manual "download data" from WebDAV must pass true, otherwise a
+///               device whose settings[46] already matches the server will
+///               silently refuse to import (the sync "deadlock" bug).
+///
+/// [mergeSettings] - 是否允许用备份里的值覆盖本机 `settings`。
+///   默认 true（正常的「下载」语义：把服务器设置同步过来）。
+///   但**上传前的预合并必须传 false** —— 那时本机设置才是用户刚改好的、
+///   要上传的那一份；若被服务器上的旧设置覆盖回去，用户就会遇到
+///   「刚改的底栏/翻页模式一上传就变回去了」。
+///   预合并只应该合并「数据」（收藏、历史、评论），不该碰设置。
+Future<bool> importData([String? filePath, bool force = false,
+    bool mergeSettings = true]) async {
+  final enableCheck = filePath != null && !force;
   var path = (await getApplicationSupportDirectory()).path;
   if (filePath == null) {
     if (PlatformUtils.isOhos) {
@@ -543,6 +573,7 @@ Future<bool> importData([String? filePath]) async {
     }
     if (filePath == null) {
       LogManager.addLog(LogLevel.error, "importData", "filePath is null");
+      _lastImportError = "未选择备份文件";
       return false;
     }
   }
@@ -554,6 +585,7 @@ Future<bool> importData([String? filePath]) async {
         "准备导入: $filePath, 存在=$exists, 大小=${size}B");
     if (!exists || size == 0) {
       LogManager.addLog(LogLevel.error, "importData", "选中的备份文件不存在或大小为0");
+      _lastImportError = "备份文件不存在或大小为 0 (下载可能未完成)";
       return false;
     }
     final raf = pickedFile.openSync();
@@ -571,9 +603,17 @@ Future<bool> importData([String? filePath]) async {
   }
   SingleInstanceCookieJar.instance?.dispose();
   DownloadManager().dispose();
+  // 合并收藏需要独占访问 local_favorite.db：这里先关闭本机收藏库连接，
+  // 否则合并时的写入会与已打开的连接冲突（SQLite 锁库）。
+  // 合并完成后在 finally 里通过 readData() 重新打开。
+  await LocalFavoritesManager().closeForMerge();
   String data = '';
   try {
     data = await compute<List<String>, String>((data) async {
+      // 隔离区里 LogManager.logFile 是 null，日志会被**全部丢弃**（见 log.dart）。
+      // 主 isolate 把日志路径放在 data[5] 传了进来，这里接上 ——
+      // 否则下面 SyncMerge 的合并过程（以及本回调内的所有日志）都看不见。
+      LogManager.attachIsolateLogFile(data.length > 5 ? data[5] : null);
       var path = data[0];
       await extractPortableZipFile(data[1], "$path/dataTemp");
       _flattenExtractedRoot("$path/dataTemp");
@@ -615,15 +655,30 @@ Future<bool> importData([String? filePath]) async {
       if (fileVersion <= int.parse(data[3]) && data[4] == "1") {
         return json;
       }
+      // 从这一版开始，收藏不再"整库覆盖"，改为按条目合并。
+      // 旧逻辑直接 copySync 覆盖 local_favorite.db，会让多设备各自收藏
+      // 的内容互相覆盖丢失，这里全部改为并集合并。
+      var mergedCount = 0;
       var localFavorite = File('$path/dataTemp/localFavorite');
       if (localFavorite.existsSync()) {
+        // 老版本导出的是 json 格式的 localFavorite，交给
+        // LocalFavoritesManager.readData 自己合并（它本来就是并集逻辑）。
         localFavorite.copySync('$path/localFavorite');
-      } else {
-        var localFavorite2 = File('$path/dataTemp/local_favorite.db');
-        localFavorite2.copySync('$path/local_favorite_temp.db');
+      }
+      var backupFavoriteDb = File('$path/dataTemp/local_favorite.db');
+      if (backupFavoriteDb.existsSync()) {
+        mergedCount = SyncMerge.mergeFavoriteDb(
+          localPath: '$path/local_favorite.db',
+          backupPath: backupFavoriteDb.path,
+        );
+        if (mergedCount != 0) {
+          LogManager.addLog(LogLevel.info, "importData",
+              "favorites merged, changed=$mergedCount");
+        }
       }
       var history = File('$path/dataTemp/history.db');
       if (history.existsSync()) {
+        // 历史本来就是合并式（HistoryManager.tryUpdateDb 按 target 去重补入）
         history.copySync('$path/history_temp.db');
       }
       var localComicFolders = File('$path/dataTemp/local_comic_folders.json');
@@ -636,9 +691,20 @@ Future<bool> importData([String? filePath]) async {
       }
       var comicSource = Directory('$path/dataTemp/comic_source');
       if (comicSource.existsSync()) {
-        Directory("$path/comic_source").deleteSync(recursive: true);
-        comicSource.renameSync('$path/comic_source');
+        // 合并：本机已有的书源保留，备份里新增的补进来（不再 deleteSync 清空）
+        var added = SyncMerge.mergeComicSource(
+          localDir: '$path/comic_source',
+          backupDir: comicSource.path,
+        );
+        mergedCount += added;
+        LogManager.addLog(
+            LogLevel.info, "importData", "comic_source merged, added=$added");
       }
+      // 记录本次合并产生的变更数，供主 isolate 判断是否需要回传服务器。
+      try {
+        File('$path/.last_merge_changes')
+            .writeAsStringSync(mergedCount.toString());
+      } catch (_) {}
       var cookies = File('$path/dataTemp/cookies.db');
       if (cookies.existsSync()) {
         cookies.copySync('$path/cookies.db');
@@ -653,12 +719,12 @@ Future<bool> importData([String? filePath]) async {
       var localAddComicData = Directory('$path/dataTemp/local_add_comic');
       if (localAddComicMarker.existsSync() || localAddComicData.existsSync()) {
         var currentLocalAddComic = Directory('$path/local_add_comic');
-        if (currentLocalAddComic.existsSync()) {
-          currentLocalAddComic.deleteSync(recursive: true);
-        }
-        currentLocalAddComic.createSync(recursive: true);
         if (localAddComicData.existsSync()) {
-          await moveDirectory(localAddComicData, currentLocalAddComic);
+          // 合并：本地添加的漫画按文件补齐，不再整目录清空
+          SyncMerge.mergeDirectory(
+            localDir: currentLocalAddComic.path,
+            backupDir: localAddComicData.path,
+          );
         }
       }
       for (final directoryName in ['chapter_comments', 'comic_comments']) {
@@ -666,12 +732,12 @@ Future<bool> importData([String? filePath]) async {
         final backupDirectory = Directory('$path/dataTemp/$directoryName');
         if (marker.existsSync() || backupDirectory.existsSync()) {
           final currentDirectory = Directory('$path/$directoryName');
-          if (currentDirectory.existsSync()) {
-            currentDirectory.deleteSync(recursive: true);
-          }
-          currentDirectory.createSync(recursive: true);
           if (backupDirectory.existsSync()) {
-            await moveDirectory(backupDirectory, currentDirectory);
+            // 合并：评论按文件补齐，不再整目录清空
+            SyncMerge.mergeDirectory(
+              localDir: currentDirectory.path,
+              backupDir: backupDirectory.path,
+            );
           }
         }
       }
@@ -681,16 +747,31 @@ Future<bool> importData([String? filePath]) async {
       filePath,
       DownloadManager().path!,
       appdata.settings[46],
-      (enableCheck ? "1" : "0")
+      (enableCheck ? "1" : "0"),
+      // 日志文件路径：隔离区拿不到主 isolate 的静态 logFile，靠它接上。
+      LogManager.logFile?.path ?? ""
     ]);
   } catch (e, s) {
     Log.error("importData", "$e\n$s");
+    _lastImportError = "解压或读取备份文件失败: $e";
     return false;
   } finally {
     await ComicSource.reload();
     SingleInstanceCookieJar.instance?.init();
     await DownloadManager().init();
-    Directory("$path/dataTemp").deleteSync(recursive: true);
+    try {
+      Directory("$path/dataTemp").deleteSync(recursive: true);
+    } catch (_) {}
+    // 读取隔离区写下的合并变更数（compute 不共享静态变量）
+    try {
+      var f = File('$path/.last_merge_changes');
+      if (f.existsSync()) {
+        _lastMergeChanges = int.tryParse(f.readAsStringSync()) ?? 0;
+        f.deleteSync();
+      }
+    } catch (_) {
+      _lastMergeChanges = 0;
+    }
   }
   var json = const JsonDecoder().convert(data);
   int fileVersion =
@@ -703,15 +784,32 @@ Future<bool> importData([String? filePath]) async {
         "The data file version is $fileVersion, while the app data version is "
             "$appVersion\nStop importing data");
   }
-  var dataReadRes = await appdata.readDataFromJson(json);
+  // 判断是否为「全新设备」：未完成初始引导时，需要完整继承备份里的设置
+  // （否则新设备会停留在默认配置，同步"看起来没生效"）。
+  // 已完成引导的设备则采用合并式导入，保留本机原有配置。
+  var isFreshDevice = !(appdata.firstUse.length > 3 &&
+      appdata.firstUse[3] == "1");
+  // 调用方显式不允许合并设置时（上传前的预合并），直接跳过设置导入 ——
+  // 本机设置是用户刚改好的，不能被服务器上的旧值盖回去。
+  var effectiveMergeSettings = mergeSettings && !isFreshDevice;
+  var dataReadRes = await appdata.readDataFromJson(
+    json,
+    mergeSettings: effectiveMergeSettings,
+    skipSettings: !mergeSettings,
+  );
   if (!dataReadRes) {
     LogManager.addLog(
         LogLevel.error, "Appdata", "appdata.readDataFromJson(json) failed");
+    _lastImportError = "解析备份内容失败 (readDataFromJson)";
     return false;
   }
-  await LocalFavoritesManager().readData();
+  // 重新打开收藏库连接（合并前已 closeForMerge）。
+  // 合并模式下不清空本机收藏：备份里已有的会被补入，本机独有的保留。
+  await LocalFavoritesManager().reopenAfterMerge();
+  await LocalFavoritesManager().readData(merge: true);
   LocalFavoritesManager().updateUI();
   await HistoryManager().tryUpdateDb();
+  _lastImportError = null;
   return true;
 }
 

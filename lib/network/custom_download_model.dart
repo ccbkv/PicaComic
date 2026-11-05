@@ -259,6 +259,7 @@ class CustomDownloadingItem extends DownloadingItem {
       var res = await source.loadComicPages!(comic.comicId, null);
       links[0] = res.data;
     }
+    await source.resetWebFallback();
     return links;
   }
 

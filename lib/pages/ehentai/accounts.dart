@@ -94,17 +94,17 @@ void _showIgnEditDialog(BuildContext context, VoidCallback refresh) {
         ).paddingHorizontal(16),
         actions: [
           Button.filled(
-            onPressed: () {
+            onPressed: () async {
               EhNetwork().igneous = text;
-              EhNetwork().cookieJar.saveFromResponse(
+              await EhNetwork().cookieJar.saveFromResponse(
                 Uri.parse("https://exhentai.org"),
                 [Cookie("igneous", text)],
               );
-              EhNetwork().cookieJar.saveFromResponse(
+              await EhNetwork().cookieJar.saveFromResponse(
                 Uri.parse("https://e-hentai.org"),
                 [Cookie("igneous", text)],
               );
-              context.pop();
+              if (context.mounted) context.pop();
               refresh();
             },
             child: Text("确定".tl),

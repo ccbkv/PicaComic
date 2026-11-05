@@ -4,12 +4,19 @@ import 'package:pica_comic/utils/translations.dart';
 
 class SelectDownloadChapter extends StatefulWidget {
   const SelectDownloadChapter(this.eps, this.finishSelect, this.downloadedEps,
-      {this.chapters, Key? key})
+      {this.chapters,
+      this.title,
+      this.allActionText,
+      this.selectedActionText,
+      Key? key})
       : super(key: key);
   final List<String> eps;
   final void Function(List<int>) finishSelect;
   final List<int> downloadedEps;
   final ComicChapters? chapters;
+  final String? title;
+  final String? allActionText;
+  final String? selectedActionText;
 
   @override
   State<SelectDownloadChapter> createState() => _SelectDownloadChapterState();
@@ -21,8 +28,7 @@ class _SelectDownloadChapterState extends State<SelectDownloadChapter>
   int _selectedGroupIndex = 0;
   TabController? _tabController;
 
-  bool get _isGrouped =>
-      widget.chapters != null && widget.chapters!.isGrouped;
+  bool get _isGrouped => widget.chapters != null && widget.chapters!.isGrouped;
 
   @override
   void initState() {
@@ -46,7 +52,7 @@ class _SelectDownloadChapterState extends State<SelectDownloadChapter>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("下载漫画".tl),
+        title: Text(widget.title ?? "下载漫画".tl),
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       ),
       body: Column(
@@ -67,8 +73,8 @@ class _SelectDownloadChapterState extends State<SelectDownloadChapter>
                 unselectedLabelColor: Theme.of(context).colorScheme.onSurface,
                 labelStyle:
                     const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                unselectedLabelStyle:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                unselectedLabelStyle: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.normal),
                 overlayColor: WidgetStateProperty.all(Colors.transparent),
                 onTap: (index) {
                   if (index != _selectedGroupIndex) {
@@ -78,9 +84,7 @@ class _SelectDownloadChapterState extends State<SelectDownloadChapter>
                     });
                   }
                 },
-                tabs: widget.chapters!.groups
-                    .map((g) => Tab(text: g))
-                    .toList(),
+                tabs: widget.chapters!.groups.map((g) => Tab(text: g)).toList(),
               ),
             ),
           ],
@@ -148,7 +152,7 @@ class _SelectDownloadChapterState extends State<SelectDownloadChapter>
                       }
                       widget.finishSelect(res);
                     },
-                    child: Text("下载全部".tl),
+                    child: Text(widget.allActionText ?? "下载全部".tl),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -159,7 +163,7 @@ class _SelectDownloadChapterState extends State<SelectDownloadChapter>
                         : () {
                             widget.finishSelect(selected);
                           },
-                    child: Text("下载选中".tl),
+                    child: Text(widget.selectedActionText ?? "下载选中".tl),
                   ),
                 ),
                 const SizedBox(width: 16),

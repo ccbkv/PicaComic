@@ -547,6 +547,8 @@ extension ToolBar on ComicReadingPage {
                               iconSize: 25,
                             ),
                           ),
+                        ...buildTranslationControls(
+                            comicReadingPageLogic, context),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
                           child: _buildToolIconButton(
@@ -576,6 +578,127 @@ extension ToolBar on ComicReadingPage {
         ),
       ),
     );
+  }
+
+  ({List<String> cacheKeys, InpaintMode mode})? _currentTranslationTargets(
+      ComicReadingPageLogic logic) {
+    if (!ImageTranslationService.enabledFor(
+            logic.data.id, logic.data.sourceKey) ||
+        logic.urls.isEmpty) {
+      return null;
+    }
+
+    var pages = <int>{};
+    if (logic.isContinuousMode) {
+      for (var position in logic.itemScrollListener.itemPositions.value) {
+        var page = position.index + 1;
+        if (page >= 1 && page <= logic.urls.length) pages.add(page);
+      }
+    }
+    if (pages.isEmpty && logic.index >= 1 && logic.index <= logic.urls.length) {
+      pages.add(logic.index);
+      if (logic.readingMethod.isTwoPage &&
+          !(logic.index == 1 && logic.singlePageForFirstScreen) &&
+          logic.index < logic.urls.length) {
+        pages.add(logic.index + 1);
+      }
+    }
+    if (pages.isEmpty) return null;
+
+    var data = logic.data;
+    var eid = data.hasEp
+        ? data.eps?.keys.elementAtOrNull(logic.order - 1) ?? '0'
+        : '0';
+    return (
+      cacheKeys: [
+        for (var page in pages)
+          ImageTranslationService.cacheKeyFor(
+              data.sourceKey, data.id, eid, page),
+      ],
+      mode: TranslationConfig.of(data.id, data.sourceKey).mode,
+    );
+  }
+
+  /// 与 Venera 一致：原图/译文切换、失败重试和当前屏幕页面的翻译进度。
+  List<Widget> buildTranslationControls(
+      ComicReadingPageLogic logic, BuildContext context) {
+    if (!ImageTranslationService.enabledFor(
+        logic.data.id, logic.data.sourceKey)) {
+      return const [];
+    }
+    var service = ImageTranslationService.instance;
+    var targets = _currentTranslationTargets(logic);
+    var widgets = <Widget>[];
+
+    widgets.add(
+      Padding(
+        padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
+        child: _buildToolIconButton(
+          context: context,
+          tooltip: logic.showOriginalPages
+              ? "Show translated".tl
+              : "Show original".tl,
+          icon:
+              logic.showOriginalPages ? Icons.translate : Icons.image_outlined,
+          onPressed: logic.toggleShowOriginalPages,
+        ),
+      ),
+    );
+
+    if (targets != null && !logic.showOriginalPages) {
+      PageTranslationStatus statusOf(String key) =>
+          service.statusOf(key, targets.mode);
+      var failed = [
+        for (var key in targets.cacheKeys)
+          if (statusOf(key) == PageTranslationStatus.failed) key,
+      ];
+      if (failed.isNotEmpty) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
+            child: Tooltip(
+              message: service.errorOf(failed.first, targets.mode) ??
+                  "Translation failed".tl,
+              child: IconButton(
+                icon: Icon(
+                  Icons.error_outline,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                onPressed: () => _retryTranslation(logic, failed, targets.mode),
+              ),
+            ),
+          ),
+        );
+      } else if (targets.cacheKeys.any(
+        (key) => statusOf(key) == PageTranslationStatus.translating,
+      )) {
+        widgets.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      }
+    }
+    return widgets;
+  }
+
+  void _retryTranslation(
+      ComicReadingPageLogic logic, List<String> cacheKeys, InpaintMode mode) {
+    var service = ImageTranslationService.instance;
+    var error = service.errorOf(cacheKeys.first, mode);
+    for (var key in cacheKeys) {
+      service.clearFailure(key, mode);
+    }
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    logic.refreshTranslatedImages();
+    logic.update(["ToolBar"]);
+    if (error != null) showToast(message: error);
   }
 
   bool _shouldShowChapterComments() {

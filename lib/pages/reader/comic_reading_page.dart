@@ -36,8 +36,13 @@ import 'package:pica_comic/network/nhentai_network/nhentai_main_network.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/comic_page.dart';
 import 'package:pica_comic/pages/follow_updates_page.dart';
+import 'package:pica_comic/pages/settings/settings_page.dart';
 import 'package:pica_comic/utils/keep_screen_on.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
+import 'package:pica_comic/foundation/image_translation/llm_translator.dart';
+import 'package:pica_comic/foundation/image_translation/translation_config.dart';
+import 'package:pica_comic/foundation/image_translation/translation_service.dart';
+import 'package:pica_comic/foundation/image_translation/translation_types.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/utils/save_image.dart';
 import 'package:pica_comic/utils/time.dart';
@@ -78,6 +83,8 @@ part 'reading_type.dart';
 part 'reading_settings.dart';
 
 part 'reading_data.dart';
+
+part 'translated_image_provider.dart';
 
 part 'continuation.dart';
 
@@ -316,6 +323,8 @@ class ComicReadingPage extends StatelessWidget {
       //进入阅读器时清除内存中的缓存, 并且增大限制
       BaseImageProvider.clearCache();
       BaseImageProvider.setCacheSizeLimit(100 * 1024 * 1024);
+      ImageTranslationService.instance
+          .addListener(logic.refreshTranslatedImages);
       logic.openEpsView = openEpsDrawer;
       logic.continuationIndexCallback ??= (_) {
         unawaited(syncReaderContinuationState(readingData, logic));
@@ -325,6 +334,9 @@ class ComicReadingPage extends StatelessWidget {
       OhosDecorBridge.holdDecorDark(this);
       if (useDarkBackground) {}
     }, dispose: (logic) {
+      ImageTranslationService.instance
+          .removeListener(logic.refreshTranslatedImages);
+      ImageTranslationService.instance.clearQueue();
       //清除缓存并减小最大缓存
       BaseImageProvider.clearCache();
       BaseImageProvider.setCacheSizeLimit(50 * 1024 * 1024);

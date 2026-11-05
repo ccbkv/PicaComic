@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/history.dart';
+import 'package:pica_comic/foundation/image_translation/translation_store.dart';
 import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/foundation/log.dart';
@@ -134,6 +135,7 @@ Future<void> init() async {
       JmNetwork().init(),
       LocalFavoritesManager().init(),
       HistoryManager().init(),
+      TranslationStore().init(),
       AppTranslation.init(),
     ]);
     CacheManager().setLimitSize(appdata.appSettings.cacheLimit);

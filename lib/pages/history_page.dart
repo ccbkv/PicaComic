@@ -133,7 +133,9 @@ class _HistoryPageState extends State<HistoryPage> {
     final displayList = searchMode ? results : comics;
     final maxPage = _maxPageForCount(displayList.length);
     final currentPage = _clampPage(_currentPage, maxPage);
-    final visibleComics = _paginateComics(displayList, currentPage);
+    final visibleComics = appdata.settings[25] == "1"
+        ? _paginateComics(displayList, currentPage)
+        : displayList;
 
     if (App.isFluent) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -215,21 +217,23 @@ class _HistoryPageState extends State<HistoryPage> {
         content: CustomScrollView(
           controller: _scrollController,
           slivers: [
-            SliverToBoxAdapter(
-              child: _buildPaginationSection(
-                context,
-                currentPage: currentPage,
-                maxPage: maxPage,
+            if (appdata.settings[25] == "1")
+              SliverToBoxAdapter(
+                child: _buildPaginationSection(
+                  context,
+                  currentPage: currentPage,
+                  maxPage: maxPage,
+                ),
               ),
-            ),
             buildComics(visibleComics),
-            SliverToBoxAdapter(
-              child: _buildPaginationSection(
-                context,
-                currentPage: currentPage,
-                maxPage: maxPage,
+            if (appdata.settings[25] == "1")
+              SliverToBoxAdapter(
+                child: _buildPaginationSection(
+                  context,
+                  currentPage: currentPage,
+                  maxPage: maxPage,
+                ),
               ),
-            ),
             SliverPadding(
               padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).padding.bottom),
@@ -321,21 +325,23 @@ class _HistoryPageState extends State<HistoryPage> {
               )
             ],
           ),
-          SliverToBoxAdapter(
-            child: _buildPaginationSection(
-              context,
-              currentPage: currentPage,
-              maxPage: maxPage,
+          if (appdata.settings[25] == "1")
+            SliverToBoxAdapter(
+              child: _buildPaginationSection(
+                context,
+                currentPage: currentPage,
+                maxPage: maxPage,
+              ),
             ),
-          ),
           buildComics(visibleComics),
-          SliverToBoxAdapter(
-            child: _buildPaginationSection(
-              context,
-              currentPage: currentPage,
-              maxPage: maxPage,
+          if (appdata.settings[25] == "1")
+            SliverToBoxAdapter(
+              child: _buildPaginationSection(
+                context,
+                currentPage: currentPage,
+                maxPage: maxPage,
+              ),
             ),
-          ),
           SliverPadding(
             padding:
                 EdgeInsets.only(top: MediaQuery.of(context).padding.bottom),

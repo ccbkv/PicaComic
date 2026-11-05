@@ -63,6 +63,43 @@ class _ReadingSettingsState extends State<ReadingSettings> {
     logic.update();
   }
 
+  String _activeProviderSubtitle() {
+    var active = LlmProviderStore.active;
+    if (active == null) return 'Not configured'.tl;
+    var label = active.name.isNotEmpty
+        ? active.name
+        : active.isPublicFree
+            ? 'Google Translate (no key)'.tl
+            : active.url.isNotEmpty
+                ? active.url
+                : 'Unnamed provider'.tl;
+    var count = LlmProviderStore.providers.length;
+    if (count > 1) {
+      label +=
+          ' (${'@count configured'.tlParams({'count': count.toString()})})';
+    }
+    return label;
+  }
+
+  Future<void> _openTranslationSettings(ComicReadingPageLogic logic) async {
+    var data = logic.data;
+    var chapterId = data.hasEp
+        ? data.eps?.keys.elementAtOrNull(logic.order - 1) ?? '0'
+        : '0';
+    await context.to(
+      () => Material(
+        child: AiTranslationSettingsPage(
+          comicId: data.id,
+          comicSource: data.sourceKey,
+          chapterId: chapterId,
+          onChanged: (_) => logic.refreshTranslatedImages(),
+        ),
+      ),
+    );
+    logic.refreshTranslatedImages();
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     var logic = StateController.find<ComicReadingPageLogic>();
@@ -140,6 +177,17 @@ class _ReadingSettingsState extends State<ReadingSettings> {
             ),
           ),
         const SliverToBoxAdapter(child: Divider()),
+        SliverToBoxAdapter(
+          child: ListTile(
+            title: Text('AI 翻译'.tl),
+            subtitle: Text(_activeProviderSubtitle()),
+            trailing: TextButton(
+              onPressed: () => _openTranslationSettings(logic),
+              child: Text('管理'.tl),
+            ),
+            onTap: () => _openTranslationSettings(logic),
+          ),
+        ),
         // 阅读模式
         SliverToBoxAdapter(
           child: ListTile(

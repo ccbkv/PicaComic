@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
@@ -15,6 +16,7 @@ import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/foundation/ohos_download_bridge.dart';
 import 'package:pica_comic/foundation/ohos_path_provider.dart';
 import 'package:pica_comic/foundation/platform_utils.dart';
+import 'package:pica_comic/foundation/sqlite_connection.dart';
 import 'package:pica_comic/network/custom_download_model.dart';
 import 'package:pica_comic/network/download_model.dart';
 import 'package:pica_comic/network/eh_network/eh_download_model.dart';
@@ -34,7 +36,6 @@ import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/io_extensions.dart';
 import 'package:pica_comic/utils/io_tools.dart';
 import 'package:pica_comic/utils/translations.dart';
-import 'package:sqlite3/sqlite3.dart';
 
 import 'nhentai_network/models.dart';
 import 'picacg_network/models.dart';
@@ -49,6 +50,7 @@ class DownloadManager with _DownloadDb implements Listenable {
   DownloadManager._create();
 
   ///下载目录
+  @override
   String? path;
 
   ///下载队列
@@ -65,9 +67,6 @@ class DownloadManager with _DownloadDb implements Listenable {
 
   ///是否初始化
   bool _runInit = false;
-
-  @override
-  Database? _db;
 
   final List<VoidCallback> _listeners = [];
 
@@ -162,8 +161,7 @@ class DownloadManager with _DownloadDb implements Listenable {
     }
 
     _runInit = false;
-    _db?.dispose();
-    _db = null;
+    _resetDownloadDb();
     downloading.clear();
     await init();
     return "ok";
@@ -228,13 +226,26 @@ class DownloadManager with _DownloadDb implements Listenable {
       }
     }
     try {
-      _db = sqlite3.open("$path/download.db");
-      _createTable();
+      await DatabaseGateway.instance.isolateOp(_downloadDbPath, (db) {
+        db.execute('''
+          create table if not exists download (
+            id text primary key,
+            title text,
+            subtitle text,
+            time int,
+            directory text,
+            size int,
+            json text
+          )
+        ''');
+      });
+      _downloadDbAvailable = true;
       for (var entry in oldData.entries) {
-        _addToDb(entry.value, entry.key);
+        await _addToDb(entry.value, entry.key);
       }
+      await _reloadDownloadCache();
     } catch (e, s) {
-      _db = null;
+      _resetDownloadDb();
       LogManager.addLog(LogLevel.error, "DownloadDb",
           "Failed to open download database: $e\n$s");
     }
@@ -246,8 +257,7 @@ class DownloadManager with _DownloadDb implements Listenable {
       item.stop();
     }
     downloading.clear();
-    _db?.dispose();
-    _db = null;
+    _resetDownloadDb();
   }
 
   ///初始化下载管理器
@@ -291,7 +301,8 @@ class DownloadManager with _DownloadDb implements Listenable {
       'picacg' => id,
       'ehentai' => RegExp(r'/g/(\d+)/').firstMatch(id)?.group(1) ?? id,
       'jm' => 'jm${id.replaceFirst(RegExp(r'^jm'), '')}',
-      'hitomi' => 'hitomi${RegExp(r'(\d+)\.html').firstMatch(id)?.group(1) ?? id}',
+      'hitomi' =>
+        'hitomi${RegExp(r'(\d+)\.html').firstMatch(id)?.group(1) ?? id}',
       'htmanga' => 'Ht$id',
       'nhentai' => 'nhentai${id.replaceFirst(RegExp(r'^(?:nhentai|nh)'), '')}',
       _ => "$source-$id",
@@ -302,7 +313,7 @@ class DownloadManager with _DownloadDb implements Listenable {
   void _onFinish() async {
     var task = downloading.removeFirst();
     var downloadedItem = await task.toDownloadedItem();
-    _addToDb(downloadedItem, task.directory!);
+    await _addToDb(downloadedItem, task.directory!);
     await _saveInfo();
     task.saveChapterComments();
     if (appdata.settings.length > 104 && appdata.settings[104] == "1") {
@@ -375,14 +386,16 @@ class DownloadManager with _DownloadDb implements Listenable {
 
   /// 更新已下载漫画的章节列表
   void updateComic(DownloadedItem item) {
-    _addToDb(item, item.directory ?? getDirectory(item.id), item.time);
+    unawaited(
+        _addToDb(item, item.directory ?? getDirectory(item.id), item.time));
   }
 
   ///删除已下载的漫画
   Future<void> delete(List<String> ids) async {
     for (var id in ids) {
-      _deleteFromDb(id);
-      var comic = Directory("$path/${getDirectory(id)}");
+      final directory = getDirectory(id);
+      await _deleteFromDb(id);
+      var comic = Directory("$path/$directory");
       try {
         comic.delete(recursive: true);
       } catch (e) {
@@ -410,7 +423,8 @@ class DownloadManager with _DownloadDb implements Listenable {
       var size = Directory("$path/${getDirectory(comic.id)}").getMBSizeSync();
       comic.downloadedEps.remove(ep);
       comic.comicSize = size;
-      _addToDb(comic, comic.directory ?? getDirectory(comic.id), comic.time);
+      await _addToDb(
+          comic, comic.directory ?? getDirectory(comic.id), comic.time);
       return null;
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "IO", "$e/n$s");
@@ -629,7 +643,8 @@ class _LegacyScriptDownloading extends DownloadingItem {
       // Existing page offsets must not silently point at a different page list.
       final hasProgress = downloadedPages > 0 ||
           (toBaseMap()['finishedTasks'] as List).isNotEmpty;
-      if (oldLinks != null && hasProgress &&
+      if (oldLinks != null &&
+          hasProgress &&
           oldLinks[slot]?.length != pages.data.length) {
         throw '漫画页数已变化，已保留旧下载文件和进度'.tl;
       }
@@ -640,14 +655,17 @@ class _LegacyScriptDownloading extends DownloadingItem {
       throw '请先添加对应漫画源'.tl;
     }
     if (_legacy is PicDownloadingItem) {
-      final titles = List.generate(chapters!.length,
-          (i) => chapters[(i + 1).toString()]);
+      final titles =
+          List.generate(chapters!.length, (i) => chapters[(i + 1).toString()]);
       if (titles.any((title) => title == null)) {
         throw '旧下载章节与漫画源不匹配，已保留下载进度'.tl;
       }
       _legacy = PicDownloadingItem.fromMap(
           {...oldMap, '_eps': titles.cast<String>()},
-          onFinish!, onError!, updateInfo!, id);
+          onFinish!,
+          onError!,
+          updateInfo!,
+          id);
     } else if (_legacy case JmDownloadingItem item) {
       if (item.comic.series.isEmpty) item.comic.series[1] = comicId;
     }
@@ -670,8 +688,8 @@ class _LegacyScriptDownloading extends DownloadingItem {
       throw '请先添加对应漫画源'.tl;
     }
     final slot = links!.keys.elementAt(downloadingEp);
-    return ImageManager().getCustomImage(
-        link, comicId, _chapterIds[slot] ?? comicId, sourceKey);
+    return ImageManager()
+        .getCustomImage(link, comicId, _chapterIds[slot] ?? comicId, sourceKey);
   }
 
   @override
@@ -777,7 +795,8 @@ extension AddDownloadExt on DownloadManager {
     if (downloading.any((item) => item.id == id)) return;
     if (archiveUrl != null) {
       final uri = Uri.tryParse(archiveUrl);
-      if (uri == null || uri.host.isEmpty ||
+      if (uri == null ||
+          uri.host.isEmpty ||
           !const ['http', 'https'].contains(uri.scheme)) {
         throw ArgumentError('Invalid archive URL');
       }
@@ -814,7 +833,9 @@ DownloadedItem? _getComicFromJson(String id, String json, DateTime time,
   DownloadedItem comic;
   try {
     final data = jsonDecode(json);
-    if (data is Map && data['sourceKey'] is String && data['comicId'] is String) {
+    if (data is Map &&
+        data['sourceKey'] is String &&
+        data['comicId'] is String) {
       comic = CustomDownloadedItem.fromJson(Map<String, dynamic>.from(data));
     } else if (id.contains('-')) {
       comic = CustomDownloadedItem.fromJson(data);
@@ -842,11 +863,18 @@ DownloadedItem? _getComicFromJson(String id, String json, DateTime time,
 }
 
 abstract mixin class _DownloadDb {
-  Database? get _db;
+  String? get path;
+
+  String get _downloadDbPath => "$path/download.db";
+
+  bool _downloadDbAvailable = false;
   bool _downloadDbWarningShown = false;
+  Map<String, Map<String, Object?>> _downloadRecords = {};
+
+  static final _cache = <String, String>{};
 
   bool _ensureDownloadDb() {
-    if (_db != null) {
+    if (_downloadDbAvailable) {
       return true;
     }
     if (!_downloadDbWarningShown) {
@@ -857,89 +885,103 @@ abstract mixin class _DownloadDb {
     return false;
   }
 
-  void _createTable() {
-    if (!_ensureDownloadDb()) {
-      return;
-    }
-    _db!.execute('''
-      create table if not exists download (
-        id text primary key,
-        title text,
-        subtitle text,
-        time int,
-        directory text,
-        size int,
-        json text
-      )
-    ''');
+  void _resetDownloadDb() {
+    _downloadDbAvailable = false;
+    _downloadRecords = {};
+    _cache.clear();
   }
 
-  void _addToDb(DownloadedItem item, String directory, [DateTime? time]) {
+  Future<void> _reloadDownloadCache() async {
+    final rows =
+        await DatabaseGateway.instance.isolateOp(_downloadDbPath, (db) {
+      return db
+          .select('''
+        select id, title, subtitle, time, directory, size, json from download
+      ''')
+          .map((row) => <String, Object?>{
+                'id': row['id'],
+                'title': row['title'],
+                'subtitle': row['subtitle'],
+                'time': row['time'],
+                'directory': row['directory'],
+                'size': row['size'],
+                'json': row['json'],
+              })
+          .toList();
+    });
+    _downloadRecords = {
+      for (final row in rows) row['id'] as String: row,
+    };
+  }
+
+  Future<void> _addToDb(DownloadedItem item, String directory,
+      [DateTime? time]) async {
     if (!_ensureDownloadDb()) {
       return;
     }
-    _db!.execute('''
-      insert or replace into download
-      values (?,?,?,?,?,?,?)
-    ''', [
-      item.id,
-      item.name,
-      item.subTitle,
-      (time ?? DateTime.now()).millisecondsSinceEpoch,
-      directory,
-      item.comicSize,
-      jsonEncode(item.toJson()),
-    ]);
+    final record = <String, Object?>{
+      'id': item.id,
+      'title': item.name,
+      'subtitle': item.subTitle,
+      'time': (time ?? DateTime.now()).millisecondsSinceEpoch,
+      'directory': directory,
+      'size': item.comicSize,
+      'json': jsonEncode(item.toJson()),
+    };
+    await DatabaseGateway.instance.isolateOp(_downloadDbPath, (db) {
+      db.execute('''
+        insert or replace into download
+        values (?,?,?,?,?,?,?)
+      ''', [
+        record['id'],
+        record['title'],
+        record['subtitle'],
+        record['time'],
+        record['directory'],
+        record['size'],
+        record['json'],
+      ]);
+    });
+    _downloadRecords[item.id] = record;
+    _cache.remove(item.id);
   }
 
   bool isExists(String id) {
-    if (!_ensureDownloadDb()) {
-      return false;
-    }
-    var result = _db!.select('''
-      select id from download
-      where id = ?
-    ''', [id]);
-    return result.isNotEmpty;
+    return _ensureDownloadDb() && _downloadRecords.containsKey(id);
   }
 
-  void _deleteFromDb(String id) {
+  Future<void> _deleteFromDb(String id) async {
     if (!_ensureDownloadDb()) {
       return;
     }
-    _db!.execute('''
-      delete from download
-      where id = ?
-    ''', [id]);
+    await DatabaseGateway.instance.isolateOp(_downloadDbPath, (db) {
+      db.execute('''
+        delete from download
+        where id = ?
+      ''', [id]);
+    });
+    _downloadRecords.remove(id);
+    _cache.remove(id);
   }
 
   DownloadedItem? _getComicWithDb(String id) {
     if (!_ensureDownloadDb()) {
       return null;
     }
-    var result = _db!.select('''
-      select * from download
-      where id = ?
-    ''', [id]);
-    if (result.isEmpty) return null;
-    var data = result.first;
+    final record = _downloadRecords[id];
+    return record == null ? null : _comicFromRecord(record);
+  }
+
+  DownloadedItem? _comicFromRecord(Map<String, Object?> record) {
     return _getComicFromJson(
-      data['id'],
-      data['json'],
-      DateTime.fromMillisecondsSinceEpoch(data['time']),
-      data['directory'],
+      record['id'] as String,
+      record['json'] as String,
+      DateTime.fromMillisecondsSinceEpoch(record['time'] as int),
+      record['directory'] as String?,
     );
   }
 
-  int get total {
-    if (!_ensureDownloadDb()) {
-      return 0;
-    }
-    var result = _db!.select('''
-      select count(*) from download
-    ''');
-    return result.first['count(*)'];
-  }
+  int get total => _ensureDownloadDb() ? _downloadRecords.length : 0;
 
   /// order: time, title, subtitle, size
   List<DownloadedItem> getAll(
@@ -947,21 +989,24 @@ abstract mixin class _DownloadDb {
     if (!_ensureDownloadDb()) {
       return [];
     }
-    var result = _db!.select('''
-      select * from download
-      order by $order $direction
-    ''');
-    return result
-        .map(
-          (e) => _getComicFromJson(e['id'], e['json'],
-              DateTime.fromMillisecondsSinceEpoch(e['time']), e['directory']),
-        )
+    final records = _downloadRecords.values.toList();
+    records.sort((a, b) {
+      final result = switch (order) {
+        'title' =>
+          (a['title'] as String? ?? '').compareTo(b['title'] as String? ?? ''),
+        'subtitle' => (a['subtitle'] as String? ?? '')
+            .compareTo(b['subtitle'] as String? ?? ''),
+        'size' => (a['size'] as int? ?? 0).compareTo(b['size'] as int? ?? 0),
+        _ => (a['time'] as int).compareTo(b['time'] as int),
+      };
+      return direction == 'asc' ? result : -result;
+    });
+    return records
+        .map(_comicFromRecord)
         .where((comic) => comic != null)
         .cast<DownloadedItem>()
         .toList();
   }
-
-  static final _cache = <String, String>{};
 
   String getDirectory(String id) {
     var directory = _cache[id];
@@ -969,15 +1014,11 @@ abstract mixin class _DownloadDb {
       if (!_ensureDownloadDb()) {
         return _findAccurateDirectory(id);
       }
-      var result = _db!.select('''
-      select directory from download
-      where id = ?
-    ''', [id]);
-      if (result.isEmpty) {
+      final stored = _downloadRecords[id]?['directory'] as String?;
+      if (stored == null) {
         throw Exception("Directory not found for id: $id");
       }
-      directory = result.first['directory'];
-      directory = _findAccurateDirectory(directory!);
+      directory = _findAccurateDirectory(stored);
       if (_cache.length > 50) {
         _cache.remove(_cache.keys.first);
       }

@@ -64,10 +64,10 @@ class _EhScriptLoginPageState extends State<EhScriptLoginPage> {
         });
         await verified.future;
         if (!mounted) return;
-        final cookies = SingleInstanceCookieJar.instance!
+        final cookies = await SingleInstanceCookieJar.instance!
             .loadForRequest(Uri.parse(challenge.url));
-        if (!cookies.any(
-            (cookie) => cookie.name == 'cf_clearance' && cookie.value.isNotEmpty)) {
+        if (!cookies.any((cookie) =>
+            cookie.name == 'cf_clearance' && cookie.value.isNotEmpty)) {
           setState(() => _error = 'Cloudflare 验证未完成'.tl);
           return;
         }
@@ -106,7 +106,7 @@ class _EhScriptLoginPageState extends State<EhScriptLoginPage> {
         if (!await widget.checkStatus!(currentUrl, title)) return false;
         final cookies = await getCookies();
         if (closed || !mounted) return false;
-        SingleInstanceCookieJar.instance!
+        await SingleInstanceCookieJar.instance!
             .saveFromResponse(Uri.parse(currentUrl), cookies);
         await widget.onLoginSuccess?.call();
         if (closed || !mounted) return false;

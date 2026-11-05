@@ -1,16 +1,13 @@
 library pica_settings;
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:path_provider/path_provider.dart';
@@ -27,12 +24,10 @@ import 'package:pica_comic/network/app_dio.dart';
 import 'package:pica_comic/pages/about/about_page.dart';
 import 'package:pica_comic/components/components.dart' as components;
 import 'package:pica_comic/components/components.dart' hide Select;
-import 'package:pica_comic/pages/logs_page.dart';
 import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/app_url_launcher.dart';
 import 'package:pica_comic/utils/io_tools.dart';
 import '../../foundation/comic_source/comic_source.dart';
-import '../../components/components.dart' hide Select;
 import '../../foundation/app.dart';
 import '../../foundation/local_favorites.dart';
 import '../../foundation/platform_utils.dart';
@@ -48,7 +43,6 @@ import 'package:pica_comic/pages/settings/app_updater.dart';
 import 'package:pica_comic/pages/settings/app_updater_history.dart';
 import '../../network/webdav.dart';
 import '../../utils/background_service.dart';
-import '../../utils/debug.dart';
 import '../../utils/io.dart';
 import '../welcome_page.dart';
 import 'package:pica_comic/utils/translations.dart';
@@ -58,6 +52,17 @@ import 'package:pica_comic/pages/settings/file_manager_page.dart';
 import 'user_comments_page.dart';
 import 'pikacg_leavemsg_page.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
+import 'package:uuid/uuid.dart';
+import 'package:pica_comic/foundation/image_translation/llm_translator.dart';
+import 'package:pica_comic/foundation/image_translation/pre_translation_tasks.dart';
+import 'package:pica_comic/foundation/image_translation/script_translator.dart';
+import 'package:pica_comic/foundation/image_translation/translation_config.dart';
+import 'package:pica_comic/foundation/image_translation/translation_models.dart';
+import 'package:pica_comic/foundation/image_translation/translation_performance_config.dart';
+import 'package:pica_comic/foundation/image_translation/translation_service.dart';
+import 'package:pica_comic/foundation/image_translation/translation_sources.dart';
+import 'package:pica_comic/foundation/image_translation/translation_targets.dart';
+import 'package:pica_comic/foundation/image_translation/translation_worker.dart';
 
 part "reading_settings.dart";
 part "picacg_settings.dart";
@@ -77,6 +82,12 @@ part 'components.dart';
 part 'debug.dart';
 part 'chapter_comments_manager_page.dart';
 part 'comic_comments_manager_page.dart';
+part 'translation_models_settings.dart';
+part 'llm_providers_settings.dart';
+part 'translation_script_settings.dart';
+part 'translation_prompt_settings.dart';
+part 'translation_languages_settings.dart';
+part 'ai_translation_settings.dart';
 
 String get _platformName {
   if (Platform.isIOS) {
@@ -96,7 +107,7 @@ String get _platformName {
   }
   //if (PlatformUtils.isOhos) {
   //  return "Ohos版";
- // }
+  // }
   return "unknown";
 }
 
@@ -122,19 +133,19 @@ Widget? get _platformIcon {
       ),
     );
   }
-      if (Platform.isLinux) {
-        return const SizedBox(
-          width: 24,
-          height: 24,
-          child: CustomPaint(
-            painter: _LinuxPlatformPainter(),
-          ),
-        );
-      }
-  if (Platform.isWindows) {
-        return const _WindowsPlatformIcon(size: 24);
+  if (Platform.isLinux) {
+    return const SizedBox(
+      width: 24,
+      height: 24,
+      child: CustomPaint(
+        painter: _LinuxPlatformPainter(),
+      ),
+    );
   }
-      /*
+  if (Platform.isWindows) {
+    return const _WindowsPlatformIcon(size: 24);
+  }
+  /*
       if (PlatformUtils.isOhos) {
         return const SizedBox(
           width: 24,
@@ -954,10 +965,11 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> implements PopEntry {
-  static const int _aboutPageIndex = 7;
-  static const int _appUpdaterHistoryIndex = 8;
-  static const int _fileManagerIndex = 9;
-  static const int _debugPageIndex = 10;
+  static const int _aiTranslationPageIndex = 3;
+  static const int _aboutPageIndex = 8;
+  static const int _appUpdaterHistoryIndex = 9;
+  static const int _fileManagerIndex = 10;
+  static const int _debugPageIndex = 11;
 
   int currentPage = -1;
 
@@ -972,6 +984,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     "浏览",
     "漫画源",
     "阅读",
+    "AI 翻译",
     "外观",
     "本地收藏",
     "APP",
@@ -979,13 +992,14 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     "关于",
     "历史版本",
     "文件管理器",
-    "Debug"
+    "Debug",
   ];
 
   final icons = <IconData>[
     Icons.explore,
     Icons.source,
     Icons.book,
+    Icons.translate,
     Icons.color_lens,
     Icons.collections_bookmark_rounded,
     Icons.apps,
@@ -1160,13 +1174,17 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         return const ComicSourceSettings(showHeader: false);
       case 2:
         return const ReadingSettings(false);
-      case 3:
-        return buildFluentAppearanceSettings();
+      case _debugPageIndex:
+        return const DebugPage();
+      case _aiTranslationPageIndex:
+        return const AiTranslationSettingsPage(embedded: true);
       case 4:
-        return const LocalFavoritesSettings();
+        return buildFluentAppearanceSettings();
       case 5:
-        return buildFluentAppSettings();
+        return const LocalFavoritesSettings();
       case 6:
+        return buildFluentAppSettings();
+      case 7:
         return const NetworkSettings();
       case _aboutPageIndex:
         return buildFluentAbout();
@@ -1174,8 +1192,6 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         return const AppUpdaterHistoryPage(embedded: true);
       case _fileManagerIndex:
         return const FileManagerPage();
-      case _debugPageIndex:
-        return const DebugPage();
       default:
         return const SizedBox();
     }
@@ -2776,13 +2792,15 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       0 => buildExploreSettings(context, false),
       1 => const SizedBox(),
       2 => const ReadingSettings(false),
-      3 => buildAppearanceSettings(),
-      4 => const LocalFavoritesSettings(),
-      5 => buildAppSettings(),
-      6 => const NetworkSettings(),
+      4 => buildAppearanceSettings(),
+      5 => const LocalFavoritesSettings(),
+      6 => buildAppSettings(),
+      7 => const NetworkSettings(),
       _aboutPageIndex => buildAbout(),
       _appUpdaterHistoryIndex => const AppUpdaterHistoryPage(embedded: true),
       _debugPageIndex => const DebugPage(),
+      _aiTranslationPageIndex =>
+        const AiTranslationSettingsPage(embedded: true),
       _ => throw UnimplementedError()
     };
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
@@ -18,6 +20,11 @@ import 'local_add_comic.dart';
 import 'package:pica_comic/pages/pre_search_page.dart';
 import 'package:pica_comic/pages/follow_updates_page.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
+import 'package:pica_comic/foundation/image_translation/translation_service.dart';
+import 'package:pica_comic/foundation/image_translation/translation_store.dart';
+import 'package:pica_comic/network/base_comic.dart';
+import 'package:pica_comic/pages/comic_page.dart';
+import 'package:pica_comic/pages/translated_comics_page.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class _SearchBar extends StatelessWidget {
@@ -54,8 +61,7 @@ class _SearchBar extends StatelessWidget {
             context.to(() => PreSearchPage());
           },
           child: Row(
-            children:
-            [
+            children: [
               const SizedBox(width: 16),
               const Icon(Icons.search),
               const SizedBox(width: 8),
@@ -83,6 +89,7 @@ class MePage extends StatelessWidget {
           buildAccount(1000), // width not critical for Fluent layout here
           buildComicSource(context, 1000),
           buildDownload(context, 1000),
+          const _TranslatedComics(),
           buildLocalAddComic(context, 1000),
           buildImageFavorite(context, 1000),
           buildTools(context, 1000),
@@ -117,6 +124,7 @@ class MePage extends StatelessWidget {
                             buildAccount(width),
                             buildComicSource(context, width),
                             buildDownload(context, width),
+                            const _TranslatedComics(),
                             buildLocalAddComic(context, width),
                           ],
                         ),
@@ -134,15 +142,15 @@ class MePage extends StatelessWidget {
                       ),
                     ],
                   )
-                else
-                  ...[
-                    buildAccount(width),
-                    buildComicSource(context, width),
-                    buildDownload(context, width),
-                    buildLocalAddComic(context, width),
-                    buildImageFavorite(context, width),
-                    buildTools(context, width),
-                  ],
+                else ...[
+                  buildAccount(width),
+                  buildComicSource(context, width),
+                  buildDownload(context, width),
+                  const _TranslatedComics(),
+                  buildLocalAddComic(context, width),
+                  buildImageFavorite(context, width),
+                  buildTools(context, width),
+                ],
                 buildSyncData(context, width),
               ],
             ),
@@ -196,21 +204,26 @@ class MePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
-                    height: appdata.appSettings.homePageHistoryDisplayType == 0 ? 128 : 88,
+                    height: appdata.appSettings.homePageHistoryDisplayType == 0
+                        ? 128
+                        : 88,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: history.length,
                       itemBuilder: (context, index) {
-                        if (appdata.appSettings.homePageHistoryDisplayType == 1) {
+                        if (appdata.appSettings.homePageHistoryDisplayType ==
+                            1) {
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: SizedBox(
                               width: 220,
                               child: fluent.HoverButton(
-                                onPressed: () => toComicPageWithHistory(context, history[index]),
+                                onPressed: () => toComicPageWithHistory(
+                                    context, history[index]),
                                 builder: (context, states) {
                                   return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 10),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(8),
                                       color: fluent.FluentTheme.of(context)
@@ -242,7 +255,8 @@ class MePage extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: fluent.HoverButton(
-                            onPressed: () => toComicPageWithHistory(context, history[index]),
+                            onPressed: () =>
+                                toComicPageWithHistory(context, history[index]),
                             builder: (context, states) {
                               return Container(
                                 width: 96,
@@ -315,12 +329,15 @@ class MePage extends StatelessWidget {
                     ),
                   ),
                   SizedBox(
-                    height: appdata.appSettings.homePageHistoryDisplayType == 0 ? 128 : 88,
+                    height: appdata.appSettings.homePageHistoryDisplayType == 0
+                        ? 128
+                        : 88,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: history.length,
                       itemBuilder: (context, index) {
-                        if (appdata.appSettings.homePageHistoryDisplayType == 1) {
+                        if (appdata.appSettings.homePageHistoryDisplayType ==
+                            1) {
                           return InkWell(
                             onTap: () =>
                                 toComicPageWithHistory(context, history[index]),
@@ -328,7 +345,8 @@ class MePage extends StatelessWidget {
                             child: Container(
                               width: 220,
                               margin: const EdgeInsets.symmetric(horizontal: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 10),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                                 color: Theme.of(context)
@@ -395,7 +413,8 @@ class MePage extends StatelessWidget {
             ? null
             : appdata.appSettings.followUpdatesFolder;
         int count = 0;
-        if (folder != null && LocalFavoritesManager().folderNames.contains(folder)) {
+        if (folder != null &&
+            LocalFavoritesManager().folderNames.contains(folder)) {
           count = LocalFavoritesManager().countUpdates(folder);
         }
 
@@ -405,7 +424,9 @@ class MePage extends StatelessWidget {
             child: fluent.ListTile(
               leading: const Icon(fluent.FluentIcons.sync),
               title: Text('追更'.tl),
-              subtitle: count > 0 ? Text('@c 个更新'.tlParams({'c': count.toString()})) : null,
+              subtitle: count > 0
+                  ? Text('@c 个更新'.tlParams({'c': count.toString()}))
+                  : null,
               trailing: const Icon(fluent.FluentIcons.chevron_right),
               onPressed: () => context.to(() => const FollowUpdatesPage()),
             ),
@@ -444,7 +465,8 @@ class MePage extends StatelessWidget {
                 ).paddingHorizontal(16),
                 if (count > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                     margin: const EdgeInsets.only(bottom: 16, left: 16),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
@@ -472,10 +494,12 @@ class MePage extends StatelessWidget {
 
         Widget buildItem(String name) {
           if (App.isFluent) {
-             return Container(
+            return Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: fluent.FluentTheme.of(App.globalContext!).resources.cardBackgroundFillColorSecondary,
+                color: fluent.FluentTheme.of(App.globalContext!)
+                    .resources
+                    .cardBackgroundFillColorSecondary,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -501,9 +525,9 @@ class MePage extends StatelessWidget {
         return _MePageCard(
           icon: const Icon(Icons.switch_account),
           title: "账号管理".tl,
-          badge: "已登录 @a 个账号"
-              .tlParams({"a": accounts.length.toString()}),
-          onTap: () => showPopUpWidget(App.globalContext!, const AccountsPage()),
+          badge: "已登录 @a 个账号".tlParams({"a": accounts.length.toString()}),
+          onTap: () =>
+              showPopUpWidget(App.globalContext!, const AccountsPage()),
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -513,7 +537,6 @@ class MePage extends StatelessWidget {
       },
     );
   }
-
 
   Widget buildDownload(BuildContext context, double width) {
     return StateBuilder<SimpleController>(
@@ -538,8 +561,6 @@ class MePage extends StatelessWidget {
       onTap: () => context.to(() => const LocalAddComicPage()),
     );
   }
-
-  
 
   Widget buildImageFavorite(BuildContext context, double width) {
     return StateBuilder<SimpleController>(
@@ -583,10 +604,12 @@ class MePage extends StatelessWidget {
         var comicSources = ComicSource.sources;
         Widget buildItem(String name) {
           if (App.isFluent) {
-             return Container(
+            return Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: fluent.FluentTheme.of(App.globalContext!).resources.cardBackgroundFillColorSecondary,
+                color: fluent.FluentTheme.of(App.globalContext!)
+                    .resources
+                    .cardBackgroundFillColorSecondary,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -650,10 +673,12 @@ class MePage extends StatelessWidget {
   Widget buildTools(BuildContext context, double width) {
     Widget buildItem(String name) {
       if (App.isFluent) {
-          return Container(
+        return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: fluent.FluentTheme.of(App.globalContext!).resources.cardBackgroundFillColorSecondary,
+            color: fluent.FluentTheme.of(App.globalContext!)
+                .resources
+                .cardBackgroundFillColorSecondary,
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
@@ -741,7 +766,8 @@ class MePage extends StatelessWidget {
                             size: 18,
                           ),
                           const SizedBox(width: 4),
-                          Text('Error'.tl, style: const TextStyle(fontSize: 12)),
+                          Text('Error'.tl,
+                              style: const TextStyle(fontSize: 12)),
                         ],
                       ),
                     ),
@@ -774,6 +800,107 @@ class MePage extends StatelessWidget {
       }
     }
     return result;
+  }
+}
+
+class _TranslatedComics extends StatefulWidget {
+  const _TranslatedComics();
+
+  @override
+  State<_TranslatedComics> createState() => _TranslatedComicsState();
+}
+
+class _TranslatedComicsState extends State<_TranslatedComics> {
+  List<StoredTranslationComic> items = const [];
+  var count = 0;
+
+  void _load() {
+    var all = ImageTranslationService.translatedComics;
+    var translatedKeys = {
+      for (var item in all) '${item.sourceKey}\u0000${item.comicId}',
+    };
+    var enabledOnly = ImageTranslationService.enabledComicKeys.where((key) {
+      var separator = key.lastIndexOf('@');
+      if (separator <= 0 || separator == key.length - 1) return false;
+      var comicId = key.substring(0, separator);
+      var sourceKey = key.substring(separator + 1);
+      return !translatedKeys.contains('$sourceKey\u0000$comicId');
+    }).length;
+    items = all.take(20).toList();
+    count = all.length + enabledOnly;
+  }
+
+  void _reload() {
+    if (!TranslationStore().isInitialized || !mounted) return;
+    setState(_load);
+  }
+
+  @override
+  void initState() {
+    _load();
+    TranslationStore().addListener(_reload);
+    ImageTranslationService.instance.addListener(_reload);
+    unawaited(hydrateTranslatedComicMetadata().then((_) => _reload()));
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    TranslationStore().removeListener(_reload);
+    ImageTranslationService.instance.removeListener(_reload);
+    super.dispose();
+  }
+
+  CustomComic _asComic(StoredTranslationComic item) {
+    return CustomComic(
+      item.title.isEmpty ? item.comicId : item.title,
+      '',
+      item.cover,
+      item.comicId,
+      translatedComicTagsFor(item.sourceKey, item.comicId),
+      '',
+      item.sourceKey,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty && count == 0) return const SizedBox.shrink();
+    var setting = appdata.settings[44].split(',');
+    var scale = double.tryParse(setting.length > 1 ? setting[1] : '1') ?? 1;
+    var detailed = setting.first == '0' || setting.first == '3';
+    var tileWidth = detailed ? 420 * scale : 112 * scale;
+    var tileHeight = detailed ? 164 * scale : tileWidth / 0.72;
+    return _MePageCard(
+      icon: const Icon(Icons.translate_rounded),
+      title: '翻译库'.tl,
+      badge: count.toString(),
+      onTap: () => context.to(() => const TranslatedComicsPage()),
+      child: items.isEmpty
+          ? null
+          : SizedBox(
+              height: tileHeight + 4,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  var item = items[index];
+                  return SizedBox(
+                    width: tileWidth,
+                    height: tileHeight,
+                    child: TranslationComicTile(
+                      _asComic(item),
+                      onOpen: () => openTranslatedChaptersPage(context, item),
+                      categoryTags: translatedComicCategoriesFor(
+                        item.sourceKey,
+                        item.comicId,
+                      ),
+                    ),
+                  ).paddingHorizontal(4).paddingVertical(2);
+                },
+              ),
+            ).paddingHorizontal(8).paddingBottom(12),
+    );
   }
 }
 

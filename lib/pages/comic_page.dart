@@ -15,6 +15,12 @@ import 'package:pica_comic/components/select_download_eps.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/image_loader/cached_image.dart';
+import 'package:pica_comic/foundation/image_translation/llm_translator.dart';
+import 'package:pica_comic/foundation/image_translation/pre_translation_tasks.dart';
+import 'package:pica_comic/foundation/image_translation/translation_config.dart';
+import 'package:pica_comic/foundation/image_translation/translation_models.dart';
+import 'package:pica_comic/foundation/image_translation/translation_service.dart';
+import 'package:pica_comic/foundation/image_translation/translation_store.dart';
 import 'package:pica_comic/foundation/image_loader/stream_image_provider.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/foundation/js_engine.dart';
@@ -31,6 +37,7 @@ import 'package:pica_comic/pages/category_comics_page.dart';
 import 'package:pica_comic/pages/reader/comic_reading_page.dart';
 import 'package:pica_comic/pages/ehentai/eh_prime_thumbnail.dart';
 import 'package:pica_comic/pages/search_result_page.dart';
+import 'package:pica_comic/pages/settings/settings_page.dart';
 import 'package:pica_comic/utils/app_url_launcher.dart';
 import 'package:pica_comic/utils/app_share.dart';
 import 'package:pica_comic/utils/tags_translation.dart';
@@ -39,6 +46,8 @@ import 'show_image_page.dart';
 import 'package:shimmer_animation/shimmer_animation.dart';
 import 'dart:math' as math;
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
+
+part 'pre_translate_chapter_picker.dart';
 
 class ComicPage extends StatelessWidget {
   const ComicPage({
@@ -188,34 +197,38 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
                 ),
                 actions: [
                   FilledButton(
-                    onPressed: gettingLink ? null : () async {
-                      if (selected == -1) {
-                        Navigator.pop(dialogContext, 'normal');
-                        return;
-                      }
-                      if (DownloadManager().isExists(downloadId)) {
-                        showToast(message: '已有本地下载，不能重复下载整本归档'.tl);
-                        return;
-                      }
-                      setState(() => gettingLink = true);
-                      final res = await archiveDownloader.getDownloadUrl(
-                          id, archives![selected].id);
-                      if (!context.mounted) return;
-                      setState(() => gettingLink = false);
-                      if (res.error) {
-                        showToast(message: res.errorMessage!);
-                        return;
-                      }
-                      final url = res.data;
-                      final uri = Uri.tryParse(url);
-                      if (url.isNotEmpty &&
-                          (uri == null || uri.host.isEmpty ||
-                              !const ['http', 'https'].contains(uri.scheme))) {
-                        showToast(message: '无效的归档下载地址'.tl);
-                        return;
-                      }
-                      Navigator.pop(dialogContext, url);
-                    },
+                    onPressed: gettingLink
+                        ? null
+                        : () async {
+                            if (selected == -1) {
+                              Navigator.pop(dialogContext, 'normal');
+                              return;
+                            }
+                            if (DownloadManager().isExists(downloadId)) {
+                              showToast(message: '已有本地下载，不能重复下载整本归档'.tl);
+                              return;
+                            }
+                            setState(() => gettingLink = true);
+                            final res = await archiveDownloader.getDownloadUrl(
+                                id, archives![selected].id);
+                            if (!context.mounted) return;
+                            setState(() => gettingLink = false);
+                            if (res.error) {
+                              showToast(message: res.errorMessage!);
+                              return;
+                            }
+                            final url = res.data;
+                            final uri = Uri.tryParse(url);
+                            if (url.isNotEmpty &&
+                                (uri == null ||
+                                    uri.host.isEmpty ||
+                                    !const ['http', 'https']
+                                        .contains(uri.scheme))) {
+                              showToast(message: '无效的归档下载地址'.tl);
+                              return;
+                            }
+                            Navigator.pop(dialogContext, url);
+                          },
                     child: Text(gettingLink ? '加载中'.tl : '确认'.tl),
                   ),
                 ],
@@ -276,6 +289,9 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
           }, downloaded, chapters: data!.chapters));
     }
   }
+
+  @override
+  ComicChapters? get translationChapters => data?.chapters;
 
   @override
   EpsData? get eps {
@@ -506,8 +522,7 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
   @override
   Widget thumbnailImageBuilder(int index, String imageUrl) {
     if (sourceKey == 'ehentai') {
-      final suffix = RegExp(
-          r'@((?:x=\d+-\d+(?:&y=\d+-\d+)?)|(?:y=\d+-\d+))$')
+      final suffix = RegExp(r'@((?:x=\d+-\d+(?:&y=\d+-\d+)?)|(?:y=\d+-\d+))$')
           .firstMatch(imageUrl);
       if (suffix != null) {
         final ranges = Uri.splitQueryString(suffix[1]!);
@@ -516,8 +531,8 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
         return EhPrimeThumbnail(
           key: ValueKey(imageUrl),
           url: imageUrl.substring(0, suffix.start),
-          crop: Rect.fromLTRB(x?[0] ?? 0, y?[0] ?? 0,
-              x?[1] ?? double.infinity, y?[1] ?? double.infinity),
+          crop: Rect.fromLTRB(x?[0] ?? 0, y?[0] ?? 0, x?[1] ?? double.infinity,
+              y?[1] ?? double.infinity),
         );
       }
     }
@@ -1240,6 +1255,9 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
   /// episodes information
   EpsData? get eps;
 
+  /// Source chapter ids and titles used by pre-translation.
+  ComicChapters? get translationChapters => null;
+
   /// comic introduction
   String? get introduction;
 
@@ -1314,6 +1332,133 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
   String get downloadedId;
 
   String get sourceKey;
+
+  bool _ensureTranslationReady() {
+    var lang = TranslationConfig.of(id, sourceKey).sourceLang;
+    if (!TranslationModels.isReadyFor(lang)) {
+      showConfirmDialog(
+        context: App.globalContext!,
+        title: "Models not downloaded".tl,
+        content:
+            "AI translation needs the offline recognition models on this device. Download them now?"
+                .tl,
+        confirmText: "Go to download".tl,
+        onConfirm: () =>
+            context.to(() => TranslationModelsPage(sourceLang: lang)),
+      );
+      return false;
+    }
+    if (!LlmTranslator.isConfigured) {
+      showConfirmDialog(
+        context: App.globalContext!,
+        title: "LLM provider not configured".tl,
+        content:
+            "AI translation needs a translation service. Add one now? A no-key option is available."
+                .tl,
+        confirmText: "Go to settings".tl,
+        onConfirm: () => context.to(() => const LlmProvidersPage()),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  void preTranslate() {
+    if (!ImageTranslationService.isEnabledForComic(id, sourceKey)) {
+      showToast(
+          message:
+              "Enable AI translation in the reader for this comic first".tl);
+      return;
+    }
+    if (!_ensureTranslationReady()) return;
+
+    var manager = PreTranslationTaskManager.instance;
+    if (manager.runningTaskFor(id, sourceKey) != null) {
+      showToast(message: "A pre-translation task is already running".tl);
+      return;
+    }
+
+    var chapters = translationChapters;
+    if (chapters == null || chapters.length == 0) {
+      showConfirmDialog(
+        context: App.globalContext!,
+        title: "Start pre-translation?".tl,
+        content:
+            "Pages are translated in the background. If your configured AI endpoint is paid this may cost money; the offline engine is free."
+                .tl,
+        onConfirm: () => _startPreTranslation([
+          PreTranslationChapter(eid: '0', title: title ?? ''),
+        ]),
+      );
+      return;
+    }
+
+    var entries = <(String, String)>[];
+    List<(String, List<int>)>? groups;
+    var index = 1;
+    if (chapters.isGrouped) {
+      groups = [];
+      for (var groupName in chapters.groups) {
+        var indices = <int>[];
+        for (var entry in chapters.getGroup(groupName).entries) {
+          indices.add(entries.length);
+          entries.add((
+            entry.key,
+            entry.value.isEmpty ? 'E$index' : entry.value,
+          ));
+          index++;
+        }
+        groups.add((groupName, indices));
+      }
+    } else {
+      for (var entry in chapters.allChapters.entries) {
+        entries.add((entry.key, entry.value.isEmpty ? 'E$index' : entry.value));
+        index++;
+      }
+    }
+
+    void finishSelect(List<int> selected) {
+      _startPreTranslation([
+        for (var i in selected)
+          PreTranslationChapter(eid: entries[i].$1, title: entries[i].$2),
+      ]);
+    }
+
+    context.to(
+      () => _SelectPreTranslateChapter(
+        cid: id,
+        sourceKey: sourceKey,
+        comicType: toLocalFavoriteItem().type.comicType,
+        title: title ?? '',
+        cover: cover ?? '',
+        entries: entries,
+        groups: groups,
+        finishSelect: finishSelect,
+      ),
+    );
+  }
+
+  void _startPreTranslation(List<PreTranslationChapter> chapters) {
+    if (chapters.isEmpty) return;
+    var manager = PreTranslationTaskManager.instance;
+    if (manager.runningTaskFor(id, sourceKey) != null) {
+      showToast(message: "A pre-translation task is already running".tl);
+      return;
+    }
+    var task = manager.start(
+      cid: id,
+      sourceKey: sourceKey,
+      comicType: toLocalFavoriteItem().type.comicType,
+      title: title ?? '',
+      cover: cover ?? '',
+      chapters: chapters,
+    );
+    showToast(
+      message: task == null
+          ? "Unable to start pre-translation".tl
+          : "Pre-translation started".tl,
+    );
+  }
 
   void scrollListener() {
     try {
@@ -2005,6 +2150,43 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
                   onPressed: download,
                   iconColor: _useTextColor(context, Colors.cyan),
                 ),
+              AnimatedBuilder(
+                animation: Listenable.merge([
+                  ImageTranslationService.instance,
+                  PreTranslationTaskManager.instance,
+                ]),
+                builder: (context, child) {
+                  if (!ImageTranslationService.isEnabledForComic(
+                          id, sourceKey) ||
+                      ComicSource.find(sourceKey)?.loadComicPages == null) {
+                    return const SizedBox.shrink();
+                  }
+                  var manager = PreTranslationTaskManager.instance;
+                  var task = manager.runningTaskFor(id, sourceKey);
+                  if (task != null) {
+                    var progress =
+                        manager.activityOf(task.id)?.liveProgress(task) ??
+                            task.progress;
+                    var pct = task.total == 0
+                        ? null
+                        : (progress * 100).clamp(0, 100).toStringAsFixed(0);
+                    return _ActionButton(
+                      icon: const Icon(Icons.translate_rounded),
+                      activeIcon: const Icon(Icons.translate_rounded),
+                      isActive: true,
+                      text: pct == null
+                          ? 'Translating'.tl
+                          : '${'Translating'.tl} $pct%',
+                      onPressed: preTranslate,
+                    );
+                  }
+                  return _ActionButton(
+                    icon: const Icon(Icons.translate_rounded),
+                    text: 'Pre-translate'.tl,
+                    onPressed: preTranslate,
+                  );
+                },
+              ),
               if (onLike != null)
                 _ActionButton(
                   icon: const Icon(Icons.favorite_border),

@@ -12,6 +12,7 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/def.dart';
 import 'package:pica_comic/foundation/log.dart';
+import 'package:pica_comic/foundation/js_pool.dart';
 import 'package:pica_comic/network/app_dio.dart';
 import 'package:html/parser.dart' as html;
 import 'package:html/dom.dart' as dom;
@@ -35,6 +36,7 @@ import 'package:pointycastle/block/modes/ofb.dart';
 import 'package:pointycastle/padded_block_cipher/padded_block_cipher_impl.dart';
 import 'package:pointycastle/paddings/pkcs7.dart';
 
+export 'package:flutter_qjs/flutter_qjs.dart' show JSInvokable;
 
 class JavaScriptRuntimeException implements Exception {
   final String message;
@@ -47,7 +49,7 @@ class JavaScriptRuntimeException implements Exception {
   }
 }
 
-class JsEngine with _JSEngineApi{
+class JsEngine with _JSEngineApi {
   factory JsEngine() => _cache ?? (_cache = JsEngine._create());
 
   static JsEngine? _cache;
@@ -60,35 +62,49 @@ class JsEngine with _JSEngineApi{
 
   Dio? _dio;
 
-  static void reset(){
+  static Uint8List? _jsInitCache;
+
+  static void cacheJsInit(Uint8List jsInit) {
+    _jsInitCache = jsInit;
+  }
+
+  static void reset() {
     _cache = null;
     _cache?.dispose();
     JsEngine().init();
   }
 
-  Future<void> init() async{
+  Future<void> init() async {
     if (!_closed) {
       return;
     }
     try {
       _dio ??= logDio(BaseOptions(
           responseType: ResponseType.plain, validateStatus: (status) => true));
-      _cookieJar ??= SingleInstanceCookieJar.instance!;
-      _dio!.interceptors.add(CookieManagerSql(_cookieJar!));
+      final cookieJar = SingleInstanceCookieJar.instance;
+      if (cookieJar != null) {
+        _cookieJar ??= cookieJar;
+        _dio!.interceptors.add(CookieManagerSql(cookieJar));
+      }
       _dio!.interceptors.add(CloudflareInterceptor());
       _closed = false;
       _engine = FlutterQjs();
       _engine!.dispatch();
-      var setGlobalFunc = _engine!.evaluate(
-          "(key, value) => { this[key] = value; }");
+      var setGlobalFunc =
+          _engine!.evaluate("(key, value) => { this[key] = value; }");
       (setGlobalFunc as JSInvokable)(["sendMessage", _messageReceiver]);
       // Set appVersion for venera-style comic sources compatibility
       setGlobalFunc(["appVersion", appVersion]);
       setGlobalFunc.free();
-      var jsInit = await rootBundle.load("assets/init.js");
-      _engine!.evaluate(utf8.decode(jsInit.buffer.asUint8List()), name: "<init>");
-    }
-    catch(e, s){
+      Uint8List jsInit;
+      if (_jsInitCache != null) {
+        jsInit = _jsInitCache!;
+      } else {
+        var buffer = await rootBundle.load("assets/init.js");
+        jsInit = buffer.buffer.asUint8List();
+      }
+      _engine!.evaluate(utf8.decode(jsInit), name: "<init>");
+    } catch (e, s) {
       log('JS Engine Init Error:\n$e\n$s', 'JS Engine', LogLevel.error);
     }
   }
@@ -239,7 +255,8 @@ class JsEngine with _JSEngineApi{
             }
           case 'delay':
             {
-              final milliseconds = (message['time'] as num).toInt().clamp(0, 60000);
+              final milliseconds =
+                  (message['time'] as num).toInt().clamp(0, 60000);
               return Future<void>.delayed(Duration(milliseconds: milliseconds));
             }
           case 'html':
@@ -262,37 +279,55 @@ class JsEngine with _JSEngineApi{
             {
               return handleCookieCallback(Map.from(message));
             }
+          case "compute":
+            {
+              final func = message["function"];
+              final args = message["args"];
+              if (func is JSInvokable) {
+                func.free();
+                throw "Function must be a string";
+              }
+              if (func is! String) {
+                throw "Function must be a string";
+              }
+              if (args != null && args is! List) {
+                throw "Args must be a list";
+              }
+              return JSPool().execute(func, args ?? []);
+            }
         }
       }
-    }
-    catch(e, s){
-      log("Failed to handle message: $message\n$e\n$s", "JsEngine", LogLevel.error);
+    } catch (e, s) {
+      log("Failed to handle message: $message\n$e\n$s", "JsEngine",
+          LogLevel.error);
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> _http(Map<String, dynamic> req) async{
+  Future<Map<String, dynamic>> _http(Map<String, dynamic> req) async {
     Response? response;
     String? error;
 
     try {
       var headers = Map<String, dynamic>.from(req["headers"] ?? {});
-      if(headers["user-agent"] == null && headers["User-Agent"] == null){
+      if (headers["user-agent"] == null && headers["User-Agent"] == null) {
         headers["User-Agent"] = webUA;
       }
       // Always use bytes responseType to avoid Content-Type parsing issues
-      response = await _dio!.request(req["url"], data: req["data"], options: Options(
-        method: req['http_method'],
-        responseType: ResponseType.bytes,
-        headers: headers
-      ));
+      response = await _dio!.request(req["url"],
+          data: req["data"],
+          options: Options(
+              method: req['http_method'],
+              responseType: ResponseType.bytes,
+              headers: headers));
     } catch (e) {
       error = e.toString();
     }
 
     Map<String, String> headers = {};
 
-    response?.headers.forEach((name, values) => headers[name] = values.join(','));
+    response?.headers
+        .forEach((name, values) => headers[name] = values.join(','));
 
     dynamic body = response?.data;
     if (body is List<int>) {
@@ -312,7 +347,8 @@ class JsEngine with _JSEngineApi{
 
   dynamic runCode(String js, [String? name]) {
     if (_engine == null) {
-      log('JS Engine is not initialized. Skip executing $name', 'JsEngine', LogLevel.error);
+      log('JS Engine is not initialized. Skip executing $name', 'JsEngine',
+          LogLevel.error);
       return null;
     }
     return _engine!.evaluate(js, name: name);
@@ -326,7 +362,7 @@ class JsEngine with _JSEngineApi{
   }
 }
 
-mixin class _JSEngineApi{
+mixin class _JSEngineApi {
   final Map<int, dom.Document> _documents = {};
   final Map<int, dom.Element> _elements = {};
   final Map<int, dom.Node> _nodes = {};
@@ -342,13 +378,13 @@ mixin class _JSEngineApi{
         return null;
       case "querySelector":
         var res = _documents[data["key"]]!.querySelector(data["query"]);
-        if(res == null) return null;
+        if (res == null) return null;
         _elements[_elements.length] = res;
         return _elements.length - 1;
       case "querySelectorAll":
         var res = _documents[data["key"]]!.querySelectorAll(data["query"]);
         var keys = <int>[];
-        for(var element in res){
+        for (var element in res) {
           _elements[_elements.length] = element;
           keys.add(_elements.length - 1);
         }
@@ -359,13 +395,13 @@ mixin class _JSEngineApi{
         return _elements[data["key"]]!.attributes;
       case "dom_querySelector":
         var res = _elements[data["key"]]!.querySelector(data["query"]);
-        if(res == null) return null;
+        if (res == null) return null;
         _elements[_elements.length] = res;
         return _elements.length - 1;
       case "dom_querySelectorAll":
         var res = _elements[data["key"]]!.querySelectorAll(data["query"]);
         var keys = <int>[];
-        for(var element in res){
+        for (var element in res) {
           _elements[_elements.length] = element;
           keys.add(_elements.length - 1);
         }
@@ -426,7 +462,7 @@ mixin class _JSEngineApi{
         return null;
       case "getElementById":
         var res = _documents[data["key"]]!.getElementById(data["id"]);
-        if(res == null) return null;
+        if (res == null) return null;
         _elements[_elements.length] = res;
         return _elements.length - 1;
       case "getInnerHTML":
@@ -434,58 +470,61 @@ mixin class _JSEngineApi{
     }
   }
 
-  dynamic handleCookieCallback(Map<String, dynamic> data) {
+  Future<dynamic> handleCookieCallback(Map<String, dynamic> data) async {
     switch (data["function"]) {
       case "set":
-        _cookieJar!.saveFromResponse(
+        await _cookieJar!.saveFromResponse(
             Uri.parse(data["url"]),
             (data["cookies"] as List).map((e) {
               var c = Cookie(e["name"], e["value"]);
-              if(e['domain'] != null){
+              if (e['domain'] != null) {
                 c.domain = e['domain'];
               }
               return c;
             }).toList());
         return null;
       case "get":
-        var cookies = _cookieJar!.loadForRequest(Uri.parse(data["url"]));
-        return cookies.map((e) => {
-          "name": e.name,
-          "value": e.value,
-          "domain": e.domain,
-          "path": e.path,
-          "expires": e.expires,
-          "max-age": e.maxAge,
-          "secure": e.secure,
-          "httpOnly": e.httpOnly,
-          "session": e.expires == null,
-        }).toList();
+        var cookies = await _cookieJar!.loadForRequest(Uri.parse(data["url"]));
+        return cookies
+            .map((e) => {
+                  "name": e.name,
+                  "value": e.value,
+                  "domain": e.domain,
+                  "path": e.path,
+                  "expires": e.expires,
+                  "max-age": e.maxAge,
+                  "secure": e.secure,
+                  "httpOnly": e.httpOnly,
+                  "session": e.expires == null,
+                })
+            .toList();
       case "delete":
         if (data['names'] is List) {
           final uri = Uri.parse(data['url']);
-          for (final cookie in _cookieJar!.loadForRequest(uri)) {
+          for (final cookie in await _cookieJar!.loadForRequest(uri)) {
             if ((data['names'] as List).contains(cookie.name)) {
-              _cookieJar!.delete(uri.replace(path: cookie.path ?? '/'), cookie.name);
+              await _cookieJar!
+                  .delete(uri.replace(path: cookie.path ?? '/'), cookie.name);
             }
           }
         } else {
-          clearCookies([data["url"]]);
+          await clearCookies([data["url"]]);
         }
         return null;
     }
   }
 
-  void clear(){
+  void clear() {
     _documents.clear();
     _elements.clear();
     _nodes.clear();
   }
 
-  void clearCookies(List<String> domains) async{
-    for(var domain in domains){
+  Future<void> clearCookies(List<String> domains) async {
+    for (var domain in domains) {
       var uri = Uri.tryParse(domain);
-      if(uri == null) continue;
-      _cookieJar!.deleteUri(uri);
+      if (uri == null) continue;
+      await _cookieJar!.deleteUri(uri);
     }
   }
 
@@ -507,7 +546,7 @@ mixin class _JSEngineApi{
     try {
       switch (type) {
         case "base64":
-          if(value is String && isEncode){
+          if (value is String && isEncode) {
             value = utf8.encode(value);
           }
           if (isEncode) {
@@ -589,32 +628,40 @@ mixin class _JSEngineApi{
             return hmac.convert(value).bytes.toList();
           }
         case "aes-ecb":
-          if(!isEncode){
+          if (!isEncode) {
             var key = _toUint8List(data["key"]);
             var valueBytes = _toUint8List(value);
-            Log.info("JS Engine", "AES-ECB decrypt: key length=${key.length}, value length=${valueBytes.length}");
+            Log.info("JS Engine",
+                "AES-ECB decrypt: key length=${key.length}, value length=${valueBytes.length}");
             // Use PaddedBlockCipher for proper ECB mode with PKCS7 padding
-            var cipher = PaddedBlockCipherImpl(PKCS7Padding(), ECBBlockCipher(AESEngine()));
-            cipher.init(false, PaddedBlockCipherParameters(KeyParameter(key), null));
+            var cipher = PaddedBlockCipherImpl(
+                PKCS7Padding(), ECBBlockCipher(AESEngine()));
+            cipher.init(
+                false, PaddedBlockCipherParameters(KeyParameter(key), null));
             var decrypted = cipher.process(valueBytes);
-            Log.info("JS Engine", "AES-ECB decrypted length: ${decrypted.length}");
+            Log.info(
+                "JS Engine", "AES-ECB decrypted length: ${decrypted.length}");
             return decrypted.toList();
           }
           return null;
         case "aes-cbc":
-          if(!isEncode){
+          if (!isEncode) {
             var key = _toUint8List(data["key"]);
             var iv = _toUint8List(data["iv"]);
             var valueBytes = _toUint8List(value);
             // Use PaddedBlockCipher for proper CBC mode with PKCS7 padding
-            var cipher = PaddedBlockCipherImpl(PKCS7Padding(), CBCBlockCipher(AESEngine()));
-            cipher.init(false, PaddedBlockCipherParameters(ParametersWithIV(KeyParameter(key), iv), null));
+            var cipher = PaddedBlockCipherImpl(
+                PKCS7Padding(), CBCBlockCipher(AESEngine()));
+            cipher.init(
+                false,
+                PaddedBlockCipherParameters(
+                    ParametersWithIV(KeyParameter(key), iv), null));
             var decrypted = cipher.process(valueBytes);
             return decrypted.toList();
           }
           return null;
         case "aes-cfb":
-          if(!isEncode){
+          if (!isEncode) {
             var key = _toUint8List(data["key"]);
             var blockSize = data["blockSize"];
             var valueBytes = _toUint8List(value);
@@ -624,7 +671,7 @@ mixin class _JSEngineApi{
           }
           return null;
         case "aes-ofb":
-          if(!isEncode){
+          if (!isEncode) {
             var key = _toUint8List(data["key"]);
             var blockSize = data["blockSize"];
             var valueBytes = _toUint8List(value);
@@ -634,20 +681,19 @@ mixin class _JSEngineApi{
           }
           return null;
         case "rsa":
-          if(!isEncode){
+          if (!isEncode) {
             var key = data["key"];
             var valueBytes = _toUint8List(value);
             final cipher = PKCS1Encoding(RSAEngine());
-            cipher.init(
-                false, PrivateKeyParameter<RSAPrivateKey>(_parsePrivateKey(key)));
+            cipher.init(false,
+                PrivateKeyParameter<RSAPrivateKey>(_parsePrivateKey(key)));
             return _processInBlocks(cipher, valueBytes).toList();
           }
           return null;
         default:
           return value;
       }
-    }
-    catch(e) {
+    } catch (e) {
       Log.error("JS Engine", "Failed to convert $type: $e");
       return null;
     }
@@ -667,11 +713,11 @@ mixin class _JSEngineApi{
     final p = pkSeq.elements![4] as ASN1Integer;
     final q = pkSeq.elements![5] as ASN1Integer;
 
-    return RSAPrivateKey(modulus.integer!, privateExponent.integer!, p.integer!, q.integer!);
+    return RSAPrivateKey(
+        modulus.integer!, privateExponent.integer!, p.integer!, q.integer!);
   }
 
-  Uint8List _processInBlocks(
-      AsymmetricBlockCipher engine, Uint8List input) {
+  Uint8List _processInBlocks(AsymmetricBlockCipher engine, Uint8List input) {
     final numBlocks = input.length ~/ engine.inputBlockSize +
         ((input.length % engine.inputBlockSize != 0) ? 1 : 0);
 

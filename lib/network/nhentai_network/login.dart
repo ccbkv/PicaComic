@@ -90,10 +90,10 @@ Future<String> solvePowNonce({
   int maxIterations = 3000000,
 }) async {
   return await Isolate.run<String>(() => _solvePowNonceJob(
-    challenge: challenge,
-    difficulty: difficulty,
-    maxIterations: maxIterations,
-  ));
+        challenge: challenge,
+        difficulty: difficulty,
+        maxIterations: maxIterations,
+      ));
 }
 
 Future<String> _solvePowNonceJob({
@@ -143,7 +143,9 @@ Future<NhentaiPowChallenge> getPowChallenge() async {
 
 /// 获取 CAPTCHA 配置
 Future<NhentaiCaptchaConfig> getCaptchaConfig() async {
-  final response = await NhentaiNetwork().dio.get<dynamic>('${NhentaiNetwork().apiUrl}/captcha');
+  final response = await NhentaiNetwork()
+      .dio
+      .get<dynamic>('${NhentaiNetwork().apiUrl}/captcha');
   return NhentaiCaptchaConfig.fromJson(response.data as Map<String, dynamic>);
 }
 
@@ -366,14 +368,17 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
     final cookieJar = NhentaiNetwork().cookieJar!;
     final uri = Uri.parse(NhentaiNetwork().baseUrl);
 
-    final accessTokenCookie = io.Cookie('access_token', loginResponse.accessToken);
+    final accessTokenCookie =
+        io.Cookie('access_token', loginResponse.accessToken);
     accessTokenCookie.domain = '.nhentai.net';
-    cookieJar.saveFromResponse(uri, [accessTokenCookie]);
+    await cookieJar.saveFromResponse(uri, [accessTokenCookie]);
 
-    if (loginResponse.refreshToken != null && loginResponse.refreshToken!.isNotEmpty) {
-      final refreshTokenCookie = io.Cookie('refresh_token', loginResponse.refreshToken!);
+    if (loginResponse.refreshToken != null &&
+        loginResponse.refreshToken!.isNotEmpty) {
+      final refreshTokenCookie =
+          io.Cookie('refresh_token', loginResponse.refreshToken!);
       refreshTokenCookie.domain = '.nhentai.net';
-      cookieJar.saveFromResponse(uri, [refreshTokenCookie]);
+      await cookieJar.saveFromResponse(uri, [refreshTokenCookie]);
     }
 
     NhentaiNetwork().logged = true;
@@ -382,88 +387,88 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
   @override
   Widget build(BuildContext context) {
     var body = Column(
-        children: [
-          const Spacer(),
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: InputDecoration(
-                    labelText: '用户名'.tl,
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return '请输入用户名'.tl;
-                    }
-                    return null;
-                  },
+      children: [
+        const Spacer(),
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _usernameController,
+                decoration: InputDecoration(
+                  labelText: '用户名'.tl,
+                  border: const OutlineInputBorder(),
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: '密码'.tl,
-                    border: const OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return '请输入密码'.tl;
-                    }
-                    return null;
-                  },
-                  onFieldSubmitted: (_) => _doLogin(),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return '请输入用户名'.tl;
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                decoration: InputDecoration(
+                  labelText: '密码'.tl,
+                  border: const OutlineInputBorder(),
                 ),
-              ],
-            ),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '请输入密码'.tl;
+                  }
+                  return null;
+                },
+                onFieldSubmitted: (_) => _doLogin(),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          // CAPTCHA 验证区域
-          if (_captchaToken == null || _captchaToken!.isEmpty)
-            _buildCaptchaPrompt()
-          else
-            _buildCaptchaVerifiedIndicator(),
-          const SizedBox(height: 32),
-          Button.filled(
-            isLoading: _loading,
-            disabled: _captchaToken == null || _captchaToken!.isEmpty,
-            onPressed: _doLogin,
-            child: Text('登录'.tl),
+        ),
+        const SizedBox(height: 16),
+        // CAPTCHA 验证区域
+        if (_captchaToken == null || _captchaToken!.isEmpty)
+          _buildCaptchaPrompt()
+        else
+          _buildCaptchaVerifiedIndicator(),
+        const SizedBox(height: 32),
+        Button.filled(
+          isLoading: _loading,
+          disabled: _captchaToken == null || _captchaToken!.isEmpty,
+          onPressed: _doLogin,
+          child: Text('登录'.tl),
+        ),
+        const Spacer(),
+        TextButton(
+          onPressed: () {
+            if (App.isLinux) {
+              _loginWithWebViewDesktop();
+            } else {
+              _loginWithWebView();
+            }
+          },
+          child: Text('通过网页登录'.tl),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () => AppUrlLauncher.launchExternalUrl(
+            'https://nhentai.net/register',
           ),
-          const Spacer(),
-          TextButton(
-            onPressed: () {
-              if (App.isLinux) {
-                _loginWithWebViewDesktop();
-              } else {
-                _loginWithWebView();
-              }
-            },
-            child: Text('通过网页登录'.tl),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.link),
+              const SizedBox(width: 8),
+              Text('创建账号'.tl),
+            ],
           ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => AppUrlLauncher.launchExternalUrl(
-              'https://nhentai.net/register',
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.link),
-                const SizedBox(width: 8),
-                Text('创建账号'.tl),
-              ],
-            ),
+        ),
+        if (UiMode.m1(context))
+          SizedBox(
+            height: MediaQuery.of(context).padding.bottom,
           ),
-          if (UiMode.m1(context))
-            SizedBox(
-              height: MediaQuery.of(context).padding.bottom,
-            ),
-        ],
-      ).paddingLeft(32).paddingRight(32).paddingBottom(16);
+      ],
+    ).paddingLeft(32).paddingRight(32).paddingBottom(16);
 
     return Scaffold(
       appBar: Appbar(
@@ -479,7 +484,10 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withOpacity(0.5),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
@@ -558,7 +566,7 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
   Future<void> _loginWithWebView() async {
     bool loginSuccess = false;
     bool hasSeenLoginPage = false;
-    
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (outerContext) => AppWebview(
@@ -566,14 +574,15 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
           singlePage: true,
           onTitleChange: (title, controller) async {
             Log.info('NHentaiLogin', 'WebView title changed: $title');
-            
+
             // 检测是否看到了登录页面
             if (title.contains("Login")) {
               hasSeenLoginPage = true;
-              Log.info('NHentaiLogin', 'Detected login page, waiting for user to login...');
+              Log.info('NHentaiLogin',
+                  'Detected login page, waiting for user to login...');
               return;
             }
-            
+
             // 只有在看到过登录页面，且当前不在登录/注册页面时，才认为登录成功
             if (hasSeenLoginPage &&
                 !title.contains("Login") &&
@@ -584,8 +593,10 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
                 appdata.implicitData[3] = ua;
                 appdata.writeImplicitData();
               }
-              var cookiesList = await controller.getCookies("${NhentaiNetwork().baseUrl}/");
-              Log.info('NHentaiLogin', 'Cookies received: ${cookiesList?.length ?? 0}');
+              var cookiesList =
+                  await controller.getCookies("${NhentaiNetwork().baseUrl}/");
+              Log.info('NHentaiLogin',
+                  'Cookies received: ${cookiesList?.length ?? 0}');
               if (cookiesList != null) {
                 bool hasSession = false;
                 for (var cookie in cookiesList) {
@@ -598,7 +609,7 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
                   }
                   cookie.domain = ".nhentai.net";
                 }
-                NhentaiNetwork().cookieJar!.saveFromResponse(
+                await NhentaiNetwork().cookieJar!.saveFromResponse(
                     Uri.parse(NhentaiNetwork().baseUrl), cookiesList);
                 if (hasSession) {
                   NhentaiNetwork().logged = true;
@@ -615,13 +626,15 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
           onLoadStop: (controller) async {
             // 页面加载完成时也检查一次 cookies
             Log.info('NHentaiLogin', 'Page loaded, checking cookies...');
-            var cookiesList = await controller.getCookies("${NhentaiNetwork().baseUrl}/");
+            var cookiesList =
+                await controller.getCookies("${NhentaiNetwork().baseUrl}/");
             if (cookiesList != null) {
               for (var cookie in cookiesList) {
                 if (cookie.name == "access_token" ||
                     cookie.name == "sessionid" ||
                     cookie.name == "XSRF-TOKEN") {
-                  Log.info('NHentaiLogin', 'Found session cookie on load: ${cookie.name}');
+                  Log.info('NHentaiLogin',
+                      'Found session cookie on load: ${cookie.name}');
                 }
               }
             }
@@ -629,7 +642,7 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
         ),
       ),
     );
-    
+
     // 如果 WebView 登录成功，关闭登录页面并返回 true
     Log.info('NHentaiLogin', 'WebView closed, loginSuccess=$loginSuccess');
     if (loginSuccess && mounted) {
@@ -645,14 +658,18 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
       onTitleChange: (title, controller) async {
         Log.info('NHentaiLogin', 'Desktop WebView title changed: $title');
         if (title == "nhentai.net") return;
-        if (!title.contains("Login") && !title.contains("Register") && title.contains("nhentai")) {
+        if (!title.contains("Login") &&
+            !title.contains("Register") &&
+            title.contains("nhentai")) {
           var ua = controller.userAgent;
           if (ua != null) {
             appdata.implicitData[3] = ua;
             appdata.writeImplicitData();
           }
-          var cookies = await controller.getCookies("${NhentaiNetwork().baseUrl}/");
-          Log.info('NHentaiLogin', 'Desktop cookies received: ${cookies?.length ?? 0}');
+          var cookies =
+              await controller.getCookies("${NhentaiNetwork().baseUrl}/");
+          Log.info('NHentaiLogin',
+              'Desktop cookies received: ${cookies?.length ?? 0}');
           List<io.Cookie> cookiesList = [];
           bool hasSession = false;
           if (cookies != null) {
@@ -671,7 +688,7 @@ class _NhentaiLoginPageState extends State<NhentaiLoginPage> {
               }
             });
           }
-          NhentaiNetwork().cookieJar!.saveFromResponse(
+          await NhentaiNetwork().cookieJar!.saveFromResponse(
               Uri.parse(NhentaiNetwork().baseUrl), cookiesList);
           if (hasSession) {
             NhentaiNetwork().logged = true;
@@ -698,13 +715,16 @@ void nhLoginWebView(void Function() onFinished) async {
       onTitleChange: (title, controller) async {
         print(title);
         if (title == "nhentai.net") return;
-        if (!title.contains("Login") && !title.contains("Register") && title.contains("nhentai")) {
+        if (!title.contains("Login") &&
+            !title.contains("Register") &&
+            title.contains("nhentai")) {
           var ua = controller.userAgent;
           if (ua != null) {
             appdata.implicitData[3] = ua;
             appdata.writeImplicitData();
           }
-          var cookies = await controller.getCookies("${NhentaiNetwork().baseUrl}/");
+          var cookies =
+              await controller.getCookies("${NhentaiNetwork().baseUrl}/");
           List<io.Cookie> cookiesList = [];
           if (cookies != null) {
             cookies.forEach((key, value) {
@@ -718,7 +738,7 @@ void nhLoginWebView(void Function() onFinished) async {
               }
             });
           }
-          NhentaiNetwork().cookieJar!.saveFromResponse(
+          await NhentaiNetwork().cookieJar!.saveFromResponse(
               Uri.parse(NhentaiNetwork().baseUrl), cookiesList);
           if (NhentaiNetwork().logged) {
             onFinished();
@@ -741,15 +761,17 @@ void nhLoginWebView(void Function() onFinished) async {
                 appdata.implicitData[3] = ua;
                 appdata.writeImplicitData();
               }
-              var cookiesList = await controller.getCookies("${NhentaiNetwork().baseUrl}/");
+              var cookiesList =
+                  await controller.getCookies("${NhentaiNetwork().baseUrl}/");
               if (cookiesList != null) {
                 for (var cookie in cookiesList) {
-                  if (cookie.name == "sessionid" || cookie.name == "XSRF-TOKEN") {
+                  if (cookie.name == "sessionid" ||
+                      cookie.name == "XSRF-TOKEN") {
                     NhentaiNetwork().logged = true;
                   }
                   cookie.domain = ".nhentai.net";
                 }
-                NhentaiNetwork().cookieJar!.saveFromResponse(
+                await NhentaiNetwork().cookieJar!.saveFromResponse(
                     Uri.parse(NhentaiNetwork().baseUrl), cookiesList);
               }
               if (NhentaiNetwork().logged) {
@@ -807,8 +829,7 @@ class _NhentaiCaptchaPageState extends State<NhentaiCaptchaPage> {
       ),
       body: Column(
         children: [
-          if (_isLoading)
-            const LinearProgressIndicator(minHeight: 2),
+          if (_isLoading) const LinearProgressIndicator(minHeight: 2),
           if (_error != null)
             Container(
               width: double.infinity,

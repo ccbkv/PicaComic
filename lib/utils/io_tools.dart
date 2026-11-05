@@ -15,9 +15,11 @@ import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/history.dart';
+import 'package:pica_comic/foundation/image_translation/translation_store.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/foundation/platform_utils.dart';
+import 'package:pica_comic/foundation/sqlite_connection.dart';
 import 'package:pica_comic/network/cookie_jar.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/network/download_model.dart';
@@ -351,6 +353,7 @@ Future<String?> _exportData(String path, String appdataString,
     encode.addFile(file.uri.pathSegments.last, file.path);
     var localFavorite = File("$path${pathSep}local_favorite.db");
     var history = File("$path${pathSep}history.db");
+    var translationStore = File("$path${pathSep}image_translation.db");
     var localComicFolders = File("$path${pathSep}local_comic_folders.json");
     var localAddComicUi = File("$path${pathSep}local_add_comic_ui.json");
     var localAddComic = Directory("$path${pathSep}local_add_comic");
@@ -372,6 +375,9 @@ Future<String?> _exportData(String path, String appdataString,
     encode.addFile(
         localFavorite.name, localFavorite.path.replaceAll("\\", "/"));
     encode.addFile(history.name, history.path);
+    if (translationStore.existsSync()) {
+      encode.addFile(translationStore.name, translationStore.path);
+    }
     encode.addFile(localComicFolders.name, localComicFolders.path);
     encode.addFile(localAddComicUi.name, localAddComicUi.path);
     encode.addFile('cookies.db', "$path/cookies.db");
@@ -416,7 +422,10 @@ Future<String?> _exportData(String path, String appdataString,
     if (localAddComicMarker.existsSync()) {
       localAddComicMarker.deleteSync();
     }
-    for (final markerName in ['chapter_comments.marker', 'comic_comments.marker']) {
+    for (final markerName in [
+      'chapter_comments.marker',
+      'comic_comments.marker'
+    ]) {
       final marker = File("$path${pathSep}$markerName");
       if (marker.existsSync()) {
         marker.deleteSync();
@@ -431,6 +440,16 @@ Future<String> exportDataToFile(bool includeDownload, String outPath) async {
   try {
     var appdataString = const JsonEncoder().convert(appdata.toJson());
     var downloadPath = includeDownload ? DownloadManager().path : null;
+    var translationStorePath = "$path${pathSep}image_translation.db";
+    if (File(translationStorePath).existsSync()) {
+      try {
+        await DatabaseGateway.instance.isolateOp(translationStorePath, (db) {
+          db.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+        });
+      } catch (e, s) {
+        Log.warning('Export Data', 'Failed to checkpoint translations: $e\n$s');
+      }
+    }
     var res = await compute<List<String?>, String?>(
         (message) =>
             _exportData(message[0]!, message[1]!, message[2], message[3]!),
@@ -683,6 +702,13 @@ Future<bool> importData([String? filePath]) async {
       appdata.settings[46],
       (enableCheck ? "1" : "0")
     ]);
+    var translationStoreFile = File("$path/dataTemp/image_translation.db");
+    if (await translationStoreFile.exists()) {
+      if (!TranslationStore().isInitialized) {
+        await TranslationStore().init();
+      }
+      await TranslationStore().mergeFrom(translationStoreFile.path);
+    }
   } catch (e, s) {
     Log.error("importData", "$e\n$s");
     return false;

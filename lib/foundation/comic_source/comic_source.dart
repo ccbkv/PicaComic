@@ -245,6 +245,21 @@ class ComicSource {
     }
   }
 
+  /// 下载批次结束后调用，通知 JS 源重置其网页回退标记（若该源实现了
+  /// `comic.resetWebFallback`）。
+  Future<void> resetWebFallback() async {
+    try {
+      await JsEngine().runCode("""
+        var s = ComicSource.sources.$key;
+        if (s && s.comic && typeof s.comic.resetWebFallback === 'function') {
+          s.comic.resetWebFallback();
+        }
+      """);
+    } catch (_) {
+      // 源未实现 resetWebFallback 或 JS 调用失败时静默忽略
+    }
+  }
+
   bool _isSaving = false;
   bool _haveWaitingTask = false;
 

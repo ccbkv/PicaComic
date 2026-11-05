@@ -69,7 +69,7 @@ class EhNetwork {
       if (appdata.settings[75] != "") Cookie("sp", appdata.settings[75]),
     ];
 
-    var cookies = cookieJar.loadForRequest(Uri.parse(url));
+    var cookies = await cookieJar.loadForRequest(Uri.parse(url));
 
     if (ehentai.isLogin &&
         cookies.every((element) => element.name != "ipb_member_id")) {
@@ -86,7 +86,7 @@ class EhNetwork {
       }
     }
 
-    cookieJar.saveFromResponse(Uri.parse(url), shouldAdd);
+    await cookieJar.saveFromResponse(Uri.parse(url), shouldAdd);
 
     var res = "";
     for (var cookie in cookies) {
@@ -340,9 +340,9 @@ class EhNetwork {
 
     try {
       final uri = Uri.parse(ehBaseUrl);
-      for (final cookie in cookieJar.loadForRequest(uri)) {
+      for (final cookie in await cookieJar.loadForRequest(uri)) {
         if (cookie.name == 'sl') {
-          cookieJar.delete(uri.replace(path: cookie.path ?? '/'), 'sl');
+          await cookieJar.delete(uri.replace(path: cookie.path ?? '/'), 'sl');
         }
       }
     } catch (_) {}
@@ -953,7 +953,12 @@ class EhNetwork {
 
   ///搜索e-hentai
   Future<Res<Galleries>> search(String keyword,
-      {int? fCats, int? startPages, int? endPages, int? minStars, int? expunged}) async {    keyword = keyword.replaceAll(RegExp(r"\s+"), " ").trim();
+      {int? fCats,
+      int? startPages,
+      int? endPages,
+      int? minStars,
+      int? expunged}) async {
+    keyword = keyword.replaceAll(RegExp(r"\s+"), " ").trim();
     if (keyword.contains(" | ")) {
       var keywords = _splitKeyword(keyword);
       var newKeywords = <String>[];
@@ -989,9 +994,9 @@ class EhNetwork {
     if (minStars != null) {
       requestUrl += "&f_srdd=$minStars";
     }
-        if (expunged != null && expunged == 1) {
+    if (expunged != null && expunged == 1) {
       requestUrl += "&f_sh=on";
-        }
+    }
     var res = await getGalleries(requestUrl);
     Future.delayed(const Duration(microseconds: 500), () {
       try {

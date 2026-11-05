@@ -393,12 +393,9 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
         );
         return false;
       },
-      child: Scrollbar(
+      child: AppScrollBar(
         controller: scrollController,
-        interactive: true,
-        thumbVisibility: true,
-        //thickness: App.isMobile ? 12 : null,
-        radius: const Radius.circular(8),
+        topPadding: MediaQuery.of(context).padding.top + 52,
         child: ScrollConfiguration(
           behavior: const ScrollBehavior().copyWith(scrollbars: false),
           child: CustomScrollView(

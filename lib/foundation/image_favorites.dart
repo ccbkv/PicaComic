@@ -2,7 +2,7 @@ part of "history.dart";
 
 // 直接用history.db了, 没必要再加一个favorites.db
 
-class ImageFavorite{
+class ImageFavorite {
   /// unique id for the comic
   final String id;
 
@@ -16,136 +16,135 @@ class ImageFavorite{
 
   final Map<String, dynamic> otherInfo;
 
-  const ImageFavorite(this.id, this.imagePath, this.title, this.ep, this.page, this.otherInfo);
+  const ImageFavorite(
+      this.id, this.imagePath, this.title, this.ep, this.page, this.otherInfo);
 }
 
-class ImageFavoriteManager{
-  static Database? get _db => HistoryManager()._db;
+class ImageFavoriteManager {
+  static List<ImageFavorite> _cache = [];
+
+  static String get _dbPath => HistoryManager()._dbPath;
+
+  static bool get _available => HistoryManager()._ensureDbAvailable();
 
   /// 检查表image_favorites是否存在, 不存在则创建
-  static void init(){
-    if (_db == null) {
+  static Future<void> init() async {
+    if (!_available) {
+      _cache = [];
       return;
     }
-    _db!.execute("CREATE TABLE IF NOT EXISTS image_favorites ("
-        "id TEXT,"
-        "title TEXT NOT NULL,"
-        "cover TEXT NOT NULL,"
-        "ep INTEGER NOT NULL,"
-        "page INTEGER NOT NULL,"
-        "other TEXT NOT NULL,"
-        "PRIMARY KEY (id, ep, page)"
-        ");");
+    await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      db.execute("CREATE TABLE IF NOT EXISTS image_favorites ("
+          "id TEXT,"
+          "title TEXT NOT NULL,"
+          "cover TEXT NOT NULL,"
+          "ep INTEGER NOT NULL,"
+          "page INTEGER NOT NULL,"
+          "other TEXT NOT NULL,"
+          "PRIMARY KEY (id, ep, page)"
+          ");");
+    });
+    _cache = await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      return db
+          .select("select * from image_favorites;")
+          .map(_imageFavoriteFromRow)
+          .toList();
+    });
   }
 
-  static void add(ImageFavorite favorite){
-    if (_db == null) {
+  static Future<void> add(ImageFavorite favorite) async {
+    if (!_available) {
       return;
     }
-    _db!.execute("""
-      insert into image_favorites(id, title, cover, ep, page, other)
-      values(?, ?, ?, ?, ?, ?);
-    """, [favorite.id, favorite.title, favorite.imagePath, favorite.ep, favorite.page, jsonEncode(favorite.otherInfo)]);
+    final values = [
+      favorite.id,
+      favorite.title,
+      favorite.imagePath,
+      favorite.ep,
+      favorite.page,
+      jsonEncode(favorite.otherInfo),
+    ];
+    await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      db.execute("""
+        insert into image_favorites(id, title, cover, ep, page, other)
+        values(?, ?, ?, ?, ?, ?);
+      """, values);
+    });
+    _cache.add(favorite);
     Webdav.uploadData();
-    Future.microtask(() => StateController.findOrNull(tag: "me_page")?.update());
+    Future.microtask(
+        () => StateController.findOrNull(tag: "me_page")?.update());
   }
 
-  static List<ImageFavorite> getAll(){
-    if (_db == null) {
-      return [];
-    }
-    var res = _db!.select("select * from image_favorites;");
-    return res.map((e) =>
-        ImageFavorite(e["id"], e["cover"], e["title"], e["ep"], e["page"], jsonDecode(e["other"]))).toList();
-  }
+  static List<ImageFavorite> getAll() => List.of(_cache);
 
   /// 根据关键词搜索图片收藏
   static List<ImageFavorite> search(String keyword) {
     if (keyword.isEmpty) return getAll();
-    
-    // var res = _db.select("""
-    //   select * from image_favorites 
-    //   where title like ? or id like ?
-    // """, ['%$keyword%', '%$keyword%']);
-    final db = _db;
-    if (db == null) {
-      // 数据库未就绪时，按业务语义返回空结果
-      return [];
-    }
-    final res = db.select("""
-      select * from image_favorites 
-      where title like ? or id like ?
-    """, ['%$keyword%', '%$keyword%']);
-    
-    return res.map((e) =>
-        ImageFavorite(e["id"], e["cover"], e["title"], e["ep"], e["page"], jsonDecode(e["other"]))).toList();
+    final lowerKeyword = keyword.toLowerCase();
+    return _cache
+        .where((favorite) =>
+            favorite.title.toLowerCase().contains(lowerKeyword) ||
+            favorite.id.toLowerCase().contains(lowerKeyword))
+        .toList();
   }
 
   /// 按漫画ID分组获取图片收藏
   static Map<String, List<ImageFavorite>> getGroupedByComic() {
-    var allFavorites = getAll();
-    var grouped = <String, List<ImageFavorite>>{};
-    
-    for (var favorite in allFavorites) {
-      if (!grouped.containsKey(favorite.id)) {
-        grouped[favorite.id] = [];
-      }
-      grouped[favorite.id]!.add(favorite);
+    final grouped = <String, List<ImageFavorite>>{};
+    for (final favorite in _cache) {
+      grouped.putIfAbsent(favorite.id, () => []).add(favorite);
     }
-    
     return grouped;
   }
 
   /// 批量删除图片收藏
-  static void deleteMultiple(Iterable<ImageFavorite> favorites) {
-    for (var favorite in favorites) {
-      // _db.execute("""
-      //   delete from image_favorites
-      //   where id = ? and ep = ? and page = ?;
-      // """, [favorite.id, favorite.ep, favorite.page]);
-      final db = _db;
-      if (db == null) {
-        // DB 尚未初始化：按你现在的容错策略直接跳过
-        return;
-      }
-      db.execute("""
-        delete from image_favorites
-        where id = ? and ep = ? and page = ?;
-      """, [favorite.id, favorite.ep, favorite.page]);
-
-    }
-    Webdav.uploadData();
-    Future.microtask(() => StateController.findOrNull(tag: "me_page")?.update());
-  }
-
-  static void delete(ImageFavorite favorite){
-    if (_db == null) {
+  static Future<void> deleteMultiple(Iterable<ImageFavorite> favorites) async {
+    if (!_available) {
       return;
     }
-    _db!.execute("""
-      delete from image_favorites
-      where id = ? and ep = ? and page = ?;
-    """, [favorite.id, favorite.ep, favorite.page]);
+    final items = favorites.toList();
+    if (items.isEmpty) return;
+    final keys = [
+      for (final favorite in items) [favorite.id, favorite.ep, favorite.page],
+    ];
+    await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      for (final key in keys) {
+        db.execute("""
+          delete from image_favorites
+          where id = ? and ep = ? and page = ?;
+        """, key);
+      }
+    });
+    final removed = items
+        .map((favorite) => (favorite.id, favorite.ep, favorite.page))
+        .toSet();
+    _cache.removeWhere((favorite) =>
+        removed.contains((favorite.id, favorite.ep, favorite.page)));
     Webdav.uploadData();
-    Future.microtask(() => StateController.findOrNull(tag: "me_page")?.update());
+    Future.microtask(
+        () => StateController.findOrNull(tag: "me_page")?.update());
+  }
+
+  static Future<void> delete(ImageFavorite favorite) {
+    return deleteMultiple([favorite]);
   }
 
   static bool exist(String id, int ep, int page) {
-    if (_db == null) {
-      return false;
-    }
-    var res = _db!.select("""
-      select * from image_favorites
-      where id = ? and ep = ? and page = ?;
-    """, [id, ep, page]);
-    return res.isEmpty ? false : true;
+    return _cache.any((favorite) =>
+        favorite.id == id && favorite.ep == ep && favorite.page == page);
   }
 
-  static int get length {
-    if (_db == null) {
-      return 0;
-    }
-    var res = _db!.select("select count(*) from image_favorites;");
-    return res.first.values.first! as int;
-  }
+  static int get length => _cache.length;
+}
+
+ImageFavorite _imageFavoriteFromRow(Row row) {
+  return ImageFavorite(
+    row["id"],
+    row["cover"],
+    row["title"],
+    row["ep"],
+    row["page"],
+    jsonDecode(row["other"]),
+  );
 }

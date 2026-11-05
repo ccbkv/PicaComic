@@ -3,6 +3,9 @@ part of 'comic_reading_page.dart';
 abstract class ReadingData {
   ReadingData();
 
+  /// 仅在当前阅读会话中显示原图。
+  bool showOriginalPages = false;
+
   String get title;
 
   String get id;
@@ -77,11 +80,35 @@ abstract class ReadingData {
   }
 
   ImageProvider createImageProvider(int ep, int page, String url) {
+    var imageKey = buildImageKey(ep, page, url);
+    if (!showOriginalPages &&
+        ImageTranslationService.isEnabledForComic(id, sourceKey)) {
+      var eid = hasEp ? eps?.keys.elementAtOrNull(ep - 1) ?? '0' : '0';
+      var config = TranslationConfig.of(id, sourceKey);
+      var translationKey =
+          ImageTranslationService.cacheKeyFor(sourceKey, id, eid, page + 1);
+      return TranslatedImageProvider(
+        () => loadImage(ep, page, url),
+        imageKey,
+        sourceKey,
+        id,
+        eid,
+        page + 1,
+        translationKey,
+        ImageTranslationService.legacyCacheKeyFor(imageKey, sourceKey, id, eid),
+        config,
+        ImageTranslationService.instance
+            .isTranslated(translationKey, config.mode),
+        comicTitle: title,
+        comicCover: historyCover,
+        chapterTitle:
+            hasEp ? eps?.values.elementAtOrNull(ep - 1) ?? title : title,
+      );
+    }
     if (downloaded && checkEpDownloaded(ep)) {
       return FileImageProvider(downloadId, hasEp ? ep : 0, page);
     } else {
-      return StreamImageProvider(
-          () => loadImage(ep, page, url), buildImageKey(ep, page, url));
+      return StreamImageProvider(() => loadImage(ep, page, url), imageKey);
     }
   }
 

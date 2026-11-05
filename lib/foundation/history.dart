@@ -11,6 +11,7 @@ import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/foundation/platform_utils.dart';
+import 'package:pica_comic/foundation/sqlite_connection.dart';
 import 'package:pica_comic/network/jm_network/jm_image.dart';
 import 'package:pica_comic/network/eh_network/eh_main_network.dart';
 import 'package:pica_comic/network/webdav.dart';
@@ -196,13 +197,15 @@ class HistoryManager {
   factory HistoryManager() =>
       cache == null ? (cache = HistoryManager.create()) : cache!;
 
-  Database? _db;
+  late final String _dbPath = "${App.dataPath}/history.db";
+  bool _dbAvailable = false;
   bool _dbWarningIssued = false;
   Timer? _ohosWidgetSyncDebounce;
   final Map<String, String> _ohosWidgetCoverDataCache = {};
+  Map<String, History> _historyCache = {};
 
   bool _ensureDbAvailable() {
-    if (_db != null) {
+    if (_dbAvailable) {
       return true;
     }
     if (!_dbWarningIssued) {
@@ -213,124 +216,109 @@ class HistoryManager {
     return false;
   }
 
-  int get length {
-    if (!_ensureDbAvailable()) {
-      return 0;
-    }
-    return _db!.select("select count(*) from history;").first[0] as int;
-  }
-
-  Map<String, bool>? _cachedHistory;
+  int get length => _historyCache.length;
 
   Future<void> tryUpdateDb() async {
-    var file = File("${App.dataPath}/history_temp.db");
-    if (!file.existsSync()) {
+    final file = File("${App.dataPath}/history_temp.db");
+    if (!await file.exists()) {
       LogManager.addLog(
           LogLevel.info, "HistoryManager.tryUpdateDb", "db file not exist");
       return;
     }
-    var db = sqlite3.open(file.path);
-    var newHistory0 = db.select("""
-      select * from history
-      order by time DESC;
-    """);
-    var newHistory =
-        newHistory0.map((element) => History.fromRow(element)).toList();
-    if (file.existsSync()) {
-      var skips = 0;
-      for (var history in newHistory) {
-        if (findSync(history.target) == null) {
-          addHistory(history);
-          LogManager.addLog(LogLevel.info, "HistoryManager",
-              "merge history ${history.target}");
-        } else {
-          skips++;
-        }
-      }
-      LogManager.addLog(LogLevel.info, "HistoryManager",
-          "merge history, skipped $skips, added ${newHistory.length - skips}");
-
-      //import favorite images
-      skips = 0;
-      ImageFavoriteManager.init();
-      var newImages0 = db.select("select * from image_favorites;");
-      var newImages = newImages0
+    final imported = await DatabaseGateway.instance.isolateOp(file.path, (db) {
+      final histories = db.select("""
+        select * from history
+        order by time DESC;
+      """).map((element) => History.fromRow(element)).toList();
+      final images = db
+          .select("select * from image_favorites;")
           .map((e) => ImageFavorite(e["id"], e["cover"], e["title"], e["ep"],
               e["page"], jsonDecode(e["other"])))
           .toList();
-      for (var image in newImages) {
-        if (ImageFavoriteManager.exist(image.id, image.ep, image.page)) {
-          skips++;
-        } else {
-          ImageFavoriteManager.add(image);
-          LogManager.addLog(LogLevel.info, "HistoryManager",
-              "merge favorite image ep ${image.ep} page ${image.page} @ ${image.id}");
-        }
+      return (histories: histories, images: images);
+    });
+
+    var skips = 0;
+    for (final history in imported.histories) {
+      if (findSync(history.target) == null) {
+        await addHistory(history);
+        LogManager.addLog(
+            LogLevel.info, "HistoryManager", "merge history ${history.target}");
+      } else {
+        skips++;
       }
-      LogManager.addLog(LogLevel.info, "HistoryManager",
-          "merge favorite images, skipped $skips, added ${newImages.length - skips}");
     }
-    db.dispose();
-    file.deleteSync();
+    LogManager.addLog(LogLevel.info, "HistoryManager",
+        "merge history, skipped $skips, added ${imported.histories.length - skips}");
+
+    skips = 0;
+    await ImageFavoriteManager.init();
+    for (final image in imported.images) {
+      if (ImageFavoriteManager.exist(image.id, image.ep, image.page)) {
+        skips++;
+      } else {
+        await ImageFavoriteManager.add(image);
+        LogManager.addLog(LogLevel.info, "HistoryManager",
+            "merge favorite image ep ${image.ep} page ${image.page} @ ${image.id}");
+      }
+    }
+    LogManager.addLog(LogLevel.info, "HistoryManager",
+        "merge favorite images, skipped $skips, added ${imported.images.length - skips}");
+    await file.delete();
   }
 
   Future<void> init() async {
     try {
-      _db = sqlite3.open("${App.dataPath}/history.db");
+      await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+        db.execute("""
+          create table if not exists history  (
+            target text primary key,
+            title text,
+            subtitle text,
+            cover text,
+            time int,
+            type int,
+            ep int,
+            page int,
+            readEpisode text,
+            max_page int
+          );
+        """);
+        final res = db.select("PRAGMA table_info(history);");
+        if (res.every((row) => row["name"] != "max_page")) {
+          db.execute("alter table history add column max_page int;");
+        }
+      });
+      _dbAvailable = true;
+      await updateCache();
     } catch (e, s) {
-      _db = null;
+      _dbAvailable = false;
       LogManager.addLog(LogLevel.error, "HistoryManager",
           "Failed to open history database: $e\n$s");
       return;
     }
 
-    _db!.execute("""
-        create table if not exists history  (
-          target text primary key,
-          title text,
-          subtitle text,
-          cover text,
-          time int,
-          type int,
-          ep int,
-          page int,
-          readEpisode text,
-          max_page int
-        );
-      """);
-
-    // 检查是否有max_page字段, 如果没有则添加
-    var res = _db!.select("""
-      PRAGMA table_info(history);
-    """);
-    if (res.every((row) => row["name"] != "max_page")) {
-      _db!.execute("""
-        alter table history
-        add column max_page int;
-      """);
-    }
-
     // 迁移早期版本的数据
-    var file = File("${App.dataPath}/history.json");
-    if (file.existsSync()) {
-      readDataFromJson(jsonDecode(file.readAsStringSync()));
-      file.deleteSync();
+    final file = File("${App.dataPath}/history.json");
+    if (await file.exists()) {
+      await readDataFromJson(jsonDecode(await file.readAsString()));
+      await file.delete();
     }
 
-    ImageFavoriteManager.init();
+    await ImageFavoriteManager.init();
     unawaited(syncOhosWidgetHistory());
   }
 
-  void readDataFromJson(List<dynamic> json) {
+  Future<void> readDataFromJson(List<dynamic> json) async {
     var history = LinkedList<History>();
     for (var h in json) {
       history.add(History.fromMap((h as Map<String, dynamic>)));
     }
     // do not clear previous history
     for (var element in history) {
-      if (findSync(element.target) == null) addHistory(element);
+      if (findSync(element.target) == null) await addHistory(element);
     }
-    vacuum();
+    await vacuum();
     unawaited(syncOhosWidgetHistory());
   }
 
@@ -345,35 +333,38 @@ class HistoryManager {
     if (!_ensureDbAvailable()) {
       return;
     }
-    var res = _db!.select("""
-      select * from history
-      where target == ?;
-    """, [newItem.target]);
-    if (res.isEmpty) {
-      _db!.execute("""
-        insert into history (target, title, subtitle, cover, time, type, ep, page, readEpisode, max_page)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-      """, [
-        newItem.target,
-        newItem.title,
-        newItem.subtitle,
-        newItem.cover,
-        newItem.time.millisecondsSinceEpoch,
-        newItem.type.value,
-        newItem.ep,
-        newItem.page,
-        newItem.readEpisode.join(','),
-        newItem.maxPage
-      ]);
-    } else {
-      _db!.execute("""
-        update history
-        set time = ${DateTime.now().millisecondsSinceEpoch}
-        where target == ?;
-      """, [newItem.target]);
-    }
+    final item = newItem.toMap();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      final res = db.select(
+        "select * from history where target == ?;",
+        [item['target']],
+      );
+      if (res.isEmpty) {
+        db.execute("""
+          insert into history (target, title, subtitle, cover, time, type, ep, page, readEpisode, max_page)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, [
+          item['target'],
+          item['title'],
+          item['subtitle'],
+          item['cover'],
+          item['time'],
+          item['type'],
+          item['ep'],
+          item['page'],
+          (item['readEpisode'] as List).join(','),
+          item['max_page'],
+        ]);
+      } else {
+        db.execute(
+          "update history set time = ? where target == ?;",
+          [now, item['target']],
+        );
+      }
+    });
     saveData();
-    updateCache();
+    await updateCache();
     _scheduleOhosWidgetHistorySync();
   }
 
@@ -383,44 +374,49 @@ class HistoryManager {
     if (!_ensureDbAvailable()) {
       return;
     }
-    _db!.execute("""
-        update history
-        set time = ${DateTime.now().millisecondsSinceEpoch}, ep = ?, page = ?, readEpisode = ?, max_page = ?
-        where target == ?;
-    """, [
+    final values = [
+      DateTime.now().millisecondsSinceEpoch,
       history.ep,
       history.page,
       history.readEpisode.join(','),
       history.maxPage,
-      history.target
-    ]);
+      history.target,
+    ];
+    await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      db.execute("""
+        update history
+        set time = ?, ep = ?, page = ?, readEpisode = ?, max_page = ?
+        where target == ?;
+      """, values);
+    });
     if (updateMePage) {
       scheduleMicrotask(() {
         StateController.findOrNull(tag: "me_page_history")?.update();
       });
     }
-    updateCache();
+    await updateCache();
     _scheduleOhosWidgetHistorySync();
   }
 
-  void clearHistory() {
+  Future<void> clearHistory() async {
     if (!_ensureDbAvailable()) {
       return;
     }
-    _db!.execute("delete from history;");
-    updateCache();
+    await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      db.execute("delete from history;");
+    });
+    await updateCache();
     _scheduleOhosWidgetHistorySync();
   }
 
-  void remove(String id) async {
+  Future<void> remove(String id) async {
     if (!_ensureDbAvailable()) {
       return;
     }
-    _db!.execute("""
-      delete from history
-      where target == '$id';
-    """);
-    updateCache();
+    await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      db.execute("delete from history where target == ?;", [id]);
+    });
+    await updateCache();
     _scheduleOhosWidgetHistorySync();
   }
 
@@ -645,102 +641,55 @@ class HistoryManager {
     return findSync(target);
   }
 
-  void updateCache() {
+  Future<void> updateCache() async {
     if (!_ensureDbAvailable()) {
-      _cachedHistory = {};
+      _historyCache = {};
       return;
     }
-    _cachedHistory = {};
-    var res = _db!.select("""
-        select * from history;
-      """);
-    for (var element in res) {
-      _cachedHistory![element["target"] as String] = true;
-    }
+    final histories = await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      return db
+          .select("select * from history order by time DESC;")
+          .map((element) => History.fromRow(element))
+          .toList();
+    });
+    _historyCache = {for (final history in histories) history.target: history};
   }
 
-  History? findSync(String target) {
-    if (_cachedHistory == null) {
-      updateCache();
-    }
-    if (!_cachedHistory!.containsKey(target)) {
-      return null;
-    }
+  History? findSync(String target) => _historyCache[target];
 
-    if (!_ensureDbAvailable()) {
-      return null;
-    }
-    var res = _db!.select("""
-      select * from history
-      where target == ?;
-    """, [target]);
-    if (res.isEmpty) {
-      return null;
-    }
-    return History.fromRow(res.first);
-  }
+  List<History> getAll() => _historyCache.values.toList();
 
-  List<History> getAll() {
-    if (!_ensureDbAvailable()) {
-      return [];
-    }
-    var res = _db!.select("""
-      select * from history
-      order by time DESC;
-    """);
-    return res.map((element) => History.fromRow(element)).toList();
-  }
-
-  void vacuum() {
+  Future<void> vacuum() async {
     if (!_ensureDbAvailable()) {
       return;
     }
-    _db!.execute("""
-      vacuum;
-    """);
+    await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      db.execute("vacuum;");
+    });
   }
 
   /// 获取最近一周的阅读数据, 用于生成图表, List中的元素是当天阅读的漫画数量
   List<int> getWeekData(int days) {
-    if (!_ensureDbAvailable()) {
-      return List<int>.filled(days, 0);
-    }
-    var res = _db!.select("""
-      select * from history
-      where time > ${DateTime.now().add(Duration(days: 1 - days)).millisecondsSinceEpoch}
-      order by time ASC;
-    """);
-    var data = List<int>.filled(days, 0);
-    for (var element in res) {
-      var time = DateTime.fromMillisecondsSinceEpoch(element["time"] as int);
-      data[DateTime.now().difference(time).inDays]++;
+    final start = DateTime.now().add(Duration(days: 1 - days));
+    final histories = _historyCache.values
+        .where((history) => history.time.isAfter(start))
+        .toList()
+      ..sort((a, b) => a.time.compareTo(b.time));
+    final data = List<int>.filled(days, 0);
+    for (final history in histories) {
+      final index = DateTime.now().difference(history.time).inDays;
+      if (index >= 0 && index < data.length) {
+        data[index]++;
+      }
     }
     return data.reversed.toList();
   }
 
   /// 获取最近阅读的漫画
-  List<History> getRecent() {
-    if (!_ensureDbAvailable()) {
-      return [];
-    }
-    var res = _db!.select("""
-      select * from history
-      order by time DESC
-      limit 20;
-    """);
-    return res.map((element) => History.fromRow(element)).toList();
-  }
+  List<History> getRecent() => _historyCache.values.take(20).toList();
 
   /// 获取历史记录的数量
-  int count() {
-    if (!_ensureDbAvailable()) {
-      return 0;
-    }
-    var res = _db!.select("""
-      select count(*) from history;
-    """);
-    return res.first[0] as int;
-  }
+  int count() => _historyCache.length;
 
   /// Get plain search keyword from a keyword that may be polluted.
   static String getPlainSearchKeyword(String keyword) {

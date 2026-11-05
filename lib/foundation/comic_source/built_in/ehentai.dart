@@ -145,7 +145,7 @@ final ehentai = ComicSource.named(
     allowReLogin: false,
     onLogin: (BuildContext context) async {
       await context.to(() => const EhLoginPage());
-      var cookies = EhNetwork()
+      var cookies = await EhNetwork()
           .cookieJar
           .loadForRequest(Uri.parse("https://e-hentai.org"));
       if (!cookies.any((e) => e.name == 'ipb_member_id')) {
@@ -210,7 +210,7 @@ final ehentai = ComicSource.named(
             startPages: int.tryParse(options.elementAtOrNull(1) ?? ''),
             endPages: int.tryParse(options.elementAtOrNull(2) ?? ''),
             minStars: int.tryParse(options.elementAtOrNull(3) ?? ''),
-                        expunged: int.tryParse(options.elementAtOrNull(4) ?? ''),
+            expunged: int.tryParse(options.elementAtOrNull(4) ?? ''),
           ),
         );
       }
@@ -276,7 +276,7 @@ class _EhGalleryTile extends ComicTile {
 
   @override
   int get maxLines => 2;
-      // MediaQuery.of(App.globalContext!).size.width < 430 ? 1 : 2;
+  // MediaQuery.of(App.globalContext!).size.width < 430 ? 1 : 2;
 
   @override
   ActionFunc? get read => () async {
@@ -295,7 +295,7 @@ class _EhGalleryTile extends ComicTile {
         } else {
           var history = await History.findOrCreate(res.data);
           App.globalTo(
-                () => ComicReadingPage.ehentai(
+            () => ComicReadingPage.ehentai(
               res.data,
               initialPage: history.page,
             ),
@@ -445,8 +445,8 @@ class _SearchOptionsState extends State<_SearchOptions> {
   @override
   Widget build(BuildContext context) {
     var isInDialog = context.findAncestorWidgetOfExactType<Dialog>() != null;
-    var width = context.width-16;
-    if(width > 500) {
+    var width = context.width - 16;
+    if (width > 500) {
       width = 500;
     }
     return Column(
@@ -456,7 +456,7 @@ class _SearchOptionsState extends State<_SearchOptions> {
         ListTile(
           title: Text("高级选项".tl),
         ),
-        if(!isInDialog)
+        if (!isInDialog)
           LayoutBuilder(
             builder: (context, constrains) => Wrap(
               children: List.generate(categories.length, (index) {
@@ -488,7 +488,7 @@ class _SearchOptionsState extends State<_SearchOptions> {
         const SizedBox(
           height: 8,
         ),
-               Row(
+        Row(
           children: [
             const SizedBox(
               width: 8,
@@ -507,7 +507,7 @@ class _SearchOptionsState extends State<_SearchOptions> {
               },
             ),
           ],
-         ).paddingHorizontal(12),
+        ).paddingHorizontal(12),
         Row(
           children: [
             const SizedBox(width: 8),
@@ -655,7 +655,7 @@ class _EhentaiGalleriesLoader {
     page--;
     while (page >= cache.length) {
       var res = await loadNext();
-      if(res.error) {
+      if (res.error) {
         return Res.fromErrorRes(res);
       }
     }

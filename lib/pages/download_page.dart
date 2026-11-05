@@ -3073,6 +3073,9 @@ class DownloadedComicTile extends ComicTile {
   String get title => name;
 
   @override
+  int get maxLines => 1;
+
+  @override
   void onLongTap_() => onLongTap();
 
   @override

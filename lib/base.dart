@@ -135,6 +135,8 @@ class Appdata {
     "0", //103 液态玻璃底部导航栏
     "0", //104 下载漫画时保存普通评论
     "0", //105 使用 Codeberg 代替 GitHub
+
+    
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步
@@ -156,6 +158,59 @@ class Appdata {
     "0", // 图片收藏数量筛选
     "1", //15 webdav autoSync
   ];
+
+  /// Dynamic image-translation settings. Kept separate from the legacy
+  /// numeric lists so existing settings files remain backward compatible.
+  Map<String, dynamic> translationSettings = {};
+  Map<String, dynamic> translationImplicitData = {};
+
+  static const _translationReaderSettingsKey = 'readerSettings';
+
+  dynamic getTranslationReaderSetting(
+      String? comicId, String? sourceKey, String name) {
+    if (comicId != null && sourceKey != null) {
+      var all = translationSettings[_translationReaderSettingsKey];
+      if (all is Map) {
+        var values = all['$comicId@$sourceKey'];
+        if (values is Map && values.containsKey(name)) {
+          return values[name];
+        }
+      }
+    }
+    return translationSettings[name];
+  }
+
+  dynamic getDeviceTranslationReaderSetting(String name) {
+    return translationSettings[name];
+  }
+
+  void setTranslationReaderSetting(
+      String? comicId, String? sourceKey, String name, dynamic value) {
+    if (comicId == null || sourceKey == null) {
+      if (value == null) {
+        translationSettings.remove(name);
+      } else {
+        translationSettings[name] = value;
+      }
+    } else {
+      var all = Map<String, dynamic>.from(
+          translationSettings[_translationReaderSettingsKey] as Map? ?? {});
+      var key = '$comicId@$sourceKey';
+      var values = Map<String, dynamic>.from(all[key] as Map? ?? {});
+      if (value == null) {
+        values.remove(name);
+      } else {
+        values[name] = value;
+      }
+      if (values.isEmpty) {
+        all.remove(key);
+      } else {
+        all[key] = values;
+      }
+      translationSettings[_translationReaderSettingsKey] = all;
+    }
+    saveData();
+  }
 
   void writeFavoriteTags() async {
     if (Platform.isAndroid) {
@@ -335,7 +390,34 @@ class Appdata {
     }
   }
 
-  void writeImplicitData() async {
+  Future<Map<String, dynamic>> _readTranslationMap(String fileName) async {
+    try {
+      var file = File('${App.dataPath}/$fileName');
+      if (!file.existsSync()) return {};
+      var decoded = jsonDecode(await file.readAsString());
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      LogManager.addLog(LogLevel.warning, 'Appdata._readTranslationMap',
+          '$fileName contains invalid data format');
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, 'Appdata._readTranslationMap',
+          'Failed to read $fileName: $e');
+    }
+    return {};
+  }
+
+  Future<void> _writeTranslationMap(
+      String fileName, Map<String, dynamic> values) async {
+    try {
+      await File('${App.dataPath}/$fileName').writeAsString(jsonEncode(values));
+    } catch (e) {
+      LogManager.addLog(LogLevel.error, 'Appdata._writeTranslationMap',
+          'Failed to write $fileName: $e');
+    }
+  }
+
+  Future<void> saveData([bool syncData = true]) => updateSettings(syncData);
+
+  Future<void> writeImplicitData() async {
     if (Platform.isAndroid) {
       try {
         var externalDirectory = await getExternalStorageDirectory();
@@ -354,9 +436,13 @@ class Appdata {
       var s = await SharedPreferences.getInstance();
       await s.setStringList("implicitData", implicitData);
     }
+    await _writeTranslationMap(
+        'image_translation_implicit_data.json', translationImplicitData);
   }
 
-  void readImplicitData() async {
+  Future<void> readImplicitData() async {
+    translationImplicitData = await _readTranslationMap(
+        'image_translation_implicit_data.json');
     if (Platform.isAndroid) {
       try {
         var externalDirectory = await getExternalStorageDirectory();
@@ -593,6 +679,8 @@ class Appdata {
   }
 
   Future<void> readSettings() async {
+    translationSettings =
+        await _readTranslationMap('image_translation_settings.json');
     try {
       var settingsFile = File("${App.dataPath}/settings");
 
@@ -656,6 +744,8 @@ class Appdata {
     var settingsFile = File("${App.dataPath}/settings");
 
     await settingsFile.writeAsString(jsonEncode(settings));
+    await _writeTranslationMap(
+        'image_translation_settings.json', translationSettings);
 
     if (syncData) {
       Webdav.uploadData();
@@ -672,7 +762,7 @@ class Appdata {
   }
 
   Future<void> writeData([bool sync = true]) async {
-    writeImplicitData();
+    await writeImplicitData();
     if (sync) {
       Webdav.uploadData();
     }
@@ -708,7 +798,7 @@ class Appdata {
       }
 
       try {
-        readImplicitData();
+        await readImplicitData();
       } catch (e) {
         LogManager.addLog(LogLevel.error, "Appdata.readData",
             "Failed to read implicit data: $e");
@@ -755,7 +845,9 @@ class Appdata {
       // 不强制设置firstUse[3]为"1"，保持默认值，确保全新安装可以显示开始界面
 
       // 重置隐式数据
-      writeImplicitData();
+      translationSettings = {};
+      translationImplicitData = {};
+      await writeImplicitData();
 
       // 保存重置后的数据
       await writeData();
@@ -773,6 +865,8 @@ class Appdata {
         "firstUse": firstUse,
         "blockingKeywords": blockingKeyword,
         "favoriteTags": favoriteTags.toList(),
+        "translationSettings": translationSettings,
+        "translationImplicitData": translationImplicitData,
       };
 
   bool readDataFromJson(Map<String, dynamic> json) {
@@ -798,6 +892,14 @@ class Appdata {
           .toList();
       favoriteTags =
           Set.from((json["favoriteTags"] ?? []) + List.from(favoriteTags));
+      if (json['translationSettings'] is Map) {
+        translationSettings =
+            Map<String, dynamic>.from(json['translationSettings'] as Map);
+      }
+      if (json['translationImplicitData'] is Map) {
+        translationImplicitData =
+            Map<String, dynamic>.from(json['translationImplicitData'] as Map);
+      }
       writeData(false);
       return true;
     } catch (e, s) {
@@ -893,9 +995,15 @@ var notifications = Notifications();
 Future<void> clearAppdata() async {
   var s = await SharedPreferences.getInstance();
   await s.clear();
-  var settingsFile = File("${App.dataPath}/settings");
-  if (await settingsFile.exists()) {
-    await settingsFile.delete();
+  for (var name in [
+    'settings',
+    'image_translation_settings.json',
+    'image_translation_implicit_data.json',
+  ]) {
+    var file = File('${App.dataPath}/$name');
+    if (await file.exists()) {
+      await file.delete();
+    }
   }
   appdata.history.clearHistory();
   appdata = Appdata();

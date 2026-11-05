@@ -44,7 +44,7 @@ class NhentaiNetwork {
 
   Future<void> init() async {
     cookieJar = SingleInstanceCookieJar.instance;
-    refreshLoginState();
+    await refreshLoginState();
     dio = logDio(BaseOptions(
       headers: _defaultHeaders,
       validateStatus: (i) => i == 200 || i == 302 || i == 401,
@@ -55,16 +55,16 @@ class NhentaiNetwork {
 
   void logout() async {
     logged = false;
-    cookieJar!.delete(Uri.parse(baseUrl), "access_token");
-    cookieJar!.delete(Uri.parse(baseUrl), "refresh_token");
+    await cookieJar!.delete(Uri.parse(baseUrl), "access_token");
+    await cookieJar!.delete(Uri.parse(baseUrl), "refresh_token");
   }
 
-  void refreshLoginState() {
+  Future<void> refreshLoginState() async {
     if (cookieJar == null) {
       logged = false;
       return;
     }
-    final cookies = cookieJar!.loadForRequest(Uri.parse(baseUrl));
+    final cookies = await cookieJar!.loadForRequest(Uri.parse(baseUrl));
     for (var cookie in cookies) {
       if (cookie.name == 'access_token') {
         logged = true;
@@ -72,11 +72,11 @@ class NhentaiNetwork {
     }
   }
 
-  String? _getAccessToken() {
+  Future<String?> _getAccessToken() async {
     if (cookieJar == null) {
       return null;
     }
-    for (final cookie in cookieJar!.loadForRequest(Uri.parse(baseUrl))) {
+    for (final cookie in await cookieJar!.loadForRequest(Uri.parse(baseUrl))) {
       if (cookie.name == 'access_token' && cookie.value.isNotEmpty) {
         return cookie.value;
       }
@@ -84,11 +84,11 @@ class NhentaiNetwork {
     return null;
   }
 
-  String? _getRefreshToken() {
+  Future<String?> _getRefreshToken() async {
     if (cookieJar == null) {
       return null;
     }
-    for (final cookie in cookieJar!.loadForRequest(Uri.parse(baseUrl))) {
+    for (final cookie in await cookieJar!.loadForRequest(Uri.parse(baseUrl))) {
       if (cookie.name == 'refresh_token' && cookie.value.isNotEmpty) {
         return cookie.value;
       }
@@ -96,16 +96,16 @@ class NhentaiNetwork {
     return null;
   }
 
-  Map<String, String>? _buildAuthHeaders() {
-    final token = _getAccessToken();
+  Future<Map<String, String>?> _buildAuthHeaders() async {
+    final token = await _getAccessToken();
     if (token == null) {
       return null;
     }
     return {..._defaultHeaders, 'Authorization': 'User $token'};
   }
 
-  void _saveTokens(String accessToken, String refreshToken) {
-    cookieJar?.saveFromResponse(Uri.parse(baseUrl), [
+  Future<void> _saveTokens(String accessToken, String refreshToken) async {
+    await cookieJar?.saveFromResponse(Uri.parse(baseUrl), [
       Cookie('access_token', accessToken)
         ..domain = '.nhentai.net'
         ..path = '/',
@@ -113,9 +113,8 @@ class NhentaiNetwork {
         ..domain = '.nhentai.net'
         ..path = '/',
     ]);
-    refreshLoginState();
+    await refreshLoginState();
   }
-
 
   Future<bool> _refreshAccessToken() {
     _refreshingFuture ??= _doRefreshAccessToken().whenComplete(() {
@@ -125,12 +124,14 @@ class NhentaiNetwork {
   }
 
   Future<bool> _doRefreshAccessToken() async {
-    final refreshToken = _getRefreshToken();
+    final refreshToken = await _getRefreshToken();
     if (refreshToken == null) {
       return false;
     }
     try {
-      final res = await dio.post<dynamic>('$apiUrl/auth/refresh', data: {'refresh_token': refreshToken},
+      final res = await dio.post<dynamic>(
+        '$apiUrl/auth/refresh',
+        data: {'refresh_token': refreshToken},
         options: Options(headers: _defaultHeaders),
       );
       final data = res.data;
@@ -139,29 +140,36 @@ class NhentaiNetwork {
       }
       final accessToken = data['access_token']?.toString();
       final newRefreshToken = data['refresh_token']?.toString();
-      if (accessToken == null || accessToken.isEmpty || newRefreshToken == null || newRefreshToken.isEmpty) {
+      if (accessToken == null ||
+          accessToken.isEmpty ||
+          newRefreshToken == null ||
+          newRefreshToken.isEmpty) {
         return false;
       }
-      _saveTokens(accessToken, newRefreshToken);
+      await _saveTokens(accessToken, newRefreshToken);
       return true;
     } catch (e) {
       return false;
     }
   }
 
-  Future<Res<dynamic>> get(String url, {bool withAuth = false, bool retried = false}) async {
+  Future<Res<dynamic>> get(String url,
+      {bool withAuth = false, bool retried = false}) async {
     if (cookieJar == null) {
       await init();
     }
     try {
-      final headers = withAuth ? _buildAuthHeaders() : null;
-      var res = await dio.get<dynamic>(url, options: Options(followRedirects: false, headers: headers),
+      final headers = withAuth ? await _buildAuthHeaders() : null;
+      var res = await dio.get<dynamic>(
+        url,
+        options: Options(followRedirects: false, headers: headers),
       );
       if (res.statusCode == 302) {
         var path = res.headers["Location"]?.first ??
             res.headers["location"]?.first ??
             "";
-        return get(Uri.parse(url).replace(path: path).toString(), withAuth: withAuth, retried: retried);
+        return get(Uri.parse(url).replace(path: path).toString(),
+            withAuth: withAuth, retried: retried);
       }
       if (res.statusCode == 401) {
         if (withAuth && !retried) {
@@ -179,13 +187,15 @@ class NhentaiNetwork {
     }
   }
 
-  Future<Res<dynamic>> post(String url, dynamic data,{bool withAuth = false, bool retried = false}) async {
+  Future<Res<dynamic>> post(String url, dynamic data,
+      {bool withAuth = false, bool retried = false}) async {
     if (cookieJar == null) {
       await init();
     }
     try {
-      final headers = withAuth ? _buildAuthHeaders() : null;
-      var res = await dio.post<dynamic>(url, data: data, options: Options(headers: headers));
+      final headers = withAuth ? await _buildAuthHeaders() : null;
+      var res = await dio.post<dynamic>(url,
+          data: data, options: Options(headers: headers));
       if (res.statusCode == 401 || res.statusCode == 403) {
         if (withAuth && !retried) {
           final refreshed = await _refreshAccessToken();
@@ -281,13 +291,15 @@ class NhentaiNetwork {
     return Res(_dedupeNhentaiFilterTerms(suggestions));
   }
 
-  Future<Res<dynamic>> delete(String url, {bool withAuth = false, bool retried = false}) async {
+  Future<Res<dynamic>> delete(String url,
+      {bool withAuth = false, bool retried = false}) async {
     if (cookieJar == null) {
       await init();
     }
     try {
-      final headers = withAuth ? _buildAuthHeaders() : null;
-      var res = await dio.delete<dynamic>(url, options: Options(headers: headers));
+      final headers = withAuth ? await _buildAuthHeaders() : null;
+      var res =
+          await dio.delete<dynamic>(url, options: Options(headers: headers));
       if (res.statusCode == 401 || res.statusCode == 403) {
         if (withAuth && !retried) {
           final refreshed = await _refreshAccessToken();
@@ -334,7 +346,9 @@ class NhentaiNetwork {
     var lang = _getLanguageFromTagIds(item.tagIds);
     var tags = _getTagsFromTagIds(item.tagIds);
     return NhentaiComicBrief(
-      item.englishTitle.isNotEmpty ? item.englishTitle : (item.japaneseTitle ?? item.id.toString()),
+      item.englishTitle.isNotEmpty
+          ? item.englishTitle
+          : (item.japaneseTitle ?? item.id.toString()),
       item.coverUrl,
       item.id.toString(),
       lang,
@@ -355,7 +369,8 @@ class NhentaiNetwork {
     var latestRes = await _searchApi("", page ?? 1, "date");
 
     if (popularTodayRes.error && latestRes.error) {
-      return Res(null, errorMessage: popularTodayRes.errorMessage ?? latestRes.errorMessage);
+      return Res(null,
+          errorMessage: popularTodayRes.errorMessage ?? latestRes.errorMessage);
     }
 
     try {
@@ -449,13 +464,16 @@ class NhentaiNetwork {
         var totalPages = response.numPages;
         if (totalPages > 0) {
           // 生成随机页码 (1 到 totalPages)
-          var randomPage = (DateTime.now().millisecondsSinceEpoch % totalPages) + 1;
+          var randomPage =
+              (DateTime.now().millisecondsSinceEpoch % totalPages) + 1;
           var randomRes = await _searchApi("", randomPage, "date");
           if (!randomRes.error) {
-            var randomResponse = NhentaiSearchResponseV2.fromJson(randomRes.data);
+            var randomResponse =
+                NhentaiSearchResponseV2.fromJson(randomRes.data);
             if (randomResponse.result.isNotEmpty) {
               // 从该页随机选择一个漫画
-              var randomIndex = DateTime.now().millisecondsSinceEpoch % randomResponse.result.length;
+              var randomIndex = DateTime.now().millisecondsSinceEpoch %
+                  randomResponse.result.length;
               id = randomResponse.result[randomIndex].id.toString();
             }
           }
@@ -503,7 +521,10 @@ class NhentaiNetwork {
 
       // 添加上传时间
       if (gallery.uploadDate > 0) {
-        tags["时间".tl] = [timeToString(DateTime.fromMillisecondsSinceEpoch(gallery.uploadDate * 1000))];
+        tags["时间".tl] = [
+          timeToString(
+              DateTime.fromMillisecondsSinceEpoch(gallery.uploadDate * 1000))
+        ];
       }
 
       // 获取缩略图
@@ -633,7 +654,7 @@ class NhentaiNetwork {
     if (!logged) {
       return const Res(null, errorMessage: "login required");
     }
-    var res = await get('$apiUrl/favorites?page=$page', withAuth: true);  
+    var res = await get('$apiUrl/favorites?page=$page', withAuth: true);
     if (res.error) {
       return Res.fromErrorRes(res);
     }
@@ -686,7 +707,8 @@ class NhentaiNetwork {
     if (!logged) {
       return const Res(null, errorMessage: 'login required');
     }
-    var res = await post('$apiUrl/galleries/$id/favorite', null, withAuth: true);
+    var res =
+        await post('$apiUrl/galleries/$id/favorite', null, withAuth: true);
     if (res.error) {
       return Res.fromErrorRes(res);
     }
@@ -762,7 +784,6 @@ class NhentaiNetwork {
   }
 }
 
-
 List<String> splitNhentaiCategoryFilterParam(String? param) {
   if (param == null || param.trim().isEmpty) {
     return const [];
@@ -802,8 +823,7 @@ NhentaiNumericCondition _parseNhentaiNumericCondition(
   String token,
   String value, {
   bool allowSuffix = false,
-}
-) {
+}) {
   final match = RegExp(
     allowSuffix ? r'^(>=|>|=|<|<=)(\d+)([hdwmy])?$' : r'^(>=|>|=|<|<=)(\d+)$',
   ).firstMatch(value);
@@ -955,13 +975,11 @@ class NhentaiCategoryFilter {
   final List<NhentaiNumericCondition> favorites;
   final List<NhentaiNumericCondition> uploadedDays;
 
-  bool get hasExplicitLanguage =>
-      terms.any(
+  bool get hasExplicitLanguage => terms.any(
         (term) =>
             term.namespace == 'language' ||
             (term.isRawQuery &&
-                RegExp(r'(^|\s)language:')
-                    .hasMatch(term.value.toLowerCase())),
+                RegExp(r'(^|\s)language:').hasMatch(term.value.toLowerCase())),
       );
 
   factory NhentaiCategoryFilter.fromParam(String? param) {
@@ -991,7 +1009,9 @@ class NhentaiCategoryFilter {
           favorites.add(_parseNhentaiNumericCondition(token, value));
           break;
         case 'uploaded':
-          uploadedDays.add(_parseNhentaiNumericCondition(token, value, allowSuffix: true),);
+          uploadedDays.add(
+            _parseNhentaiNumericCondition(token, value, allowSuffix: true),
+          );
           break;
         default:
           terms.add(

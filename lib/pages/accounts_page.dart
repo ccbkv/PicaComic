@@ -252,7 +252,8 @@ class _LoginPageState extends State<_LoginPage> {
         ),
         const SizedBox(height: 16),
         if ((widget.loginWebsite != null || widget.source != null) &&
-            widget.source?.key != "copy_manga")
+            widget.source?.key != "copy_manga" && widget.source?.key != "htmanga" && widget.source?.key != "picacg"
+)
           TextButton(
             onPressed: loginWithWebview,
             child: Row(

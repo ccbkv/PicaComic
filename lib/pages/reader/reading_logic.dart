@@ -221,6 +221,22 @@ class ComicReadingPageLogic extends StateController {
   ///所有的图片链接
   var urls = <String>[];
 
+  /// 仅在当前阅读会话中切换原图，便于与译文对照。
+  bool get showOriginalPages => data.showOriginalPages;
+
+  void toggleShowOriginalPages() {
+    data.showOriginalPages = !data.showOriginalPages;
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    refreshTranslatedImages();
+    update(["ToolBar"]);
+  }
+
+  void refreshTranslatedImages() {
+    requestedLoadingItems = [];
+    update();
+  }
+
   void reload() {
     index = 1;
     isOnChapterCommentsPage = false;

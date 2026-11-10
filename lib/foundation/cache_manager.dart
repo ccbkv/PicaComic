@@ -76,8 +76,9 @@ class CacheManager {
 
   void setType(String key, String? type) {
     _types[key] = type;
+    final dbPath = _dbPath;
     unawaited(
-        _ready.then((_) => DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+        _ready.then((_) => DatabaseGateway.instance.isolateOp(dbPath, (db) {
               db.execute('''
             UPDATE cache
             SET type = ?

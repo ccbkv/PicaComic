@@ -8,7 +8,7 @@ import 'package:pica_comic/utils/extensions.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/pages/search/image_search_page.dart';
 
-import 'ehentai/subscription.dart';
+import 'ehentai/subscription.dart'; 
 import 'comic_page.dart';
 import 'webview.dart';
 
@@ -24,6 +24,7 @@ void openTool(BuildContext context) {
                 title: Text("工具".tl),
               ),
             ),
+             
             SliverToBoxAdapter(
               child: ListTile(
                 leading: const Icon(Icons.subscriptions),
@@ -34,6 +35,7 @@ void openTool(BuildContext context) {
                 },
               ),
             ),
+            
             SliverToBoxAdapter(
               child: ListTile(
                 leading: const Icon(Icons.image_search_rounded),

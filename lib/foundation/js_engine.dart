@@ -140,7 +140,7 @@ class JsEngine with _JSEngineApi {
               if (message["key"] == "jm") {
                 return ComicSource.find("jm")?.isLogin ?? false;
               }
-              return null;
+              return ComicSource.find(message["key"])?.isLogin ?? false;
             }
           case 'jm_ui':
             {

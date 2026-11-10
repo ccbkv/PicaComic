@@ -996,7 +996,7 @@ abstract mixin class _DownloadDb {
           (a['title'] as String? ?? '').compareTo(b['title'] as String? ?? ''),
         'subtitle' => (a['subtitle'] as String? ?? '')
             .compareTo(b['subtitle'] as String? ?? ''),
-        'size' => (a['size'] as int? ?? 0).compareTo(b['size'] as int? ?? 0),
+        'size' => (a['size'] as num? ?? 0).compareTo(b['size'] as num? ?? 0),
         _ => (a['time'] as int).compareTo(b['time'] as int),
       };
       return direction == 'asc' ? result : -result;

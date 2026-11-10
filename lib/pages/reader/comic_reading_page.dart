@@ -653,6 +653,16 @@ class ComicReadingPage extends StatelessWidget {
     }
     logic.isLoading = false;
     logic.update();
+    if (logic.jumpToLastPageOnChapterLoad) {
+      logic.jumpToLastPageOnChapterLoad = false;
+      // 章节内容构建完成后再跳转到末尾
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (logic.urls.isEmpty) {
+          return;
+        }
+        logic.jumpToPage(logic.urls.length);
+      });
+    }
   }
 
   Widget buildEpsView() {

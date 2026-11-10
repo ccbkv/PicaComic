@@ -8,10 +8,13 @@ abstract class OpenCC {
 
   static Future<void> init() async {
     var data = await rootBundle.load("assets/opencc.txt");
-    var txt = utf8.decode(data.buffer.asUint8List());
+    var txt = utf8.decode(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+    );
     _s2t = <int, int>{};
     _t2s = <int, int>{};
     for (var line in txt.split('\n')) {
+      line = line.trim();
       if (line.isEmpty || line.startsWith('#') || line.length != 2) continue;
       var s = line.runes.elementAt(0);
       var t = line.runes.elementAt(1);

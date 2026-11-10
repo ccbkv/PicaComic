@@ -484,6 +484,33 @@ Map<String, dynamic> _readLocalFavoritesSnapshot(Database db) {
   };
 }
 
+Future<void> _updateReadRows(
+  String path,
+  List<Map<String, dynamic>> updates,
+) {
+  return DatabaseGateway.instance.isolateOp(path, (db) {
+    db.execute("BEGIN TRANSACTION;");
+    for (final update in updates) {
+      final folder = update['folder'] as String;
+      final order = update['order'] as int?;
+      if (order == null) {
+        db.execute("""
+          UPDATE "$folder"
+          SET time = ?
+          WHERE target == ?;
+        """, [update['time'], update['target']]);
+      } else {
+        db.execute("""
+          UPDATE "$folder"
+          SET display_order = ?, time = ?
+          WHERE target == ?;
+        """, [order, update['time'], update['target']]);
+      }
+    }
+    db.execute("COMMIT;");
+  });
+}
+
 class LocalFavoritesManager {
   factory LocalFavoritesManager() =>
       cache ?? (cache = LocalFavoritesManager._create());
@@ -1178,27 +1205,7 @@ class LocalFavoritesManager {
         _pendingTypes.remove(t);
       }
       _runBackground(
-        DatabaseGateway.instance.isolateOp(_dbPath, (db) {
-          db.execute("BEGIN TRANSACTION;");
-          for (final update in updates) {
-            final folder = update['folder'] as String;
-            final order = update['order'] as int?;
-            if (order == null) {
-              db.execute("""
-                UPDATE "$folder"
-                SET time = ?
-                WHERE target == ?;
-              """, [update['time'], update['target']]);
-            } else {
-              db.execute("""
-                UPDATE "$folder"
-                SET display_order = ?, time = ?
-                WHERE target == ?;
-              """, [order, update['time'], update['target']]);
-            }
-          }
-          db.execute("COMMIT;");
-        }),
+        _updateReadRows(_dbPath, updates),
         upload: true,
       );
       if (isModified) {

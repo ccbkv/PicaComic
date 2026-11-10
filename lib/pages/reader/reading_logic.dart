@@ -61,6 +61,9 @@ class ComicReadingPageLogic extends StateController {
 
   bool haveUsedInitialPage = false;
 
+  /// 切换到上一章后, 章节加载完成时跳转到该章末尾
+  bool jumpToLastPageOnChapterLoad = false;
+
   bool isOnChapterCommentsPage = false;
 
   /// 当前是否为连续滚动阅读模式
@@ -372,6 +375,7 @@ class ComicReadingPageLogic extends StateController {
     index = 1;
     requestedLoadingItems = [];
     clearPhotoViewControllers();
+    jumpToLastPageOnChapterLoad = true;
     update();
   }
 

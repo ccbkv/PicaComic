@@ -1,41 +1,396 @@
-name: Build IOS
-run-name: Build IOS
+name: Build ALL
+run-name: Build ALL
 on:
-  workflow_dispatch: {}
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      build_macos:
+        description: 'Build MacOS'
+        required: true
+        default: true
+        type: boolean
+      build_ios:
+        description: 'Build iOS'
+        required: true
+        default: true
+        type: boolean
+      build_android:
+        description: 'Build Android'
+        required: true
+        default: true
+        type: boolean
+      build_windows:
+        description: 'Build Windows'
+        required: true
+        default: true
+        type: boolean
+      build_linux:
+        description: 'Build Linux'
+        required: true
+        default: true
+        type: boolean
+      build_linux_arm64:
+        description: 'Build Linux ARM64'
+        required: true
+        default: true
+        type: boolean
+      publish_release:
+        description: 'Publish artifacts to a release after building'
+        required: true
+        default: false
+        type: boolean
+      allow_personal_trigger:
+        description: 'Allow a personal workflow actor; release still uses github-actions[bot]'
+        required: true
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Existing tag to publish when publish_release is enabled'
+        required: false
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
 jobs:
-  Build_IOS:
-    runs-on: macos-26
+  Validate_Version:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      notes: ${{ steps.version.outputs.notes }}
     steps:
-    - uses: actions/checkout@v3
-    - uses: subosito/flutter-action@v2
-      with:
-        channel: 'stable'
-        architecture: x64
-    - run: sudo xcode-select --switch /Applications/Xcode_26.4.app
-    - run: flutter pub get
-    - run: flutter build ios --release --no-codesign
-    - run: |
-        mkdir -p /Users/runner/work/PicaComic/PicaComic/build/ios/iphoneos/Payload
-        mv /Users/runner/work/PicaComic/PicaComic/build/ios/iphoneos/Runner.app /Users/runner/work/PicaComic/PicaComic/build/ios/iphoneos/Payload
-        cd /Users/runner/work/PicaComic/PicaComic/build/ios/iphoneos/
-        zip -r app-ios.ipa Payload
-    - uses: actions/upload-artifact@v4
-      with:
-        name: app-ios.ipa
-        path: /Users/runner/work/PicaComic/PicaComic/build/ios/iphoneos/app-ios.ipa
+      - uses: actions/checkout@v4
+      - name: Verify automated release identity
+        if: ${{ github.event_name == 'release' || inputs.publish_release }}
+        env:
+          RELEASE_ACTOR: ${{ github.actor }}
+          RELEASE_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          ALLOW_PERSONAL_TRIGGER: ${{ inputs.allow_personal_trigger }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+        run: python3 tool/check_release_identity.py
+      - name: Validate version consistency
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+        run: python3 tool/check_version.py
+
   Build_MacOS:
-    runs-on: macos-26
+    needs: Validate_Version
+    if: ${{ github.event_name == 'release' || inputs.build_macos }}
+    runs-on: macos-15
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v3
-    - uses: subosito/flutter-action@v2
-      with:
-        channel: 'stable'
-        architecture: x64
-    - run: sudo xcode-select --switch /Applications/Xcode_26.4.app
-    - run: flutter pub get
-    - run: flutter build macos --release
-    - uses: actions/upload-artifact@v4
-      with:
-        name: macos-build.zip
-        path: build/macos/Build/Products/Release/pica_comic.app
- 
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+      - run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+      - run: flutter pub get
+        # Step 1: Decode and install the certificate
+      - name: Decode and install certificate
+        env:
+          CERTIFICATE: ${{ secrets.CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          if [[ -n "$CERTIFICATE" && -n "$CERTIFICATE_PASSWORD" ]]; then
+            printf '%s' "$CERTIFICATE" | base64 --decode > signing_certificate.p12
+            security import signing_certificate.p12 -k ~/Library/Keychains/login.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          else
+            echo "macOS signing secrets are not configured; continuing without certificate import"
+          fi
+
+      - name: Check rust-toolchain.toml
+        run: rustup show
+
+      # Step 2: Build the Flutter macOS app
+      - name: Build Flutter macOS App
+        run: flutter build macos --release
+
+      # Step 3: Create the DMG file
+      - name: Create DMG
+        run: |
+          mkdir -p dist
+          mkdir -p dist/dmg_contents
+          cp -R build/macos/Build/Products/Release/pica_comic.app dist/dmg_contents/
+          ln -s /Applications dist/dmg_contents/Applications
+          hdiutil create -volname "Pica Comic" -srcfolder dist/dmg_contents -ov -format UDZO "dist/pica_comic.dmg"
+
+      - name: Add version to filename
+        run: |
+          APP_VERSION=$(grep "version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+          mkdir -p result
+          mv dist/pica_comic.dmg result/pica_comic-$APP_VERSION.dmg
+
+      # Step 4: Attach and upload artifacts (optional)
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos_build
+          path: result/
+
+  Build_IOS:
+    needs: Validate_Version
+    if: ${{ github.event_name == 'release' || inputs.build_ios }}
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+      - run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign
+      - run: |
+          mkdir -p build/ios/iphoneos/Payload
+          mv build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload
+          cd build/ios/iphoneos/
+          zip -r pica_comic-ios.ipa Payload
+      - name: Add version to filename
+        run: |
+          APP_VERSION=$(grep "version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+          mkdir -p result
+          mv build/ios/iphoneos/pica_comic-ios.ipa result/pica_comic-ios-$APP_VERSION.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios_build
+          path: result/
+
+  Build_Android:
+    needs: Validate_Version
+    if: ${{ github.event_name == 'release' || inputs.build_android }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "oracle"
+          java-version: "17"
+
+      - name: Decode Android signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "ANDROID_KEYSTORE_BASE64 secret is required"; exit 1; }
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/release.keystore
+
+      - name: Create Android signing properties
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "ANDROID_KEYSTORE_PASSWORD secret is required"; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo "ANDROID_KEY_ALIAS secret is required"; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo "ANDROID_KEY_PASSWORD secret is required"; exit 1; }
+          cat > android/key.properties <<EOF
+          storeFile=../release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Verify Android signing keystore
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          keytool -list -keystore android/release.keystore \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD \
+            -alias "$ANDROID_KEY_ALIAS" >/dev/null
+
+      - name: Check rust-toolchain.toml
+        run: rustup show
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build signed APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android_build
+          path: build/app/outputs/apk/release
+
+  Build_Windows:
+    needs: Validate_Version
+    if: ${{ github.event_name == 'release' || inputs.build_windows }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: install dependencies
+        run: | 
+          choco install yq -y
+          pip install httpx
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+      - name: build
+        run: |
+          flutter pub get
+          python windows/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows_build
+          path: build/windows/Venera-*
+
+  Build_Linux:
+    needs: Validate_Version
+    if: ${{ github.event_name == 'release' || inputs.build_linux }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+      - run: |
+          flutter pub get
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libwebkit2gtk-4.1-dev
+          dart pub global activate -s git https://github.com/venera-app/flutter_to_debian.git
+      - run: python3 debian/build.py x64
+      - run: dart run flutter_to_arch
+      - run: |
+          sudo rm -rf build/linux/arch/app.tar.gz
+          sudo rm -rf build/linux/arch/pkg
+          sudo rm -rf build/linux/arch/src
+          sudo rm -rf build/linux/arch/PKGBUILD
+      - name: Build AppImage
+        run: |
+          sudo apt-get install -y libfuse2
+          bash tool/build_appimage.sh x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appimage_build
+          path: build/linux/appimage/Venera-Prime-*.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb_build
+          path: build/linux/x64/release/debian
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch_build
+          path: build/linux/arch/
+
+  Build_Linux_ARM64:
+    needs: Validate_Version
+    if: ${{ github.event_name == 'release' || inputs.build_linux_arm64 }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flutter for ARM64
+        run: |
+          git clone --depth 1 --branch 3.41.4 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+          flutter --version
+      - run: |
+          flutter pub get
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libwebkit2gtk-4.1-dev
+          dart pub global activate -s git https://github.com/venera-app/flutter_to_debian.git
+      - name: "Patch font"
+        run: |
+          dart run patch/font.dart
+      - run: python3 debian/build.py arm64
+      - name: Build AppImage
+        run: |
+          sudo apt-get install -y libfuse2
+          bash tool/build_appimage.sh aarch64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appimage_arm64_build
+          path: build/linux/appimage/Venera-Prime-*.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb_arm64_build
+          path: build/linux/x64/release/debian # This is a bug related to flutter_to_debian, but it's not a big deal.
+
+  Release:
+    runs-on: ubuntu-22.04
+    needs: [Validate_Version, Build_MacOS, Build_IOS, Build_Android, Build_Windows, Build_Linux, Build_Linux_ARM64]
+    if: ${{ always() && (github.event_name == 'release' || inputs.publish_release) && needs.Validate_Version.result == 'success' }}
+    steps:
+      - name: Require successful platform builds
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo '::error::One or more platform builds failed or were canceled. No release will be published.'
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*_build"
+          merge-multiple: true
+          path: outputs
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.Validate_Version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Venera Prime ${{ needs.Validate_Version.outputs.version }}
+          body_path: ${{ needs.Validate_Version.outputs.notes }}
+          files: |
+            outputs/*.ipa
+            outputs/*.dmg
+            outputs/*.apk
+            outputs/*.zip
+            outputs/*.exe
+            outputs/*.deb
+            outputs/*.zst
+            outputs/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  Update_AltStore:
+    runs-on: ubuntu-22.04
+    needs: [Validate_Version, Release]
+    if: ${{ needs.Release.result == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Update AltStore feed from published release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.Validate_Version.outputs.tag }}
+        run: python3 update_alt_store.py
+      - name: Commit AltStore feed as bot
+        run: |
+          if git diff --quiet -- alt_store.json; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add alt_store.json
+          git commit -m 'Update Prime AltStore feed'
+          git push origin HEAD:${{ github.event.repository.default_branch }}

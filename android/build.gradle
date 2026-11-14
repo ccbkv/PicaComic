@@ -9,6 +9,27 @@ allprojects {
     }
 }
 
+// ONNX Runtime 1.23+ routes MLAS matmul/convolution through KleidiAI kernels
+// built for SME2, but the dispatch only tests for SME1. On chips that report
+// SME without usable SME2 the OCR models hit an illegal instruction (SIGILL)
+// the moment inference starts, killing the whole process. Upstream still has
+// the same one-sided check as of 1.28, so hold the runtime at the last release
+// whose arm64 binary carries no SME kernels at all. Revisit once the dispatch
+// checks SME2 before selecting those kernels.
+ext.onnxRuntimeAndroidVersion = "1.22.0"
+
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == "com.microsoft.onnxruntime"
+                    && details.requested.name == "onnxruntime-android") {
+                details.useVersion rootProject.ext.onnxRuntimeAndroidVersion
+                details.because("KleidiAI SME2 kernels crash on SME1-only devices")
+            }
+        }
+    }
+}
+
 rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"

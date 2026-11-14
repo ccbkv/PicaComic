@@ -1,6 +1,7 @@
 package com.github.pacalini.pica_comic
 
 import android.app.Activity
+import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.os.Build
 import android.os.Bundle
@@ -79,6 +80,40 @@ class MainActivity: FlutterFragmentActivity() {
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             else
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            DOWNLOAD_SERVICE_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "start" -> {
+                    val intent = Intent(applicationContext, DownloadForegroundService::class.java).apply {
+                        putExtra(
+                            DownloadForegroundService.EXTRA_TITLE,
+                            call.argument<String>("title") ?: "下载中",
+                        )
+                        putExtra(
+                            DownloadForegroundService.EXTRA_CONTENT,
+                            call.argument<String>("content") ?: "",
+                        )
+                    }
+                    try {
+                        ContextCompat.startForegroundService(applicationContext, intent)
+                        result.success(true)
+                    } catch (error: Exception) {
+                        result.error("start_failed", error.message, null)
+                    }
+                }
+                "stop" -> {
+                    val intent = Intent(applicationContext, DownloadForegroundService::class.java)
+                    val stopped = applicationContext.stopService(intent)
+                    applicationContext.getSystemService(NotificationManager::class.java)
+                        .cancel(DownloadForegroundService.NOTIFICATION_ID)
+                    result.success(stopped)
+                }
+                else -> result.notImplemented()
+            }
         }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger,"pica_comic/playServer").setMethodCallHandler{
@@ -463,6 +498,8 @@ class MainActivity: FlutterFragmentActivity() {
 
     companion object {
         private const val DIRECTORY_CHANNEL = "ezvenera/directory"
+        private const val DOWNLOAD_SERVICE_CHANNEL =
+            "com.github.pacalini.pica_comic/download_service"
         private const val DIRECTORY_REQUEST_CODE = 14021
         private const val STORAGE_PERMISSION_REQUEST_CODE = 14022
     }

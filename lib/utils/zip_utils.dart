@@ -30,7 +30,8 @@ Future<int> extractComicArchive(List<String> paths) async {
         throw const FormatException('Unsafe archive entry');
       }
       totalSize += file.size;
-      if (file.size < 0 || file.size > 256 * 1024 * 1024 ||
+      if (file.size < 0 ||
+          file.size > 256 * 1024 * 1024 ||
           totalSize > 8 * 1024 * 1024 * 1024) {
         throw const FormatException('Archive exceeds extraction size limits');
       }
@@ -133,7 +134,11 @@ class _ArchiveZipWriter implements ZipArchiveWriter {
     if (!file.existsSync()) {
       throw FileSystemException("File not found", sourcePath);
     }
-    _encoder.addFile(file, archivePath);
+    //大文件改为流式存储。
+    final level = file.lengthSync() > 8 * 1024 * 1024
+        ? archive.ZipFileEncoder.STORE
+        : archive.ZipFileEncoder.GZIP;
+    _encoder.addFile(file, archivePath, level);
   }
 
   @override

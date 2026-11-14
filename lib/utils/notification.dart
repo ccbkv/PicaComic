@@ -1,11 +1,40 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/pages/downloading_page.dart';
 import '../foundation/app.dart';
 
 class Notifications {
+  static const _downloadServiceChannel =
+      MethodChannel('com.github.pacalini.pica_comic/download_service');
+
   FlutterLocalNotificationsPlugin? flutterLocalNotificationsPlugin;
   final progressId = 72382;
+  bool _androidDownloadServiceRequested = false;
+
+  Future<void> _startAndroidDownloadService(
+      String title, String content) async {
+    if (!App.isAndroid || _androidDownloadServiceRequested) return;
+    _androidDownloadServiceRequested = true;
+    try {
+      await _downloadServiceChannel.invokeMethod('start', {
+        'title': title,
+        'content': content,
+      });
+    } catch (_) {
+      _androidDownloadServiceRequested = false;
+    }
+  }
+
+  Future<void> _stopAndroidDownloadService() async {
+    if (!App.isAndroid) return;
+    _androidDownloadServiceRequested = false;
+    try {
+      await _downloadServiceChannel.invokeMethod('stop');
+    } catch (_) {
+      // 保留原有本地通知行为，服务停止失败不影响下载任务状态。
+    }
+  }
 
   Future<bool?> requestPermission() async {
     try {
@@ -65,6 +94,7 @@ class Notifications {
   void sendProgressNotification(
       int progress, int total, String title, String content) async {
     if (!(App.isAndroid || App.isIOS)) return;
+    await _startAndroidDownloadService(title, content);
     AndroidNotificationDetails androidNotificationDetails =
         AndroidNotificationDetails('download', '下载漫画'.tl,
             channelDescription: '显示下载进度'.tl,
@@ -77,7 +107,9 @@ class Notifications {
             onlyAlertOnce: true,
             autoCancel: false);
     DarwinNotificationDetails ios = const DarwinNotificationDetails(
-        presentSound: false, presentAlert: false, presentBadge: false,
+        presentSound: false,
+        presentAlert: false,
+        presentBadge: false,
         presentBanner: false);
     NotificationDetails notificationDetails =
         NotificationDetails(android: androidNotificationDetails, iOS: ios);
@@ -88,7 +120,11 @@ class Notifications {
 
   void endProgress() async {
     if (!(App.isAndroid || App.isIOS)) return;
-    await flutterLocalNotificationsPlugin!.cancel(progressId);
+    try {
+      await flutterLocalNotificationsPlugin!.cancel(progressId);
+    } finally {
+      await _stopAndroidDownloadService();
+    }
   }
 
   void cancelAll() async {
@@ -98,6 +134,7 @@ class Notifications {
     } catch (e) {
       // ignore
     }
+    await _stopAndroidDownloadService();
   }
 
   void sendNotification(String title, String content) async {

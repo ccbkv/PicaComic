@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:math';
 
 import 'package:dio/dio.dart';
@@ -68,6 +69,7 @@ class ImageManager {
     await wait(url);
     loadingItems[url] = DownloadProgress(0, 1, url, "");
     CachingFile? caching;
+    var countedEhgt = false;
 
     try {
       final key = url;
@@ -94,12 +96,14 @@ class ImageManager {
       if (realUrl.contains("ehgt.org")) {
         if (ehgtLoading < 3) {
           ehgtLoading++;
+          countedEhgt = true;
           await Future.delayed(const Duration(milliseconds: 10));
         } else {
           while (ehgtLoading > 2) {
             await Future.delayed(const Duration(milliseconds: 200));
           }
           ehgtLoading++;
+          countedEhgt = true;
         }
       }
       var dioRes = await dio.get<ResponseBody>(realUrl,
@@ -108,7 +112,7 @@ class ImageManager {
       if (dioRes.data == null) {
         throw Exception("Empty Data");
       }
-      List<int> imageData = [];
+      final imageData = BytesBuilder();
       int? expectedBytes;
       try {
         expectedBytes =
@@ -117,7 +121,7 @@ class ImageManager {
         //忽略
       }
       await for (var res in dioRes.data!.stream) {
-        imageData.addAll(res);
+        imageData.add(res);
         await cachingFile.writeBytes(res);
         var progress = DownloadProgress(imageData.length,
             (expectedBytes ?? imageData.length + 1), url, savePath);
@@ -127,12 +131,13 @@ class ImageManager {
       await cachingFile.close();
       var ext = getExt(dioRes);
       CacheManager().setType(key, ext);
+      var length = imageData.length;
       yield DownloadProgress(
-        imageData.length,
-        imageData.length,
+        length,
+        length,
         url,
         savePath,
-        Uint8List.fromList(imageData),
+        imageData.takeBytes(),
         ext,
       );
     } catch (e, s) {
@@ -146,9 +151,11 @@ class ImageManager {
       }
       rethrow;
     } finally {
-      if (url.contains("ehgt.org") || url.contains("s.exhentai.org")) {
+      if (countedEhgt) {
         ehgtLoading--;
       }
+      // Also runs when the listener cancels: drop the partial file.
+      caching?.cancel();
       loadingItems.remove(url);
     }
   }
@@ -252,7 +259,7 @@ class ImageManager {
       var imgKey = readerLink.split('/')[4];
 
       int totalBytes = 0;
-      List<int> data = [];
+      final data = BytesBuilder();
 
       if (gallery.auth?["mpvKey"] != null) {
         Future<(String image, String nl)> getImageFromApi([String? nl]) async {
@@ -398,7 +405,7 @@ class ImageManager {
             await for (var b in stream) {
               await cachingFile.writeBytes(b);
               currentBytes += b.length;
-              data.addAll(b);
+              data.add(b);
               var progress = DownloadProgress(
                 currentBytes,
                 expectedBytes + 1,
@@ -432,14 +439,15 @@ class ImageManager {
       }
 
       await cachingFile.close();
-      var ext = detectFileType(data).ext.replaceFirst(('.'), '');
+      var bytes = data.takeBytes();
+      var ext = detectFileType(bytes).ext.replaceFirst(('.'), '');
       CacheManager().setType(key, ext);
       yield DownloadProgress(
         totalBytes,
         totalBytes,
         cacheKey,
         savePath,
-        Uint8List.fromList(data),
+        bytes,
         ext,
       );
     } catch (e, s) {
@@ -453,6 +461,8 @@ class ImageManager {
       }
       rethrow;
     } finally {
+      // Also runs when the listener cancels: drop the partial file.
+      caching?.cancel();
       loadingItems.remove(cacheKey);
     }
   }
@@ -509,9 +519,9 @@ class ImageManager {
         }
       }
       var currentBytes = 0;
-      var data = <int>[];
+      final data = BytesBuilder();
       await for (var b in stream) {
-        data.addAll(b);
+        data.add(b);
         await cachingFile.writeBytes(b);
         currentBytes += b.length;
         var progress = DownloadProgress(
@@ -522,8 +532,8 @@ class ImageManager {
       await cachingFile.close();
       var ext = getExt(res);
       CacheManager().setType(key, ext);
-      yield DownloadProgress(currentBytes, currentBytes, url, savePath,
-          Uint8List.fromList(data), ext);
+      yield DownloadProgress(
+          currentBytes, currentBytes, url, savePath, data.takeBytes(), ext);
     } catch (e) {
       caching?.cancel();
       if (e is DioException && e.type == DioExceptionType.badResponse) {
@@ -534,6 +544,8 @@ class ImageManager {
       }
       rethrow;
     } finally {
+      // Also runs when the listener cancels: drop the partial file.
+      caching?.cancel();
       loadingItems.remove(image.hash);
     }
   }
@@ -565,30 +577,27 @@ class ImageManager {
 
       var dio = logDio();
 
-      var bytes = <int>[];
+      final received = BytesBuilder();
       String? ext;
       try {
-        var res = await dio.get<ResponseBody>(
-            url,
+        var res = await dio.get<ResponseBody>(url,
             options: Options(
-                responseType: ResponseType.stream,
-                headers: getImgHeaders()
-            )
-        );
+                responseType: ResponseType.stream, headers: getImgHeaders()));
         ext = getExt(res);
         var stream = res.data!.stream;
         await for (var b in stream) {
           //不直接写入文件, 因为需要对图片进行重组, 处理完成后再写入
-          bytes.addAll(b);
+          received.add(b);
           //构建虚假的进度条, 因为无法获取jm文件大小
-          var total = max(1 << 20, bytes.length + 1);
-          var progress = DownloadProgress(bytes.length, total, url, savePath);
+          var total = max(1 << 20, received.length + 1);
+          var progress = DownloadProgress(received.length, total, url, savePath);
           yield progress;
           loadingItems[urlWithoutParam] = progress;
         }
       } catch (e) {
         rethrow;
       }
+      var bytes = received.takeBytes();
       var progress = DownloadProgress(
         bytes.length,
         (bytes.length / 0.75).toInt(),
@@ -599,7 +608,7 @@ class ImageManager {
       loadingItems[urlWithoutParam] = progress;
       if (url.split('.').last != "gif") {
         bytes = await startRecombineAndWriteImage(
-            Uint8List.fromList(bytes), epsId, scrambleId, bookId, savePath);
+            bytes, epsId, scrambleId, bookId, savePath);
       }
       await cachingFile.writeBytes(bytes);
       await cachingFile.close();
@@ -609,7 +618,7 @@ class ImageManager {
         bytes.length,
         url,
         savePath,
-        Uint8List.fromList(bytes),
+        bytes,
         ext,
       );
       yield progress;
@@ -623,6 +632,8 @@ class ImageManager {
       }
       rethrow;
     } finally {
+      // Also runs when the listener cancels: drop the partial file.
+      caching?.cancel();
       loadingItems.remove(urlWithoutParam);
     }
   }
@@ -664,7 +675,7 @@ class ImageManager {
               headers: config['headers'] ?? {'user-agent': webUA},
               responseType: ResponseType.stream));
 
-      List<int> imageData = [];
+      final imageData = BytesBuilder();
 
       int? expectedBytes = res.data!.contentLength;
       if (expectedBytes == -1) {
@@ -677,7 +688,7 @@ class ImageManager {
         if (!shouldModifyData) {
           await caching.writeBytes(data);
         }
-        imageData.addAll(data);
+        imageData.add(data);
         var progress = DownloadProgress(
           imageData.length,
           shouldModifyData
@@ -693,7 +704,7 @@ class ImageManager {
       Uint8List? result;
 
       if (shouldModifyData) {
-        var data = Uint8List.fromList(imageData);
+        var data = imageData.toBytes();
         imageData.clear();
         if (config['onResponse'] != null) {
           final callback = config['onResponse'] as JSInvokable;
@@ -722,7 +733,7 @@ class ImageManager {
         length,
         url,
         savePath,
-        result ?? Uint8List.fromList(imageData),
+        result ?? imageData.takeBytes(),
         ext,
       );
     } catch (e) {
@@ -735,6 +746,8 @@ class ImageManager {
       }
       rethrow;
     } finally {
+      // Also runs when the listener cancels: drop the partial file.
+      caching?.cancel();
       (config['onResponse'] as JSInvokable?)?.free();
       loadingItems.remove(cacheKey);
     }
@@ -753,8 +766,8 @@ class ImageManager {
     });
   }
 
-  Stream<DownloadProgress> getCustomThumbnail(
-      String url, String sourceKey, [Map<String, String>? headers]) async* {
+  Stream<DownloadProgress> getCustomThumbnail(String url, String sourceKey,
+      [Map<String, String>? headers]) async* {
     var cacheKey = "$sourceKey$url";
     await wait(cacheKey);
     loadingItems[cacheKey] = DownloadProgress(0, 1, cacheKey, "");
@@ -792,7 +805,7 @@ class ImageManager {
               headers: config['headers'] ?? {'user-agent': webUA},
               responseType: ResponseType.stream));
 
-      List<int> imageData = [];
+      final imageData = BytesBuilder();
 
       int? expectedBytes = res.data!.contentLength;
       if (expectedBytes == -1) {
@@ -805,7 +818,7 @@ class ImageManager {
         if (!shouldModifyData) {
           await caching.writeBytes(data);
         }
-        imageData.addAll(data);
+        imageData.add(data);
         var progress = DownloadProgress(imageData.length,
             expectedBytes ?? (imageData.length + 1), url, savePath);
         yield progress;
@@ -815,8 +828,7 @@ class ImageManager {
       Uint8List? result;
 
       if (shouldModifyData) {
-        var data = (config['onResponse']
-            as JSInvokable)(Uint8List.fromList(imageData));
+        var data = (config['onResponse'] as JSInvokable)(imageData.toBytes());
         imageData.clear();
         if (data is! Uint8List) {
           throw "Invalid Config: onImageLoad.onResponse return invalid type\n"
@@ -829,7 +841,7 @@ class ImageManager {
 
       await caching.close();
       yield DownloadProgress(
-          1, 1, url, savePath, result ?? Uint8List.fromList(imageData));
+          1, 1, url, savePath, result ?? imageData.takeBytes());
     } catch (e) {
       Log.error("Network", "Failed to load a image:\nUrl:$url\nError:$e");
       caching?.cancel();
@@ -841,6 +853,8 @@ class ImageManager {
       }
       rethrow;
     } finally {
+      // Also runs when the listener cancels: drop the partial file.
+      caching?.cancel();
       loadingItems.remove(cacheKey);
     }
   }

@@ -59,7 +59,7 @@ class ScrollManager {
       if (value.dy < 0 && logic.isAtChapterEnd) {
         logic.jumpToNextChapter();
       } else if (value.dy > 0 && logic.isAtChapterStart) {
-        logic.jumpToLastChapter();
+        logic.jumpToLastChapter(jumpToLast: true);
       }
       return;
     }

@@ -211,7 +211,7 @@ extension ImageExt on ComicReadingPage {
               logic.jumpByDeviceType(1);
               return;
             }
-            logic.jumpToLastChapter();
+            logic.jumpToLastChapter(jumpToLast: true);
           } else if (i == logic.urls.length + 1 + extraPage) {
             if (!logic.data.hasEp) {
               logic.jumpByDeviceType(i - 1);
@@ -309,7 +309,7 @@ extension ImageExt on ComicReadingPage {
               logic.pageController.jumpByDeviceType(1);
               return;
             }
-            logic.jumpToLastChapter();
+            logic.jumpToLastChapter(jumpToLast: true);
           } else if (i == calcItemCount() - 1) {
             if (!logic.data.hasEp || logic.order == logic.data.eps?.length) {
               logic.pageController
@@ -373,7 +373,7 @@ extension ImageExt on ComicReadingPage {
             return;
           }
           if (pointerSignal.scrollDelta.dy < 0 && logic.isAtChapterStart) {
-            logic.jumpToLastChapter();
+            logic.jumpToLastChapter(jumpToLast: true);
             return;
           }
           if ((logic.scrollController.position.pixels <=
@@ -405,7 +405,7 @@ extension ImageExt on ComicReadingPage {
                 return;
               }
               if (event.panDelta.dy > 0 && logic.isAtChapterStart) {
-                logic.jumpToLastChapter();
+                logic.jumpToLastChapter(jumpToLast: true);
                 return;
               }
               logic.scrollController.smoothTo(0 - event.panDelta.dy * 1.2);

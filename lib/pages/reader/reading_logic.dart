@@ -273,7 +273,7 @@ class ComicReadingPageLogic extends StateController {
 
   void jumpToLastPage() {
     if (isAtChapterStart) {
-      jumpToLastChapter();
+      jumpToLastChapter(jumpToLast: true);
       return;
     }
     if (readingMethod.index < 3) {
@@ -354,7 +354,7 @@ class ComicReadingPageLogic extends StateController {
     update();
   }
 
-  void jumpToLastChapter() {
+  void jumpToLastChapter({bool jumpToLast = false}) {
     if (order == 1 || !data.hasEp) {
       if (readingMethod != ReadingMethod.topToBottomContinuously) {
         jumpByDeviceType(1);
@@ -375,7 +375,7 @@ class ComicReadingPageLogic extends StateController {
     index = 1;
     requestedLoadingItems = [];
     clearPhotoViewControllers();
-    jumpToLastPageOnChapterLoad = true;
+    jumpToLastPageOnChapterLoad = jumpToLast;
     update();
   }
 

@@ -43,6 +43,12 @@ class DebugPageState extends State<DebugPage> {
             },
             actionTitle: '打开'.tl,
           ),
+          SwitchSetting(
+            title: "忽略证书错误".tl,
+            icon: const Icon(Icons.security),
+            settingsIndex: 106,
+          ),
+
           const SizedBox(height: 8),
           const Text(
             "JS Evaluator",

@@ -89,6 +89,19 @@ part 'translation_prompt_settings.dart';
 part 'translation_languages_settings.dart';
 part 'ai_translation_settings.dart';
 
+Future<void> _launchGroup() async {
+  try {
+    final response = await logDio().get<String>(kGroupUrl);
+    final groupUrl = response.data?.trim();
+    if (groupUrl == null || groupUrl.isEmpty) {
+      throw const FormatException("Group URL is empty");
+    }
+    await AppUrlLauncher.launchExternalUrl(groupUrl);
+  } catch (e) {
+    showToast(message: "${"获取群聊地址失败".tl}: $e");
+  }
+}
+
 String get _platformName {
   if (Platform.isIOS) {
     return "iOS版";
@@ -1405,6 +1418,12 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           onPressed: () => AppUrlLauncher.launchExternalUrl(kProjectIssuesUrl),
           trailing: const Icon(Icons.open_in_new),
         ),
+         fluent.ListTile(
+           leading: const Icon(Icons.telegram),
+           title: Text("加入群组群聊".tl),
+           onPressed: _launchGroup,
+           trailing: const Icon(Icons.open_in_new),
+         ),        
       ],
     );
   }
@@ -2760,13 +2779,12 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         //       mode: LaunchMode.externalApplication),
         //   trailing: const Icon(Icons.arrow_right),
         // ),
-        // ListTile(
-        //   leading: const Icon(Icons.telegram),
-        //   title: Text("JOIN_GROUP_PLACEHOLDER".tl),
-        //   onTap: () => launchUrlString("https://t.me/example",
-        //       mode: LaunchMode.externalApplication),
-        //   trailing: const Icon(Icons.arrow_right),
-        // ),
+         ListTile(
+           leading: const Icon(Icons.telegram),
+           title: Text("加入群组群聊".tl),
+           onTap: _launchGroup,
+           trailing: const Icon(Icons.open_in_new),
+         ),
         Padding(
             padding:
                 EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))

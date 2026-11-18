@@ -293,9 +293,9 @@ class DownloadManager with _DownloadDb implements Listenable {
   }
 
   String generateId(String source, String id) {
-    var comicSource = ComicSource.find(source)!;
-    if (comicSource.matchBriefIdReg != null) {
-      id = RegExp(comicSource.matchBriefIdReg!).firstMatch(id)!.group(1)!;
+    var comicSource = ComicSource.find(source);
+    if (comicSource?.matchBriefIdReg != null) {
+      id = RegExp(comicSource!.matchBriefIdReg!).firstMatch(id)!.group(1)!;
     }
     return switch (source) {
       'picacg' => id,

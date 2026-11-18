@@ -135,8 +135,7 @@ class Appdata {
     "0", //103 液态玻璃底部导航栏
     "0", //104 下载漫画时保存普通评论
     "0", //105 使用 Codeberg 代替 GitHub
-
-    
+    "0", //106 忽略证书错误
   ];
 
   /// 隐式数据, 用于存储一些不需要用户设置的数据, 此数据通常为某些组件的状态, 此设置不应当被同步
@@ -305,8 +304,7 @@ class Appdata {
       try {
         var externalDirectory = await getExternalStorageDirectory();
         if (externalDirectory != null) {
-          var file =
-              File("${externalDirectory.path}/lastComicSourceCheck.txt");
+          var file = File("${externalDirectory.path}/lastComicSourceCheck.txt");
           if (await file.exists()) {
             var content = await file.readAsString();
             return int.tryParse(content);
@@ -328,8 +326,7 @@ class Appdata {
       try {
         var externalDirectory = await getExternalStorageDirectory();
         if (externalDirectory != null) {
-          var file =
-              File("${externalDirectory.path}/lastComicSourceCheck.txt");
+          var file = File("${externalDirectory.path}/lastComicSourceCheck.txt");
           if (!await file.exists()) {
             await file.create();
           }
@@ -441,8 +438,8 @@ class Appdata {
   }
 
   Future<void> readImplicitData() async {
-    translationImplicitData = await _readTranslationMap(
-        'image_translation_implicit_data.json');
+    translationImplicitData =
+        await _readTranslationMap('image_translation_implicit_data.json');
     if (Platform.isAndroid) {
       try {
         var externalDirectory = await getExternalStorageDirectory();

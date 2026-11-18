@@ -30,6 +30,9 @@ String get kComicSourceHelpUrl => _useCodeberg
 String get kHtApiListUrl => _useCodeberg
     ? "https://codeberg.org/ccbkv/PicaComicapitxt/raw/branch/main/htmanga_api_list.txt"
     : "https://raw.githubusercontent.com/ccbkv/PicaComicapitxt/refs/heads/main/htmanga_api_list.txt";
+String get kGroupUrl => _useCodeberg
+    ? "https://codeberg.org/ccbkv/PicaComicapitxt/raw/branch/main/group"
+    : "https://raw.githubusercontent.com/ccbkv/PicaComicapitxt/refs/heads/main/group";
 
 String resolveComicSourceUrl(String url) {
   if (_useCodeberg && url.startsWith(_githubComicSourceRepositoryUrl)) {

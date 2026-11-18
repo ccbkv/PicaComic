@@ -99,6 +99,7 @@ class MainActivity: FlutterFragmentActivity() {
                         )
                     }
                     try {
+                        DownloadForegroundService.stopRequested = false
                         ContextCompat.startForegroundService(applicationContext, intent)
                         result.success(true)
                     } catch (error: Exception) {
@@ -107,7 +108,12 @@ class MainActivity: FlutterFragmentActivity() {
                 }
                 "stop" -> {
                     val intent = Intent(applicationContext, DownloadForegroundService::class.java)
-                    val stopped = applicationContext.stopService(intent)
+                    DownloadForegroundService.stopRequested = true
+                    val stopped = if (DownloadForegroundService.isRunning) {
+                        applicationContext.stopService(intent)
+                    } else {
+                        true
+                    }
                     applicationContext.getSystemService(NotificationManager::class.java)
                         .cancel(DownloadForegroundService.NOTIFICATION_ID)
                     result.success(stopped)

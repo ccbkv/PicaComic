@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart' as archive;
 import 'package:collection/collection.dart';
+import 'package:path/path.dart' as p;
 import 'package:zip_flutter/zip_flutter.dart' as zip_flutter;
 
 import '../foundation/platform_utils.dart';
@@ -68,11 +69,14 @@ Future<int> extractComicArchive(List<String> paths) async {
 }
 
 ZipArchiveWriter createPortableZipWriter(String outputPath) {
-  return _ArchiveZipWriter(outputPath);
+  if (PlatformUtils.isOhos) {
+    return _ArchiveZipWriter(outputPath);
+  }
+  return _ZipFlutterWriter(outputPath);
 }
 
 ZipArchiveWriter createZipWriter(String outputPath) {
-  if (PlatformUtils.isOhos || Platform.isWindows) {
+  if (PlatformUtils.isOhos) {
     return _ArchiveZipWriter(outputPath);
   }
   return _ZipFlutterWriter(outputPath);
@@ -101,7 +105,26 @@ Future<void> extractZipFile(String zipFilePath, String destinationDir) async {
     await extractPortableZipFile(zipFilePath, destinationDir);
     return;
   }
-  zip_flutter.ZipFile.openAndExtract(zipFilePath, destinationDir);
+  Directory(destinationDir).createSync(recursive: true);
+  final zip = zip_flutter.ZipFile.openRead(zipFilePath);
+  try {
+    final root = p.normalize(Directory(destinationDir).absolute.path);
+    for (var i = 0; i < zip.entriesCount; i++) {
+      final entry = zip.getEntryByIndex(i);
+      if (entry.name.isEmpty) continue;
+      final target = p.normalize(p.join(root, entry.name));
+      if (!p.isWithin(root, target)) {
+        throw const FormatException('Archive entry escapes target directory');
+      }
+      if (entry.isDir) {
+        Directory(target).createSync(recursive: true);
+      } else {
+        entry.writeToFile(target);
+      }
+    }
+  } finally {
+    zip.close();
+  }
 }
 
 class _ZipFlutterWriter implements ZipArchiveWriter {
@@ -112,7 +135,23 @@ class _ZipFlutterWriter implements ZipArchiveWriter {
 
   @override
   void addFile(String archivePath, String sourcePath) {
-    _zipFile.addFile(archivePath, sourcePath);
+    final needsAsciiPath = Platform.isWindows &&
+        sourcePath.codeUnits.any((codeUnit) => codeUnit > 0x7f);
+    if (!needsAsciiPath) {
+      _zipFile.addFile(archivePath, sourcePath);
+      return;
+    }
+
+    // zip_flutter stats source files through a narrow-character path on
+    // Windows. Let it read an ASCII temporary copy while retaining archivePath.
+    final tempDir = Directory.systemTemp.createTempSync('pica_comic_zip_');
+    try {
+      final tempPath = p.join(tempDir.path, 'input${p.extension(sourcePath)}');
+      File(sourcePath).copySync(tempPath);
+      _zipFile.addFile(archivePath, tempPath);
+    } finally {
+      tempDir.deleteSync(recursive: true);
+    }
   }
 
   @override
@@ -134,11 +173,8 @@ class _ArchiveZipWriter implements ZipArchiveWriter {
     if (!file.existsSync()) {
       throw FileSystemException("File not found", sourcePath);
     }
-    //大文件改为流式存储。
-    final level = file.lengthSync() > 8 * 1024 * 1024
-        ? archive.ZipFileEncoder.STORE
-        : archive.ZipFileEncoder.GZIP;
-    _encoder.addFile(file, archivePath, level);
+    // archive 3.6.1 的 GZIP 会将整个文件读入内存，STORE 始终分块写入。
+    _encoder.addFile(file, archivePath, archive.ZipFileEncoder.STORE);
   }
 
   @override

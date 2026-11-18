@@ -146,6 +146,8 @@ extension ReadComic on DownloadedItem {
             data.title,
             ComicSource.find(comic.sourceKey),
             comic.chapters,
+            sourceKey: comic.sourceKey,
+            downloadId: comic.id,
           ),
           ep == null ? history.page : 0,
           ep ?? history.ep,
@@ -2442,7 +2444,9 @@ class _DownloadedComicInfoViewState extends State<DownloadedComicInfoView>
   void initState() {
     super.initState();
     _initFromStored();
-    _fetchLatestEps();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fetchLatestEps();
+    });
   }
 
   /// 从已存储的下载项初始化章节信息

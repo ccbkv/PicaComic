@@ -464,12 +464,20 @@ class CustomReadingData extends ReadingData {
     this._chapters, {
     this.historySubTitle = '',
     this.historyCover = '',
-  });
+    String? sourceKey,
+    String? downloadId,
+  })  : _sourceKey = sourceKey ?? source?.key ?? '',
+        _downloadId = downloadId;
 
   final ComicSource? source;
 
+  final String _sourceKey;
+
+  final String? _downloadId;
+
   @override
-  String get downloadId => DownloadManager().generateId(sourceKey, id);
+  String get downloadId =>
+      _downloadId ?? DownloadManager().generateId(sourceKey, id);
 
   final ComicChapters? _chapters;
 
@@ -513,7 +521,7 @@ class CustomReadingData extends ReadingData {
   }
 
   @override
-  String get sourceKey => source?.key ?? "";
+  String get sourceKey => _sourceKey;
 
   @override
   ComicType get type => ComicType.other;

@@ -594,7 +594,7 @@ Future<bool> importData([String? filePath]) async {
   try {
     data = await compute<List<String>, String>((data) async {
       var path = data[0];
-      await extractPortableZipFile(data[1], "$path/dataTemp");
+      await extractZipFile(data[1], "$path/dataTemp");
       _flattenExtractedRoot("$path/dataTemp");
       var downloadPath = Directory(data[2]);
       List<FileSystemEntity> contents = Directory("$path/dataTemp").listSync();

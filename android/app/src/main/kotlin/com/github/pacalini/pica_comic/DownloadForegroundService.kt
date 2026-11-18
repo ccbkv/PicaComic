@@ -13,6 +13,8 @@ class DownloadForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        isRunning = false
+        stopRequested = false
         stopForeground(true)
         super.onDestroy()
     }
@@ -21,6 +23,10 @@ class DownloadForegroundService : Service() {
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "下载中"
         val content = intent?.getStringExtra(EXTRA_CONTENT) ?: ""
         startForeground(NOTIFICATION_ID, createNotification(title, content))
+        isRunning = true
+        if (stopRequested) {
+            stopSelf()
+        }
         return START_NOT_STICKY
     }
 
@@ -69,5 +75,12 @@ class DownloadForegroundService : Service() {
         const val NOTIFICATION_ID = 72382
         const val EXTRA_TITLE = "title"
         const val EXTRA_CONTENT = "content"
+
+        @Volatile
+        var isRunning = false
+            private set
+
+        @Volatile
+        var stopRequested = false
     }
 }

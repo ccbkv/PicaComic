@@ -38,6 +38,8 @@ class ComicReadingPageLogic extends StateController {
 
   var photoViewControllers = <int, PhotoViewController>{};
 
+  final imageStates = <State<ComicImage>>{};
+
   ListenVolumeController? listenVolume;
 
   ScrollManager? scrollManager;

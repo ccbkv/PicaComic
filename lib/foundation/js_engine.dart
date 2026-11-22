@@ -279,6 +279,8 @@ class JsEngine with _JSEngineApi {
             {
               return handleCookieCallback(Map.from(message));
             }
+          case "getLocale":
+            return "${App.locale.languageCode}_${App.locale.countryCode}";
           case "compute":
             {
               final func = message["function"];

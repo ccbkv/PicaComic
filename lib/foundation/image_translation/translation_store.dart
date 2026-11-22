@@ -92,6 +92,12 @@ class StoredTranslationComic {
 typedef _TranslationStoreSnapshot = ({
   List<List<Object?>> pages,
   List<List<Object?>> chapters,
+  List<List<Object?>> pageCounts,
+});
+
+typedef _TranslationMergeResult = ({
+  int applied,
+  bool pageCountsChanged,
 });
 
 class _TranslationPageSnapshot {
@@ -99,6 +105,22 @@ class _TranslationPageSnapshot {
 
   final Object? regions;
   final int? time;
+}
+
+class _ChapterPageCountSnapshot {
+  const _ChapterPageCountSnapshot(
+    this.sourceKey,
+    this.comicId,
+    this.chapterId,
+    this.totalPages,
+    this.updatedAt,
+  );
+
+  final String sourceKey;
+  final String comicId;
+  final String chapterId;
+  final int totalPages;
+  final int updatedAt;
 }
 
 class TranslationStore with ChangeNotifier {
@@ -112,6 +134,7 @@ class TranslationStore with ChangeNotifier {
 
   final _pages = <String, _TranslationPageSnapshot>{};
   final _chapterIndex = <String, StoredTranslationChapter>{};
+  final _pageCounts = <String, _ChapterPageCountSnapshot>{};
   var _snapshotVersion = 0;
 
   Timer? _notifyTimer;
@@ -124,6 +147,7 @@ class TranslationStore with ChangeNotifier {
     final snapshot = await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
       db.execute(_createTableSql);
       db.execute(_createIndexTableSql);
+      db.execute(_createPageCountTableSql);
       migrateSchema(db);
       migrateLegacyKeys(db);
       _backfillChapterIndex(db);
@@ -145,17 +169,20 @@ class TranslationStore with ChangeNotifier {
       throw StateError("TranslationStore is not initialized; cannot merge");
     }
     var merged = 0;
+    var pageCountsChanged = false;
     try {
-      merged = await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+      final result = await DatabaseGateway.instance.isolateOp(_dbPath, (db) {
         return withDatabase(sourcePath, mode: OpenMode.readOnly, (src) {
           return _mergeDatabases(db, src);
         });
       });
+      merged = result.applied;
+      pageCountsChanged = result.pageCountsChanged;
       await _refreshSnapshot();
     } catch (e, s) {
       Log.error("TranslationStore", "merge failed: $e\n$s");
     }
-    if (merged > 0 && isInitialized) _notifyChanged();
+    if ((merged > 0 || pageCountsChanged) && isInitialized) _notifyChanged();
     return merged;
   }
 
@@ -211,18 +238,37 @@ class TranslationStore with ChangeNotifier {
     'updated_at',
   };
 
+  // Source page totals are independent of translation language and saved pages.
+  static const _createPageCountTableSql = '''
+    create table if not exists chapter_page_count (
+      source_key text not null,
+      comic_id text not null,
+      chapter_id text not null,
+      total_pages int not null,
+      updated_at int not null,
+      primary key (source_key, comic_id, chapter_id)
+    );
+  ''';
+
+  static const _pageCountColumns = {
+    'source_key',
+    'comic_id',
+    'chapter_id',
+    'total_pages',
+    'updated_at',
+  };
+
   /// Columns a foreign database must have for [mergeFrom] to read it.
   static const _requiredColumns = ["cache_key", "regions", "time"];
 
-  static int _mergeDatabases(Database db, Database src) {
+  static _TranslationMergeResult _mergeDatabases(Database db, Database src) {
     final cols = src
         .select("PRAGMA table_info(translated_page);")
         .map((c) => c["name"] as String)
         .toSet();
-    if (!_requiredColumns.every(cols.contains)) return 0;
-    final rows = src.select(
-      "select cache_key, regions, time from translated_page;",
-    );
+    final rows = _requiredColumns.every(cols.contains)
+        ? src.select("select cache_key, regions, time from translated_page;")
+        : const <Row>[];
     final indexColumns = src
         .select("PRAGMA table_info(translated_chapter_index);")
         .map((c) => c["name"] as String)
@@ -230,9 +276,40 @@ class TranslationStore with ChangeNotifier {
     final indexRows = _indexColumns.every(indexColumns.contains)
         ? src.select("select * from translated_chapter_index;")
         : null;
+    final pageCountColumns = src
+        .select("PRAGMA table_info(chapter_page_count);")
+        .map((c) => c["name"] as String)
+        .toSet();
+    final pageCountRows = _pageCountColumns.every(pageCountColumns.contains)
+        ? src.select("select * from chapter_page_count;")
+        : const <Row>[];
     var merged = 0;
+    var pageCountsChanged = false;
     db.execute("BEGIN TRANSACTION;");
     try {
+      for (final row in pageCountRows) {
+        final source = row['source_key'];
+        final comic = row['comic_id'];
+        final chapter = row['chapter_id'];
+        final total = row['total_pages'];
+        final time = row['updated_at'];
+        if (source is String &&
+            comic is String &&
+            chapter is String &&
+            total is int &&
+            total > 0 &&
+            time is int) {
+          final changed = _writeChapterPageCount(
+            db,
+            source,
+            comic,
+            chapter,
+            total,
+            time,
+          );
+          pageCountsChanged = changed || pageCountsChanged;
+        }
+      }
       for (final row in rows) {
         db.execute(_insertIgnoreSql, [
           row["cache_key"],
@@ -269,7 +346,7 @@ class TranslationStore with ChangeNotifier {
       db.execute("ROLLBACK;");
       rethrow;
     }
-    return merged;
+    return (applied: merged, pageCountsChanged: pageCountsChanged);
   }
 
   static _TranslationStoreSnapshot _readSnapshot(Database db) {
@@ -306,7 +383,22 @@ class TranslationStore with ChangeNotifier {
           ],
         )
         .toList();
-    return (pages: pages, chapters: chapters);
+    final pageCounts = db
+        .select(
+          'select source_key, comic_id, chapter_id, total_pages, updated_at '
+          'from chapter_page_count;',
+        )
+        .map(
+          (row) => <Object?>[
+            row['source_key'],
+            row['comic_id'],
+            row['chapter_id'],
+            row['total_pages'],
+            row['updated_at'],
+          ],
+        )
+        .toList();
+    return (pages: pages, chapters: chapters, pageCounts: pageCounts);
   }
 
   /// Generation 1 keys carry no generation segment (`pageTranslation@ja>zh@…`),
@@ -540,6 +632,98 @@ class TranslationStore with ChangeNotifier {
       }
     }
     return (pages, updatedAt ?? 0);
+  }
+
+  static String _pageCountKey(
+    String sourceKey,
+    String comicId,
+    String chapterId,
+  ) =>
+      '$sourceKey\u0000$comicId\u0000$chapterId';
+
+  Map<String, int> chapterPageCounts(String sourceKey, String comicId) {
+    if (!isInitialized) return const {};
+    return {
+      for (final count in _pageCounts.values)
+        if (count.sourceKey == sourceKey && count.comicId == comicId)
+          count.chapterId: count.totalPages,
+    };
+  }
+
+  bool hasTranslationsForComic(String sourceKey, String comicId) =>
+      isInitialized &&
+      _chapterIndex.values.any(
+        (chapter) =>
+            chapter.identity.sourceKey == sourceKey &&
+            chapter.identity.comicId == comicId &&
+            chapter.pageCount > 0,
+      );
+
+  /// Records a complete page list, never the number of cached or translated pages.
+  bool recordChapterPageCount(
+    String sourceKey,
+    String comicId,
+    String chapterId,
+    int totalPages, {
+    int? updatedAt,
+  }) {
+    if (!isInitialized || totalPages <= 0) return false;
+    final timestamp = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
+    final key = _pageCountKey(sourceKey, comicId, chapterId);
+    final previous = _pageCounts[key];
+    if (previous != null && previous.updatedAt >= timestamp) return false;
+    final changed = previous == null || previous.totalPages != totalPages;
+    _pageCounts[key] = _ChapterPageCountSnapshot(
+      sourceKey,
+      comicId,
+      chapterId,
+      totalPages,
+      timestamp,
+    );
+    _snapshotVersion++;
+    _trackWrite(
+      DatabaseGateway.instance.isolateOp(_dbPath, (db) {
+        _writeChapterPageCount(
+          db,
+          sourceKey,
+          comicId,
+          chapterId,
+          totalPages,
+          timestamp,
+        );
+      }),
+      'recordChapterPageCount',
+    );
+    if (changed) _notifyChanged();
+    return changed;
+  }
+
+  static bool _writeChapterPageCount(
+    Database db,
+    String sourceKey,
+    String comicId,
+    String chapterId,
+    int totalPages,
+    int updatedAt,
+  ) {
+    final previous = db.select(
+      'select total_pages from chapter_page_count '
+      'where source_key = ? and comic_id = ? and chapter_id = ?;',
+      [sourceKey, comicId, chapterId],
+    );
+    db.execute(
+      '''
+      insert into chapter_page_count
+        (source_key, comic_id, chapter_id, total_pages, updated_at)
+      values (?, ?, ?, ?, ?)
+      on conflict(source_key, comic_id, chapter_id) do update set
+        total_pages = excluded.total_pages, updated_at = excluded.updated_at
+      where excluded.updated_at > chapter_page_count.updated_at;
+    ''',
+      [sourceKey, comicId, chapterId, totalPages, updatedAt],
+    );
+    return (db.select('select changes();').first[0] as int) > 0 &&
+        (previous.isEmpty || previous.first['total_pages'] != totalPages);
   }
 
   bool _upsertChapterSnapshot(
@@ -874,6 +1058,21 @@ class TranslationStore with ChangeNotifier {
       final chapter = _chapterFromValues(row);
       _chapterIndex[chapter.identity.scopePrefix] = chapter;
     }
+    _pageCounts.clear();
+    for (final row in snapshot.pageCounts) {
+      final count = _ChapterPageCountSnapshot(
+        row[0] as String,
+        row[1] as String,
+        row[2] as String,
+        row[3] as int,
+        row[4] as int,
+      );
+      _pageCounts[_pageCountKey(
+        count.sourceKey,
+        count.comicId,
+        count.chapterId,
+      )] = count;
+    }
   }
 
   static StoredTranslationChapter _chapterFromValues(List<Object?> row) {
@@ -1050,6 +1249,7 @@ class TranslationStore with ChangeNotifier {
     _snapshotVersion++;
     _pages.clear();
     _chapterIndex.clear();
+    _pageCounts.clear();
   }
 
   void _trackWrite(Future<void> write, String operation) {

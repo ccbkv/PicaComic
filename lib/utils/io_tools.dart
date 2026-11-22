@@ -12,6 +12,7 @@ import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_details_cache.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/history.dart';
@@ -354,6 +355,7 @@ Future<String?> _exportData(String path, String appdataString,
     var localFavorite = File("$path${pathSep}local_favorite.db");
     var history = File("$path${pathSep}history.db");
     var translationStore = File("$path${pathSep}image_translation.db");
+    var detailsCache = File("$path${pathSep}details_cache.db");
     var localComicFolders = File("$path${pathSep}local_comic_folders.json");
     var localAddComicUi = File("$path${pathSep}local_add_comic_ui.json");
     var localAddComic = Directory("$path${pathSep}local_add_comic");
@@ -377,6 +379,9 @@ Future<String?> _exportData(String path, String appdataString,
     encode.addFile(history.name, history.path);
     if (translationStore.existsSync()) {
       encode.addFile(translationStore.name, translationStore.path);
+    }
+    if (detailsCache.existsSync()) {
+      encode.addFile(detailsCache.name, detailsCache.path);
     }
     encode.addFile(localComicFolders.name, localComicFolders.path);
     encode.addFile(localAddComicUi.name, localAddComicUi.path);
@@ -448,6 +453,16 @@ Future<String> exportDataToFile(bool includeDownload, String outPath) async {
         });
       } catch (e, s) {
         Log.warning('Export Data', 'Failed to checkpoint translations: $e\n$s');
+      }
+    }
+    var detailsCachePath = "$path${pathSep}details_cache.db";
+    if (File(detailsCachePath).existsSync()) {
+      try {
+        await DatabaseGateway.instance.isolateOp(detailsCachePath, (db) {
+          db.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+        });
+      } catch (e, s) {
+        Log.warning('Export Data', 'Failed to checkpoint details cache: $e\n$s');
       }
     }
     var res = await compute<List<String?>, String?>(
@@ -590,6 +605,7 @@ Future<bool> importData([String? filePath]) async {
   }
   SingleInstanceCookieJar.instance?.dispose();
   DownloadManager().dispose();
+  ComicDetailsCache().close();
   String data = '';
   try {
     data = await compute<List<String>, String>((data) async {
@@ -644,6 +660,10 @@ Future<bool> importData([String? filePath]) async {
       var history = File('$path/dataTemp/history.db');
       if (history.existsSync()) {
         history.copySync('$path/history_temp.db');
+      }
+      var detailsCache = File('$path/dataTemp/details_cache.db');
+      if (detailsCache.existsSync()) {
+        detailsCache.copySync('$path/details_cache.db');
       }
       var localComicFolders = File('$path/dataTemp/local_comic_folders.json');
       if (localComicFolders.existsSync()) {

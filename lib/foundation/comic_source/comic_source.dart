@@ -11,6 +11,7 @@ import 'package:html/parser.dart' as html;
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/history.dart';
+import 'package:pica_comic/foundation/image_translation/translation_store.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/network/update.dart';
 import 'package:pica_comic/utils/extensions.dart';
@@ -230,7 +231,8 @@ class ComicSource {
 
   final RegExp? idMatcher;
 
-  final Widget Function(BuildContext context, String id, String? cover)? comicPageBuilder;
+  final Widget Function(BuildContext context, String id, String? cover)?
+      comicPageBuilder;
 
   Future<void> loadData() async {
     var file = File("${App.dataPath}/comic_source/$key.data");
@@ -239,7 +241,8 @@ class ComicSource {
         data = Map.from(jsonDecode(await file.readAsString()));
       } catch (e, s) {
         // 数据文件为空或损坏时，回退到空数据
-        log("Failed to load data of $key: $e\n$s", "ComicSource", LogLevel.error);
+        log("Failed to load data of $key: $e\n$s", "ComicSource",
+            LogLevel.error);
         data = <String, dynamic>{};
       }
     }
@@ -312,7 +315,7 @@ class ComicSource {
       this.searchPageData,
       this.settings,
       this.loadComicInfo,
-      this.loadComicPages,
+      LoadComicPagesFunc? loadComicPages,
       this.getImageLoadingConfig,
       this.getThumbnailLoadingConfig,
       this.matchBriefIdReg,
@@ -322,8 +325,10 @@ class ComicSource {
       this.commentsLoader,
       this.sendCommentFunc,
       this.enableTagsTranslate,
-      {this.veneraSettings = const {}, this.archiveDownloader})
-      : initData = null,
+      {this.veneraSettings = const {},
+      this.archiveDownloader})
+      : loadComicPages = _recordChapterPageCount(key, loadComicPages),
+        initData = null,
         comicTileBuilderOverride = null,
         idMatcher = null,
         comicPageBuilder = null,
@@ -344,7 +349,7 @@ class ComicSource {
     this.searchPageData,
     this.settings = const [],
     this.loadComicInfo,
-    this.loadComicPages,
+    LoadComicPagesFunc? loadComicPages,
     this.archiveDownloader,
     this.getImageLoadingConfig,
     this.getThumbnailLoadingConfig,
@@ -365,7 +370,7 @@ class ComicSource {
     this.comicPageBuilder,
     this.enableTagsTranslate = true,
     this.veneraSettings = const {},
-  });
+  }) : loadComicPages = _recordChapterPageCount(key, loadComicPages);
 
   ComicSource.unknown(this.key)
       : name = "Unknown",
@@ -398,6 +403,25 @@ class ComicSource {
         idMatcher = null,
         comicPageBuilder = null,
         enableTagsTranslate = false;
+}
+
+LoadComicPagesFunc? _recordChapterPageCount(
+  String sourceKey,
+  LoadComicPagesFunc? loader,
+) {
+  if (loader == null) return null;
+  return (comicId, chapterId) async {
+    final result = await loader(comicId, chapterId);
+    if (!result.error) {
+      TranslationStore().recordChapterPageCount(
+        sourceKey,
+        comicId,
+        chapterId ?? '0',
+        result.data.length,
+      );
+    }
+    return result;
+  };
 }
 
 class AccountConfig {
@@ -508,8 +532,8 @@ class SearchPageData {
   /// If this is not null, the default value of search options will be first element.
   final List<SearchOptions>? searchOptions;
 
-  final Widget Function(BuildContext, List<String> initialValues, void Function(List<String>))?
-      customOptionsBuilder;
+  final Widget Function(BuildContext, List<String> initialValues,
+      void Function(List<String>))? customOptionsBuilder;
 
   final Widget Function(String keyword, List<String> options)?
       overrideSearchResultBuilder;
@@ -701,7 +725,11 @@ class UploaderInfo {
   final String? updateTime;
 
   const UploaderInfo(this.id, this.name,
-      {this.avatarUrl, this.frameUrl, this.slogan, this.level = 0, this.updateTime});
+      {this.avatarUrl,
+      this.frameUrl,
+      this.slogan,
+      this.level = 0,
+      this.updateTime});
 
   UploaderInfo.fromJson(Map<String, dynamic> json)
       : id = json["id"]?.toString() ?? "",
@@ -779,27 +807,27 @@ class ComicInfoData with HistoryMixin {
   final String? url;
 
   ComicInfoData(
-    this.title,
-    this.subTitle,
-    this.cover,
-    this.description,
-    this.tags,
-    this.chapters,
-    this.thumbnails,
-    this.thumbnailLoader,
-    this.thumbnailMaxPage,
-    this.suggestions,
-    this.sourceKey,
-    this.comicId, {
-    this.isFavorite,
-    this.subId,
-    this.stars,
-    this.uploader,
-    this.pages,
-    this.likesCount,
-    this.isLiked,
-    this.commentsCount,
-    this.url});
+      this.title,
+      this.subTitle,
+      this.cover,
+      this.description,
+      this.tags,
+      this.chapters,
+      this.thumbnails,
+      this.thumbnailLoader,
+      this.thumbnailMaxPage,
+      this.suggestions,
+      this.sourceKey,
+      this.comicId,
+      {this.isFavorite,
+      this.subId,
+      this.stars,
+      this.uploader,
+      this.pages,
+      this.likesCount,
+      this.isLiked,
+      this.commentsCount,
+      this.url});
 
   Map<String, dynamic> toJson() {
     return {
@@ -846,7 +874,8 @@ class ComicInfoData with HistoryMixin {
         suggestions = null,
         isFavorite = json["isFavorite"],
         subId = json["subId"],
-        stars = json["stars"] != null ? (json["stars"] as num).toDouble() : null,
+        stars =
+            json["stars"] != null ? (json["stars"] as num).toDouble() : null,
         pages = switch (json["pages"] ?? json["maxPage"]) {
           num value when value.isFinite => value.toInt(),
           String value => int.tryParse(value),
@@ -909,8 +938,8 @@ class ComicInfoData with HistoryMixin {
 typedef CategoryComicsLoader = Future<Res<List<BaseComic>>> Function(
     String category, String? param, List<String> options, int page);
 
-typedef CategoryOptionsLoader = Future<Res<List<CategoryComicsOptions>>> Function(
-    String category, String? param);
+typedef CategoryOptionsLoader = Future<Res<List<CategoryComicsOptions>>>
+    Function(String category, String? param);
 
 class CategoryComicsData {
   /// options
@@ -986,8 +1015,8 @@ class Comment {
   final bool? isLiked;
   int? voteStatus;
 
-  Comment(this.userName, this.avatar, this.content, this.time,
-      this.replyCount, this.id,
+  Comment(this.userName, this.avatar, this.content, this.time, this.replyCount,
+      this.id,
       {this.score, this.isLiked, this.voteStatus});
 
   Map<String, dynamic> toJson() => {

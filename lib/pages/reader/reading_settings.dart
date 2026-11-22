@@ -100,6 +100,68 @@ class _ReadingSettingsState extends State<ReadingSettings> {
     if (mounted) setState(() {});
   }
 
+  void _updateImageEnhance(ComicReadingPageLogic logic) {
+    appdata.updateSettings();
+    logic.update();
+    if (mounted) setState(() {});
+  }
+
+  Widget _imageEnhanceSlider(
+    String title,
+    int settingsIndex,
+    double max,
+    double fallback,
+    ComicReadingPageLogic logic,
+  ) {
+    final value = (double.tryParse(appdata.settings[settingsIndex]) ?? fallback)
+        .clamp(0.0, max)
+        .toDouble();
+    return ListTile(
+      title: Text(title),
+      subtitle: Slider(
+        min: 0,
+        max: max,
+        divisions: (max * 10).round(),
+        value: value,
+        onChanged: (value) {
+          appdata.settings[settingsIndex] = value.toStringAsFixed(1);
+          _updateImageEnhance(logic);
+        },
+      ),
+      trailing: SizedBox(
+        width: 36,
+        child: Text(value.toStringAsFixed(1)),
+      ),
+    );
+  }
+
+  ImageInfo? _snapshotCurrentPageImage(ComicReadingPageLogic logic) {
+    if (!mounted) return null;
+    final readerBox = App.globalContext?.findRenderObject();
+    if (readerBox is! RenderBox || !readerBox.hasSize) return null;
+    final center = readerBox.localToGlobal(readerBox.size.center(Offset.zero));
+    ImageInfo? best;
+    var bestDistance = double.infinity;
+    for (final state in logic.imageStates.whereType<_ComicImageState>()) {
+      final info = state._imageInfo;
+      if (info == null || !state.mounted) continue;
+      final box = state.context.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) continue;
+      final rect = MatrixUtils.transformRect(
+        box.getTransformTo(null),
+        Offset.zero & box.size,
+      );
+      if (!rect.isFinite || rect.isEmpty) continue;
+      final distance =
+          rect.contains(center) ? 0.0 : (rect.center - center).distance;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = info;
+      }
+    }
+    return best?.clone();
+  }
+
   @override
   Widget build(BuildContext context) {
     var logic = StateController.find<ComicReadingPageLogic>();
@@ -361,6 +423,82 @@ class _ReadingSettingsState extends State<ReadingSettings> {
             },
           ),
         ),
+
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(
+              "图片处理 / 增强".tl,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: SwitchListTile(
+            title: Text("图像增强".tl),
+            subtitle: Text("锐化模糊图片，并在渲染时调整清晰度".tl),
+            value:
+                appdata.settings[ImageEnhanceShader.enabledSettingIndex] == "1",
+            onChanged: (value) {
+              appdata.settings[ImageEnhanceShader.enabledSettingIndex] =
+                  value ? "1" : "0";
+              _updateImageEnhance(logic);
+            },
+          ),
+        ),
+        if (appdata.settings[ImageEnhanceShader.enabledSettingIndex] ==
+            "1") ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: ImageEnhancePreview(
+                pageImage: () => _snapshotCurrentPageImage(logic),
+                settingsVersion: Object.hash(
+                  appdata.settings[ImageEnhanceShader.strengthSettingIndex],
+                  appdata.settings[ImageEnhanceShader.claritySettingIndex],
+                  appdata.settings[ImageEnhanceShader.contrastSettingIndex],
+                  appdata.settings[ImageEnhanceShader.vibranceSettingIndex],
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _imageEnhanceSlider(
+              "锐化强度".tl,
+              ImageEnhanceShader.strengthSettingIndex,
+              ImageEnhanceShader.maxStrength,
+              0.5,
+              logic,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _imageEnhanceSlider(
+              "清晰度".tl,
+              ImageEnhanceShader.claritySettingIndex,
+              1.0,
+              0.0,
+              logic,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _imageEnhanceSlider(
+              "对比度".tl,
+              ImageEnhanceShader.contrastSettingIndex,
+              1.0,
+              0.0,
+              logic,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _imageEnhanceSlider(
+              "色彩鲜艳度".tl,
+              ImageEnhanceShader.vibranceSettingIndex,
+              1.0,
+              0.0,
+              logic,
+            ),
+          ),
+        ],
 
         SliverToBoxAdapter(
           child: SwitchListTile(
@@ -732,6 +870,17 @@ class _ReadingSettingsState extends State<ReadingSettings> {
             }),
           ),
         ),
+        const SliverToBoxAdapter(child: Divider()),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(
+              "图片处理 / 增强".tl,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+        ),
+       
         // 设置分流
         if (!logic.data.downloaded &&
             (logic.data.type == ReadingType.picacg ||

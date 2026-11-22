@@ -15,6 +15,7 @@ class TranslatedImageProvider
     this.legacyTranslationKey,
     this.translationConfig,
     this.translated, {
+    this.translationRevision = 0,
     this.comicTitle = '',
     this.comicCover = '',
     this.chapterTitle = '',
@@ -30,18 +31,20 @@ class TranslatedImageProvider
   final String legacyTranslationKey;
   final TranslationConfig translationConfig;
   final bool translated;
+  final int translationRevision;
   final String comicTitle;
   final String comicCover;
   final String chapterTitle;
 
-  @override
-  Future<Uint8List> load(StreamController<ImageChunkEvent> chunkEvents) async {
+  Future<Uint8List> loadOriginal({
+    void Function(ImageChunkEvent)? onChunk,
+  }) async {
     DownloadProgress? finishProgress;
     await for (var progress in streamBuilder()) {
       if (progress.currentBytes == progress.expectedBytes) {
         finishProgress = progress;
       }
-      chunkEvents.add(ImageChunkEvent(
+      onChunk?.call(ImageChunkEvent(
         cumulativeBytesLoaded: progress.currentBytes,
         expectedTotalBytes: progress.expectedBytes,
       ));
@@ -49,9 +52,12 @@ class TranslatedImageProvider
     if (finishProgress == null) {
       throw StateError('Empty image response');
     }
-    var imageBytes =
-        finishProgress.data ?? await finishProgress.getFile().readAsBytes();
+    return finishProgress.data ?? await finishProgress.getFile().readAsBytes();
+  }
 
+  @override
+  Future<Uint8List> load(StreamController<ImageChunkEvent> chunkEvents) async {
+    var imageBytes = await loadOriginal(onChunk: chunkEvents.add);
     var service = ImageTranslationService.instance;
     var translatedFile =
         await service.findTranslated(translationKey, translationConfig.mode);
@@ -101,6 +107,6 @@ class TranslatedImageProvider
   }
 
   @override
-  String get key =>
-      '$imageKey@$translationKey#${translationConfig.mode.token}@tr:$translated';
+  String get key => '$imageKey@$translationKey#${translationConfig.mode.token}'
+      '@tr:$translated:$translationRevision';
 }

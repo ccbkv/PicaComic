@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pica_comic/base.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_details_cache.dart';
 import 'package:pica_comic/components/comment.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/components/select_download_eps.dart';
@@ -372,6 +373,9 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
   Future<Res<ComicInfoData>> loadData() async {
     if (comicSource == null) throw "Comic Source Not Found";
     var res = await comicSource!.loadComicInfo!(id);
+    if (!res.error) {
+      ComicDetailsCache().update(sourceKey, id, res.data);
+    }
     return res;
   }
 

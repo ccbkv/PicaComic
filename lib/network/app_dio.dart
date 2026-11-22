@@ -60,26 +60,29 @@ class MyLogInterceptor extends Interceptor {
   @override
   void onResponse(
       Response<dynamic> response, ResponseInterceptorHandler handler) {
-    var headers = response.headers.map.map((key, value) => MapEntry(
-        key.toLowerCase(), value.length == 1 ? value.first : value.toString()));
-    headers.remove("cookie");
-    String content;
-    if(response.data is List<int>) {
-      try {
-        content = utf8.decode(response.data, allowMalformed: false);
+    final success = response.statusCode != null && response.statusCode! < 400;
+    if (!success || LogManager.verboseNetwork) {
+      var headers = response.headers.map.map((key, value) => MapEntry(
+          key.toLowerCase(),
+          value.length == 1 ? value.first : value.toString()));
+      headers.remove("cookie");
+      String content;
+      if(response.data is List<int>) {
+        try {
+          content = utf8.decode(response.data, allowMalformed: false);
+        }
+        catch(e) {
+          content = "<Bytes>\nlength:${response.data.length}";
+        }
+      } else {
+        content = response.data.toString();
       }
-      catch(e) {
-        content = "<Bytes>\nlength:${response.data.length}";
-      }
-    } else {
-      content = response.data.toString();
+      LogManager.addLog(
+          success ? LogLevel.info : LogLevel.error,
+          "Network",
+          "Response ${response.realUri.toString()} ${response.statusCode}\n"
+              "headers:\n$headers\n$content");
     }
-    LogManager.addLog(
-        (response.statusCode != null && response.statusCode! < 400)
-            ? LogLevel.info : LogLevel.error,
-        "Network",
-        "Response ${response.realUri.toString()} ${response.statusCode}\n"
-            "headers:\n$headers\n$content");
     handler.next(response);
   }
 
@@ -158,8 +161,10 @@ class AppHttpAdapter implements HttpClientAdapter{
 
   Future<ResponseBody> fetchOnce(RequestOptions o, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async{
     var options = o.copyWith();
-    LogManager.addLog(LogLevel.info, "Network",
-        "${options.method} ${options.path}\nheaders:\n${options.headers.toString()}\ndata:${options.data}");
+    if (LogManager.verboseNetwork) {
+      LogManager.addLog(LogLevel.info, "Network",
+          "${options.method} ${options.path}\nheaders:\n${options.headers.toString()}\ndata:${options.data}");
+    }
     if(appdata.settings[58] == "0"){
       return checkCookie(await adapter!.fetch(options, requestStream, cancelFuture));
     }

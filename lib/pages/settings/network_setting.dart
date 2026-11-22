@@ -236,7 +236,7 @@ class _ProxySettingViewState extends State<_ProxySettingView> {
           mainAxisSize: MainAxisSize.min,
           children: [
             RadioListTile<String>(
-              title: Text("Direct".tl),
+              title: Text("直连".tl),
               value: 'direct',
               groupValue: type,
               onChanged: (v) {
@@ -266,7 +266,7 @@ class _ProxySettingViewState extends State<_ProxySettingView> {
               },
             ),
             RadioListTile<String>(
-              title: Text("Manual".tl),
+              title: Text("手动".tl),
               value: 'manual',
               groupValue: type,
               onChanged: (v) {

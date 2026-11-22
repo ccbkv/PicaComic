@@ -10,6 +10,7 @@ import 'package:pica_comic/foundation/image_translation/translation_types.dart';
 import 'package:pica_comic/foundation/image_translation/translation_worker.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/utils/opencc.dart';
+import 'package:pica_comic/utils/translations.dart';
 
 /// Result of the analysis stage: render-ready regions plus the language
 /// distribution of ALL translatable blocks (including ones skipped for
@@ -142,16 +143,20 @@ class PageTranslationPipeline {
   }
 
   /// Turns [pending] blocks and their aligned [texts] into render-ready
-  /// regions, dropping empties and no-ops. [texts] must align with [pending]
-  /// (extra entries are ignored, missing ones treated as empty).
+  /// regions, dropping no-ops. Incomplete replies must remain failures instead
+  /// of being cached as pages without text.
   List<TranslatedRegion> regionsFromTranslation(
     List<OcrBlock> pending,
     List<String> texts,
   ) {
+    if (texts.length != pending.length ||
+        texts.any((text) => text.trim().isEmpty)) {
+      throw FormatException('Translation service returned incomplete text'.tl);
+    }
     var regions = <TranslatedRegion>[];
     for (var i = 0; i < pending.length; i++) {
-      var text = (i < texts.length ? texts[i] : '').trim();
-      if (text.isEmpty || text == pending[i].text) continue;
+      var text = texts[i].trim();
+      if (text == pending[i].text) continue;
       regions.add(_region(pending[i], text));
     }
     return regions;

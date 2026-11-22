@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:pica_comic/components/components.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
+import 'package:pica_comic/foundation/comic_details_cache.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/foundation/image_translation/pre_translation_tasks.dart';
 import 'package:pica_comic/foundation/image_translation/translation_service.dart';
@@ -49,8 +50,33 @@ List<String> translatedComicCategoriesFor(String sourceKey, String comicId) {
   );
 }
 
-/// Resolves missing titles, covers, chapter names and card tags. The result is
-/// shared by the home card, the library page and the chapter picker.
+void _cacheTranslatedComicTags(
+  String key,
+  Map<String, List<String>> groups,
+) {
+  var tags = <String>[];
+  var categories = <String>[];
+  for (var group in groups.entries) {
+    var isCategory = const {
+      'category',
+      'categories',
+      '分类',
+      '分類',
+    }.contains(group.key.toLowerCase());
+    for (var value in group.value) {
+      if (value.trim().isEmpty) continue;
+      if (isCategory) {
+        categories.add(value);
+      } else {
+        tags.add(group.key.isEmpty ? value : '${group.key}:$value');
+      }
+    }
+  }
+  _tagMetadataCache[key] = (tags: tags, categories: categories);
+}
+
+/// Restores cached details synchronously first, exactly like VeneraX. A source
+/// request is only a fallback for entries that have no details cache yet.
 Future<void> hydrateTranslatedComicMetadata() async {
   var pending = <String, (String, String)>{};
   for (var item in ImageTranslationService.translatedComics) {
@@ -67,14 +93,37 @@ Future<void> hydrateTranslatedComicMetadata() async {
     pending['$sourceKey\u0000$comicId'] = (sourceKey, comicId);
   }
 
+  // Populate every available tag card before the first await, so cached tags
+  // are present in the initial grid build rather than appearing one by one.
+  final cachedDetails = <String, ComicInfoData>{};
+  for (var entry in pending.entries) {
+    final cached = ComicDetailsCache().find(entry.value.$1, entry.value.$2);
+    if (cached == null) continue;
+    cachedDetails[entry.key] = cached;
+    _cacheTranslatedComicTags(entry.key, cached.tags);
+  }
+
   for (var entry in pending.entries) {
     var key = entry.key;
+    if (_metadataHydrationInFlight.contains(key)) continue;
+    var sourceKey = entry.value.$1;
+    var comicId = entry.value.$2;
+    final cached = cachedDetails[key];
+    if (cached != null) {
+      _metadataHydrationInFlight.add(key);
+      TranslationStore().updateComicMetadata(
+        sourceKey,
+        comicId,
+        comicTitle: cached.title,
+        comicCover: cached.cover,
+        chapterTitles: cached.chapters?.allChapters ?? {},
+      );
+      continue;
+    }
     if (_tagMetadataCache.containsKey(key) ||
         !_metadataHydrationInFlight.add(key)) {
       continue;
     }
-    var sourceKey = entry.value.$1;
-    var comicId = entry.value.$2;
     try {
       var source = ComicSource.find(sourceKey);
       if (source?.loadComicInfo == null) {
@@ -87,25 +136,8 @@ Future<void> hydrateTranslatedComicMetadata() async {
         continue;
       }
       var details = res.data;
-      var tags = <String>[];
-      var categories = <String>[];
-      for (var group in details.tags.entries) {
-        var isCategory = const {
-          'category',
-          'categories',
-          '分类',
-          '分類',
-        }.contains(group.key.toLowerCase());
-        for (var value in group.value) {
-          if (value.trim().isEmpty) continue;
-          if (isCategory) {
-            categories.add(value);
-          } else {
-            tags.add(group.key.isEmpty ? value : '${group.key}:$value');
-          }
-        }
-      }
-      _tagMetadataCache[key] = (tags: tags, categories: categories);
+      ComicDetailsCache().update(sourceKey, comicId, details);
+      _cacheTranslatedComicTags(key, details.tags);
       TranslationStore().updateComicMetadata(
         sourceKey,
         comicId,
@@ -353,9 +385,7 @@ class _TranslatedComicsPageState extends State<TranslatedComicsPage>
     showConfirmDialog(
       context: context,
       title: '删除本漫画的全部翻译？'.tl,
-      content:
-          '将删除本漫画所有已存的翻译和嵌字页面，原图不受影响。'
-              .tl,
+      content: '将删除本漫画所有已存的翻译和嵌字页面，原图不受影响。'.tl,
       btnColor: context.colorScheme.error,
       onConfirm: () async {
         var running = PreTranslationTaskManager.instance.runningTaskFor(

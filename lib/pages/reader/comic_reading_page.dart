@@ -4,6 +4,7 @@ import 'package:liquid_glass_widgets/widgets/shared/adaptive_liquid_glass_layer.
 import 'package:pica_comic/utils/show_delayed_dialog.dart';
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:battery_plus/battery_plus.dart';
 
 import 'package:flutter/gestures.dart';
@@ -39,9 +40,13 @@ import 'package:pica_comic/pages/follow_updates_page.dart';
 import 'package:pica_comic/pages/settings/settings_page.dart';
 import 'package:pica_comic/utils/keep_screen_on.dart';
 import 'package:pica_comic/foundation/image_manager.dart';
+import 'package:pica_comic/foundation/image_enhance_shader.dart';
+import 'package:pica_comic/pages/reader/shader_image.dart';
+import 'package:pica_comic/pages/settings/image_enhance_preview.dart';
 import 'package:pica_comic/foundation/image_translation/llm_translator.dart';
 import 'package:pica_comic/foundation/image_translation/translation_config.dart';
 import 'package:pica_comic/foundation/image_translation/translation_service.dart';
+import 'package:pica_comic/foundation/image_translation/translation_store.dart';
 import 'package:pica_comic/foundation/image_translation/translation_types.dart';
 import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/utils/save_image.dart';

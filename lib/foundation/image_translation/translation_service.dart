@@ -97,6 +97,12 @@ class ImageTranslationService with ChangeNotifier {
 
   final _queue = <_TranslationTask>[];
   final _active = <_TranslationTask>{};
+  final _retranslating = <String>{};
+
+  // Flutter's memory image cache outlives a reader route.
+  final _pageRevisions = <String, int>{};
+
+  int revisionOf(String? cacheKey) => _pageRevisions[cacheKey] ?? 0;
 
   /// The done/failed markers describe a *rendered* image, so they key on the
   /// rendered key (page key + render-mode token) rather than the raw page key.
@@ -128,6 +134,9 @@ class ImageTranslationService with ChangeNotifier {
   /// Current per-page translation state, for the reader status badge.
   PageTranslationStatus statusOf(String cacheKey, InpaintMode mode) {
     var renderKey = renderedKey(cacheKey, mode);
+    if (_retranslating.contains(cacheKey)) {
+      return PageTranslationStatus.translating;
+    }
     if (_completed.contains(renderKey)) return PageTranslationStatus.translated;
     if (_noContent.contains(cacheKey)) return PageTranslationStatus.noContent;
     if (_active.any((t) => t.cacheKey == cacheKey)) {
@@ -515,6 +524,62 @@ class ImageTranslationService with ChangeNotifier {
     return true;
   }
 
+  /// Replaces only this page after a fresh translation has rendered successfully.
+  Future<bool> retranslatePage(
+    String cacheKey,
+    String comicKey,
+    Uint8List imageBytes,
+    TranslationConfig config, {
+    required TranslationChapterIdentity chapter,
+    String? legacyCacheKey,
+  }) async {
+    if (_queue.any((task) => task.cacheKey == cacheKey) ||
+        !_retranslating.add(cacheKey)) {
+      throw StateError('Page translation already in progress');
+    }
+    _releaseTimer?.cancel();
+    notifyListeners();
+    try {
+      final pipeline = _pipeline ??= PageTranslationPipeline();
+      final analysis = await pipeline.analyzePage(
+        imageBytes,
+        sourceLang: _effectiveSourceFor(comicKey, config),
+        targetLang: config.targetLang,
+        glossary: _glossaryFor(comicKey),
+      );
+      if (analysis.regions.isEmpty) return false;
+      final bytes = await pipeline.renderPage(
+        imageBytes,
+        analysis.regions,
+        mode: config.mode,
+      );
+      final store = TranslationStore();
+      if (legacyCacheKey != null) {
+        store.adoptLegacyKey(legacyCacheKey, cacheKey);
+      }
+      for (final mode in InpaintMode.values) {
+        final key = renderedKey(cacheKey, mode);
+        if (mode != config.mode) await CacheManager().delete(key);
+        _completed.remove(key);
+        _errors.remove(key);
+        _failures.remove(key);
+      }
+      final key = renderedKey(cacheKey, config.mode);
+      await CacheManager().writeCache(key, bytes, _imageCacheDuration);
+      store.put(cacheKey, analysis.regions, chapter: chapter);
+      _pageRevisions[cacheKey] = revisionOf(cacheKey) + 1;
+      _completed.add(key);
+      _noContent.remove(cacheKey);
+      _updateLanguageLock(comicKey, analysis.languageVotes, config);
+      _mergeGlossary(comicKey, analysis.newGlossary);
+      return true;
+    } finally {
+      _retranslating.remove(cacheKey);
+      notifyListeners();
+      if (_active.isEmpty && _queue.isEmpty) _scheduleRelease();
+    }
+  }
+
   /// The shared translation core used by both the awaitable [translateOne]
   /// (pre-translation manager) and the queued [_process] (reader). It performs
   /// the cache probe, OCR/translation analysis (with the text-level cache),
@@ -605,9 +670,6 @@ class ImageTranslationService with ChangeNotifier {
     // Freshly OCR'd pages awaiting translation; null = resolved from cache,
     // already rendered, or failed during OCR.
     var pendingOcr = List<PageOcr?>.filled(pages.length, null);
-    // Text cache is (re)written only for freshly OCR'd pages, matching
-    // [_translateToCache]; cache-sourced regions are never rewritten.
-    var freshOcr = List<bool>.filled(pages.length, false);
     // Pages needing no further work (rendered-cache hit or OCR failure).
     var settled = List<bool>.filled(pages.length, false);
 
@@ -661,7 +723,6 @@ class ImageTranslationService with ChangeNotifier {
           sourceLang: sourceLang,
           targetLang: config.targetLang,
         );
-        freshOcr[i] = true;
       } catch (e, s) {
         Log.warning('Image Translation', 'Batch OCR failed: $e\n$s');
         settled[i] = true; // failed; success[i] stays false
@@ -719,10 +780,21 @@ class ImageTranslationService with ChangeNotifier {
               sliceAt[i].clamp(0, translated.length),
               (sliceAt[i] + po.pending.length).clamp(0, translated.length),
             );
-      regionsOf[i] = [
-        ...po.ready,
-        ...pipeline.regionsFromTranslation(po.pending, slice),
-      ];
+      try {
+        regionsOf[i] = [
+          ...po.ready,
+          ...pipeline.regionsFromTranslation(po.pending, slice),
+        ];
+        // Keep paid results before a chapter pause can interrupt rendering.
+        TranslationStore().put(
+          pages[i].cacheKey,
+          regionsOf[i]!,
+          chapter: chapter,
+        );
+      } on FormatException catch (error) {
+        Log.warning('Image Translation', 'Incomplete page translation: $error');
+        settled[i] = true;
+      }
     }
 
     // Stage 3 — render + cache each resolved page.
@@ -734,9 +806,6 @@ class ImageTranslationService with ChangeNotifier {
       var p = pages[i];
       onStage?.call(TranslationStage.rendering, completedPages());
       try {
-        if (freshOcr[i]) {
-          TranslationStore().put(p.cacheKey, regions, chapter: chapter);
-        }
         if (regions.isEmpty) {
           _noContent.add(p.cacheKey);
           success[i] = true; // no translatable text still counts as handled
@@ -787,7 +856,7 @@ class ImageTranslationService with ChangeNotifier {
     required TranslationChapterIdentity chapter,
     String? legacyCacheKey,
   }) {
-    if (_noContent.contains(cacheKey)) {
+    if (_noContent.contains(cacheKey) || _retranslating.contains(cacheKey)) {
       return;
     }
     var renderKey = renderedKey(cacheKey, config.mode);
@@ -858,6 +927,8 @@ class ImageTranslationService with ChangeNotifier {
       _errors.remove(renderKey);
       if (outcome != _TranslateOutcome.noContent) {
         _notifyDone(task);
+      } else {
+        notifyListeners();
       }
     } on PipelineCanceled {
       // ignore
@@ -1167,7 +1238,11 @@ class ImageTranslationService with ChangeNotifier {
   void _scheduleRelease() {
     _releaseTimer?.cancel();
     _releaseTimer = Timer(_idleReleaseDelay, () {
-      if (_active.isNotEmpty || _queue.isNotEmpty) return;
+      if (_active.isNotEmpty ||
+          _queue.isNotEmpty ||
+          _retranslating.isNotEmpty) {
+        return;
+      }
       var pipeline = _pipeline;
       _pipeline = null;
       unawaited(pipeline?.release());

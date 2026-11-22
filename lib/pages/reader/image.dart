@@ -21,6 +21,9 @@ class ComicImage extends StatefulWidget {
         this.gaplessPlayback = false,
         this.filterQuality = FilterQuality.medium,
         this.isAntiAlias = false,
+        this.errorBuilder,
+        this.onInit,
+        this.onDispose,
         Map<String, String>? headers,
         int? cacheWidth,
         int? cacheHeight,
@@ -61,6 +64,17 @@ class ComicImage extends StatefulWidget {
 
   final bool isAntiAlias;
 
+  final Widget Function(
+    BuildContext context,
+    Object error,
+    StackTrace? stackTrace,
+    VoidCallback retry,
+  )? errorBuilder;
+
+  final void Function(State<ComicImage> state)? onInit;
+
+  final void Function(State<ComicImage> state)? onDispose;
+
   static void clear() => _ComicImageState.clear();
 
   @override
@@ -88,6 +102,7 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scrollAwareContext = DisposableBuildContext<State<ComicImage>>(this);
+    widget.onInit?.call(this);
   }
 
   @override
@@ -98,6 +113,7 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
     _completerHandle?.dispose();
     _scrollAwareContext.dispose();
     _replaceImage(info: null);
+    widget.onDispose?.call(this);
     super.dispose();
   }
 
@@ -255,9 +271,25 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
     _isListeningToStream = false;
   }
 
+  void _retry() {
+    setState(() {
+      _loadingProgress = null;
+      _lastException = null;
+    });
+    _resolveImage();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_lastException != null) {
+      if (widget.errorBuilder != null) {
+        return widget.errorBuilder!(
+          context,
+          _lastException!,
+          null,
+          _retry,
+        );
+      }
       // display error and retry button on screen
       return SizedBox(
         height: 300,
@@ -277,7 +309,7 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
                   child: Listener(
                     onPointerDown: (details){
                       TapController.ignoreNextTap = true;
-                      _resolveImage();
+                      _retry();
                     },
                     child: const SizedBox(
                       width: 84,
@@ -317,28 +349,32 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
           _imageInfo!.image.height.toDouble()
       );
       // build image
-      Widget result = RawImage(
-        // Do not clone the image, because RawImage is a stateless wrapper.
-        // The image will be disposed by this state object when it is not needed
-        // anymore, such as when it is unmounted or when the image stream pushes
-        // a new image.
-        image: _imageInfo?.image,
-        debugImageLabel: _imageInfo?.debugLabel,
-        width: width,
-        height: height,
-        scale: _imageInfo?.scale ?? 1.0,
-        color: widget.color,
-        opacity: widget.opacity,
-        colorBlendMode: widget.colorBlendMode,
-        fit: widget.fit,
-        alignment: widget.alignment,
-        repeat: widget.repeat,
-        centerSlice: widget.centerSlice,
-        matchTextDirection: widget.matchTextDirection,
-        invertColors: _invertColors,
-        isAntiAlias: widget.isAntiAlias,
-        filterQuality: widget.filterQuality,
-      );
+      final image = _imageInfo!.image;
+      Widget paint(ui.Image image) => RawImage(
+            // Do not clone the image, because RawImage is a stateless wrapper.
+            // The image will be disposed by this state object when it is not needed
+            // anymore, such as when it is unmounted or when the image stream pushes
+            // a new image.
+            image: image,
+            debugImageLabel: _imageInfo?.debugLabel,
+            width: width,
+            height: height,
+            scale: _imageInfo?.scale ?? 1.0,
+            color: widget.color,
+            opacity: widget.opacity,
+            colorBlendMode: widget.colorBlendMode,
+            fit: widget.fit,
+            alignment: widget.alignment,
+            repeat: widget.repeat,
+            centerSlice: widget.centerSlice,
+            matchTextDirection: widget.matchTextDirection,
+            invertColors: _invertColors,
+            isAntiAlias: widget.isAntiAlias,
+            filterQuality: widget.filterQuality,
+          );
+      Widget result = ImageEnhanceShader.instance.isEnabled
+          ? EnhancedComicImage(image: image, builder: paint)
+          : paint(image);
 
       if (!widget.excludeFromSemantics) {
         result = Semantics(

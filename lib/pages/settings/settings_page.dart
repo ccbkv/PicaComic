@@ -14,14 +14,19 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/base.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:pica_comic/foundation/comic_source/built_in/picacg.dart';
+import 'package:pica_comic/foundation/app_page_route.dart';
 import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/foundation/comic_source/built_in/jm.dart';
 import 'package:pica_comic/foundation/log.dart';
+import 'package:pica_comic/foundation/image_enhance_shader.dart';
+import 'package:pica_comic/pages/settings/image_enhance_preview.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/main.dart';
 import 'package:pica_comic/network/app_dio.dart';
 import 'package:pica_comic/pages/about/about_page.dart';
+import 'package:pica_comic/pages/guide_page.dart';
+import 'package:pica_comic/pages/disclaimer.dart';
 import 'package:pica_comic/components/components.dart' as components;
 import 'package:pica_comic/components/components.dart' hide Select;
 import 'package:pica_comic/utils/extensions.dart';
@@ -45,6 +50,7 @@ import '../../network/webdav.dart';
 import '../../utils/background_service.dart';
 import '../../utils/io.dart';
 import '../welcome_page.dart';
+import '../logs_page.dart';
 import 'package:pica_comic/utils/translations.dart';
 import 'package:pica_comic/utils/font_manager.dart';
 import 'package:pica_comic/pages/settings/font_management_page.dart';
@@ -88,6 +94,8 @@ part 'translation_script_settings.dart';
 part 'translation_prompt_settings.dart';
 part 'translation_languages_settings.dart';
 part 'ai_translation_settings.dart';
+part 'about.dart';
+part 'settings_search.dart';
 
 Future<void> _launchGroup() async {
   try {
@@ -963,6 +971,38 @@ class _OhosPlatformPainter extends CustomPainter {
 }
 */
 
+const categories = <String>[
+  "浏览",
+  "漫画源",
+  "阅读",
+  "AI 翻译",
+  "图片处理 / 增强",
+  "外观",
+  "本地收藏",
+  "APP",
+  "网络",
+  "关于与帮助",
+  "历史版本",
+  "文件管理器",
+  "Debug",
+];
+
+const icons = <IconData>[
+  Icons.explore,
+  Icons.source,
+  Icons.book,
+  Icons.translate,
+  Icons.auto_fix_high,
+  Icons.color_lens,
+  Icons.collections_bookmark_rounded,
+  Icons.apps,
+  Icons.public,
+  Icons.info,
+  Icons.history,
+  Icons.folder_open,
+  Icons.bug_report,
+];
+
 class SettingsPage extends StatefulWidget {
   static void open([int initialPage = -1, VoidCallback? onPop]) {
     App.globalTo(() => SettingsPage(initialPage: initialPage, onPop: onPop));
@@ -979,12 +1019,63 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   static const int _aiTranslationPageIndex = 3;
-  static const int _aboutPageIndex = 8;
-  static const int _appUpdaterHistoryIndex = 9;
-  static const int _fileManagerIndex = 10;
-  static const int _debugPageIndex = 11;
+  static const int _imageEnhancePageIndex = 4;
+  static const int _aboutPageIndex = 9;
+  static const int _appUpdaterHistoryIndex = 10;
+  static const int _fileManagerIndex = 11;
+  static const int _debugPageIndex = 12;
 
   int currentPage = -1;
+
+  final _settingsNavigators = <String, GlobalKey<NavigatorState>>{};
+
+  Widget _secondarySettingsNavigation(
+    String destination,
+    WidgetBuilder builder,
+  ) {
+    final navigatorKey = _settingsNavigators.putIfAbsent(
+      destination,
+      GlobalKey<NavigatorState>.new,
+    );
+    void onEscape() {
+      final navigator = navigatorKey.currentState;
+      if (navigator?.canPop() == true) {
+        navigator!.maybePop();
+        return;
+      }
+      // Keep the previous top-level Escape behaviour on the initial settings
+      // page, but never bypass a secondary page when one is open.
+      final globalNavigator = App.navigatorKey.currentState;
+      if (globalNavigator?.canPop() == true) {
+        globalNavigator!.maybePop();
+      } else {
+        App.mainNavigatorKey?.currentState?.maybePop();
+      }
+    }
+
+    return Shortcuts(
+      shortcuts: {
+        const SingleActivator(LogicalKeyboardKey.escape):
+            VoidCallbackIntent(onEscape),
+      },
+      child: NavigatorPopHandler(
+        enabled: App.isDesktop,
+        onPopWithResult: (_) => navigatorKey.currentState?.maybePop(),
+        child: RouteDisplayInsets(
+          padding: EdgeInsets.zero,
+          child: Navigator(
+            key: navigatorKey,
+            onGenerateRoute: (_) => PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  builder(context),
+              transitionDuration: Duration.zero,
+              reverseTransitionDuration: Duration.zero,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   ColorScheme get colors => Theme.of(context).colorScheme;
 
@@ -993,35 +1084,30 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   bool get enableLiquidGlassSettingsUi =>
       appdata.settings.length > 103 && appdata.settings[103] == "1";
 
-  final categories = <String>[
-    "浏览",
-    "漫画源",
-    "阅读",
-    "AI 翻译",
-    "外观",
-    "本地收藏",
-    "APP",
-    "网络",
-    "关于",
-    "历史版本",
-    "文件管理器",
-    "Debug",
+  final _categoryDescriptions = <String>[
+    "漫画列表、内容源与筛选",
+    "管理漫画源插件",
+    "页面布局、手势与阅读显示",
+    "翻译服务、语言与模型",
+    "图片增强、锐化与色彩调整",
+    "主题、语言与界面",
+    "收藏文件夹与本地内容",
+    "应用设置与数据管理",
+    "代理与网络连接",
+    "版本、更新与帮助",
+    "查看历史版本更新",
+    "本地文件管理",
+    "日志与调试工具",
   ];
 
-  final icons = <IconData>[
-    Icons.explore,
-    Icons.source,
-    Icons.book,
-    Icons.translate,
-    Icons.color_lens,
-    Icons.collections_bookmark_rounded,
-    Icons.apps,
-    Icons.public,
-    Icons.info,
-    Icons.history,
-    Icons.folder_open,
-    Icons.bug_report,
+  final _clusters = <(String, List<int>)>[
+    ("浏览", [0, 1, 2, 3, 4]),
+    ("外观与数据", [5, 6, 7, 8]),
+    ("更多", [9, 10, 11, 12]),
   ];
+
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   double offset = 0;
 
@@ -1089,6 +1175,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
   @override
   dispose() {
+    _searchController.dispose();
     super.dispose();
     gestureRecognizer.dispose();
     App.temporaryDisablePopGesture = false;
@@ -1097,15 +1184,15 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
 
   @override
   Widget build(BuildContext context) {
-    if (App.isFluent) {
-      return buildFluent(context);
-    }
     if (currentPage != -1 && !enableTwoViews) {
       canPop.value = false;
       App.temporaryDisablePopGesture = true;
     } else {
       canPop.value = true;
       App.temporaryDisablePopGesture = false;
+    }
+    if (App.isFluent) {
+      return buildFluent(context);
     }
     return Material(
       child: buildBody(),
@@ -1171,15 +1258,18 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
   /// Fluent 模式的面板包装: 完整 Scaffold 页面 (漫画源/文件管理器) 不能放入
   /// scrollable (ListView 给子项无界高度, 会导致 infinite size 崩溃),
   /// 需改用有界约束的 ScaffoldPage.content
-  Widget _buildFluentPane(int index) {
-    final content = buildFluentRight(index);
-    if (index == 1 || index == _fileManagerIndex) {
-      return fluent.ScaffoldPage(content: content);
-    }
-    return fluent.ScaffoldPage.scrollable(children: [content]);
-  }
+  Widget _buildFluentPane(int index) => _secondarySettingsNavigation(
+    'fluent-$index',
+    (context) {
+      final content = buildFluentRight(index, context);
+      if (index == 1 || index == _fileManagerIndex) {
+        return fluent.ScaffoldPage(content: content);
+      }
+      return fluent.ScaffoldPage.scrollable(children: [content]);
+    },
+  );
 
-  Widget buildFluentRight(int index) {
+  Widget buildFluentRight(int index, BuildContext context) {
     switch (index) {
       case 0:
         return buildExploreSettings(context, false);
@@ -1191,13 +1281,15 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         return const DebugPage();
       case _aiTranslationPageIndex:
         return const AiTranslationSettingsPage(embedded: true);
-      case 4:
-        return buildFluentAppearanceSettings();
+      case _imageEnhancePageIndex:
+        return const ImageEnhanceSettings();
       case 5:
-        return const LocalFavoritesSettings();
+        return buildFluentAppearanceSettings(context);
       case 6:
-        return buildFluentAppSettings();
+        return const LocalFavoritesSettings();
       case 7:
+        return buildFluentAppSettings(context);
+      case 8:
         return const NetworkSettings();
       case _aboutPageIndex:
         return buildFluentAbout();
@@ -1210,7 +1302,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     }
   }
 
-  Widget buildFluentAppSettings() {
+  Widget buildFluentAppSettings(BuildContext context) {
     return Column(
       children: [
         fluent.ListTile(
@@ -1384,7 +1476,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
             Text(_platformName),
           ],
         ),
-        Text("Pica Comic是一个免费的开源漫画阅读应用。".tl),
+        Text("Pica Comic 是一个 Fork 自 Pica Comic和参考VeneraX并在原版基础上进行维护与增强，免费开源的多平台漫画阅读应用。".tl),
         const SizedBox(
           height: 16,
         ),
@@ -1789,12 +1881,70 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           const SizedBox(
             height: 4,
           ),
+          buildSearchField(),
           Expanded(
-            child: buildCategories(),
+            child: _searchQuery.trim().isEmpty
+                ? buildCategories()
+                : _buildSettingsSearchResults(
+                    context,
+                    _searchQuery,
+                    _openSettingsResult,
+                  ),
           )
         ],
       ),
     );
+  }
+
+  Widget buildSearchField() => Padding(
+    padding: EdgeInsets.fromLTRB(
+      enableTwoViews ? 12 : 20,
+      4,
+      enableTwoViews ? 12 : 20,
+      0,
+    ),
+    child: TextField(
+      controller: _searchController,
+      style: const TextStyle(fontSize: 14),
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: "搜索设置".tl,
+        prefixIcon: const Icon(Icons.search, size: 20),
+        filled: true,
+        fillColor: colors.surfaceContainerHighest,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: enableTwoViews
+              ? BorderSide(color: colors.outlineVariant)
+              : BorderSide.none,
+        ),
+        suffixIcon: _searchQuery.isEmpty
+            ? null
+            : IconButton(
+                tooltip: "清除".tl,
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              ),
+      ),
+      onChanged: (value) => setState(() => _searchQuery = value),
+    ),
+  );
+
+  void _openSettingsResult(_SettingsSearchEntry entry) {
+    final target = _picaCategory(entry.category);
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      currentPage = target;
+    });
   }
 
   Widget buildCategories() {
@@ -1815,51 +1965,92 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         ),
       );
     }
-    Widget buildItem(String name, int id) {
-      final bool selected = id == currentPage;
 
-      Widget content = AnimatedContainer(
-        key: ValueKey(id),
-        duration: const Duration(milliseconds: 200),
-        width: double.infinity,
-        height: 46,
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-        decoration: BoxDecoration(
-          color: selected ? colors.primaryContainer.toOpacity(0.36) : null,
-          border: Border(
-            left: BorderSide(
-              color: selected ? colors.primary : Colors.transparent,
-              width: 2,
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        enableTwoViews ? 12 : 20,
+        0,
+        enableTwoViews ? 12 : 20,
+        24,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (title, ids) in _clusters) ...[
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                8,
+                !enableTwoViews && title == _clusters.first.$1 ? 8 : 20,
+                8,
+                9,
+              ),
+              child: Text(
+                title.tl,
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+              ),
+            ),
+            Material(
+              color: enableTwoViews ? Colors.transparent : colors.surface,
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (var i = 0; i < ids.length; i++) ...[
+                    if (!enableTwoViews && i > 0)
+                      Divider(
+                        height: 1,
+                        thickness: 0.6,
+                        indent: 48,
+                        color: colors.outlineVariant,
+                      ),
+                    _categoryTile(ids[i]),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 28, 8, 8),
+            child: Text(
+              'Pica Comic V$appVersion',
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _categoryTile(int id) {
+    final selected = enableTwoViews && id == currentPage;
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: enableTwoViews ? 2 : 0),
+      child: ListTile(
+        key: ValueKey('settings-category-$id'),
+        dense: enableTwoViews,
+        minTileHeight: enableTwoViews ? 44 : 68,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        selected: selected,
+        selectedTileColor: colors.primaryContainer.withValues(alpha: 0.45),
+        leading: Icon(icons[id], size: 21),
+        minLeadingWidth: 21,
+        horizontalTitleGap: 11,
+        title: Text(
+          categories[id].tl,
+          style: const TextStyle(fontSize: 14),
         ),
-        child: Row(children: [
-          Icon(icons[id]),
-          const SizedBox(width: 16),
-          Text(
-            name,
-            style: const TextStyle(fontSize: 16),
-          ),
-          const Spacer(),
-          if (selected) const Icon(Icons.arrow_right)
-        ]),
-      );
-
-      return Padding(
-        padding: enableTwoViews
-            ? const EdgeInsets.fromLTRB(8, 0, 8, 0)
-            : EdgeInsets.zero,
-        child: InkWell(
-          onTap: () => setState(() => currentPage = id),
-          child: content,
-        ).paddingVertical(4),
-      );
-    }
-
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: categories.length,
-      itemBuilder: (context, index) => buildItem(categories[index].tl, index),
+        subtitle: enableTwoViews
+            ? null
+            : Text(
+                _categoryDescriptions[id].tl,
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+              ),
+        trailing: enableTwoViews
+            ? null
+            : const Icon(Icons.chevron_right, size: 18),
+        onTap: () => setState(() => currentPage = id),
+      ),
     );
   }
 
@@ -1985,7 +2176,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     }
   }
 
-  Widget buildFluentAppearanceSettings() {
+  Widget buildFluentAppearanceSettings(BuildContext context) {
     return Column(
       children: [
         fluent.ListTile(
@@ -2220,7 +2411,116 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     );
   }
 
-  Widget buildAppearanceSettings() => Column(
+  Widget _themeSample(bool dark) {
+    final ink = dark ? const Color(0xFFAAA5B7) : const Color(0xFFDAD6E4);
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF24232A) : Colors.white,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: ink.withValues(alpha: 0.5)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          Container(width: 8, color: ink.withValues(alpha: 0.2)),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(height: 5, color: ink),
+                  const SizedBox(height: 6),
+                  Container(height: 9, color: ink.withValues(alpha: 0.3)),
+                  const SizedBox(height: 4),
+                  Container(height: 9, color: ink.withValues(alpha: 0.3)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _themeModes() {
+    final colors = context.colorScheme;
+    const modes = {0: '跟随系统', 1: '浅色', 2: '深色'};
+    final selected = int.tryParse(appdata.settings[32]) ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '主题模式'.tl,
+          style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+        ),
+        const SizedBox(height: 9),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final mode in modes.entries) ...[
+                if (mode.key != modes.keys.first) const SizedBox(width: 10),
+                Expanded(
+                  child: Semantics(
+                    selected: selected == mode.key,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.all(10),
+                        foregroundColor: colors.onSurface,
+                        backgroundColor: selected == mode.key
+                            ? colors.primaryContainer.withValues(alpha: 0.4)
+                            : colors.surfaceContainerLow,
+                        side: BorderSide(
+                          color: selected == mode.key
+                              ? colors.primary
+                              : colors.outlineVariant,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          appdata.settings[32] = mode.key.toString();
+                        });
+                        appdata.updateSettings();
+                        MyApp.updater?.call();
+                      },
+                      child: Column(
+                        children: [
+                          ExcludeSemantics(
+                            child: mode.key == 0
+                                ? Row(
+                                    children: [
+                                      Expanded(child: _themeSample(false)),
+                                      const SizedBox(width: 2),
+                                      Expanded(child: _themeSample(true)),
+                                    ],
+                                  )
+                                : _themeSample(mode.key == 2),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            mode.value.tl,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildAppearanceSettings(BuildContext context) => Column(
         children: [
           ListTile(
             leading: const Icon(Icons.color_lens),
@@ -2297,19 +2597,9 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
               App.to(context, () => const FontManagementPage());
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.dark_mode),
-            title: Text("深色模式".tl),
-            trailing: components.Select(
-              initialValue: int.parse(appdata.settings[32]),
-              values: ["跟随系统".tl, "禁用".tl, "启用".tl],
-              onChange: (i) {
-                appdata.settings[32] = i.toString();
-                appdata.updateSettings();
-                MyApp.updater?.call();
-              },
-              width: 140,
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: _themeModes(),
           ),
           ListTile(
             leading: const Icon(Icons.window),
@@ -2498,7 +2788,7 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
         ],
       );
 
-  Widget buildAppSettings() {
+  Widget buildAppSettings(BuildContext context) {
     return Column(
       children: [
         ListTile(
@@ -2631,6 +2921,8 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
           leading: const Icon(Icons.person_outline),
         ),
 
+        if (App.isAndroid) const _BatteryOptimizationSetting(),
+
         ListTile(
           title: Text("语言".tl),
           //leading: const Icon(Icons.language),
@@ -2680,119 +2972,12 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
     );
   }
 
-  Widget buildAbout() {
-    return Column(
-      children: [
-        SizedBox(
-          height: 130,
-          width: double.infinity,
-          child: Center(
-            child: Container(
-              width: 156,
-              height: 156,
-              decoration:
-                  BoxDecoration(borderRadius: BorderRadius.circular(20)),
-              child: const Image(
-                image: AssetImage("images/app_icon_no_bg.png"),
-                filterQuality: FilterQuality.medium,
-              ),
-            ),
-          ),
-        ),
-        const Text(
-          "V$appVersion",
-          style: TextStyle(fontSize: 16),
-        ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_platformIcon != null) ...[
-              _platformIcon!,
-              const SizedBox(width: 4),
-            ],
-            Text(_platformName),
-          ],
-        ),
-        Text("Pica Comic是一个免费的开源漫画阅读应用。".tl),
-        const SizedBox(
-          height: 16,
-        ),
-        ListTile(
-          leading: const Icon(Icons.description_outlined),
-          title: const Text("开源许可证"),
-          subtitle: const Text("查看所有开源许可证"),
-          onTap: () => App.globalTo(() => const AboutLicensePage()),
-          trailing: const Icon(Icons.arrow_right),
-        ),
-        ListTile(
-          leading: const Icon(Icons.history),
-          title: const Text("历史版本"),
-          subtitle: const Text("查看历史版本更新"),
-          onTap: () => showPopUpWidget(
-              App.globalContext!, const AppUpdaterHistoryPage()),
-          trailing: const Icon(Icons.arrow_right),
-        ),
-        ListTile(
-          title: Text("检查更新".tl),
-          trailing: Button.filled(
-            child: Text("检查".tl),
-            onPressed: () => findUpdate(context),
-          ),
-        ),
-        if (!PlatformUtils.isOhos)
-          SwitchListTile(
-            title: Text("切换至codeberg更新漫画源和更新".tl),
-            subtitle: const Text("关闭可切换回github"),
-            value: appdata.settings[105] == "1",
-            onChanged: (value) {
-              appdata.settings[105] = value ? "1" : "0";
-              appdata.updateSettings();
-              setState(() {});
-            },
-          ),
-        SwitchListTile(
-          title: Text("启动时检查更新".tl),
-          value: appdata.settings[2] == "1",
-          onChanged: (value) {
-            appdata.settings[2] = value ? "1" : "0";
-            appdata.updateSettings();
-            setState(() {});
-          },
-        ),
+  Widget buildRight() => _secondarySettingsNavigation(
+    'material-$currentPage',
+    _buildRightPage,
+  );
 
-        ListTile(
-          leading: const Icon(Icons.code),
-          title: Text("项目地址".tl),
-          onTap: () => AppUrlLauncher.launchExternalUrl(kProjectRepoUrl),
-          trailing: const Icon(Icons.open_in_new),
-        ),
-        ListTile(
-          leading: const Icon(Icons.comment_outlined),
-          title: Text("问题反馈 (Github)".tl),
-          onTap: () => AppUrlLauncher.launchExternalUrl(kProjectIssuesUrl),
-          trailing: const Icon(Icons.open_in_new),
-        ),
-        // ListTile(
-        //   leading: const Icon(Icons.email),
-        //   title: Text("EMAIL_ME_PLACEHOLDER".tl),
-        //   onTap: () => launchUrlString("mailto://example@foo.bar",
-        //       mode: LaunchMode.externalApplication),
-        //   trailing: const Icon(Icons.arrow_right),
-        // ),
-         ListTile(
-           leading: const Icon(Icons.telegram),
-           title: Text("加入群组群聊".tl),
-           onTap: _launchGroup,
-           trailing: const Icon(Icons.open_in_new),
-         ),
-        Padding(
-            padding:
-                EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
-      ],
-    );
-  }
-
-  Widget buildRight() {
+  Widget _buildRightPage(BuildContext context) {
     if (currentPage == _fileManagerIndex) {
       return const FileManagerPage();
     }
@@ -2805,16 +2990,21 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       );
     }
 
+    // 关于页面自带 SmoothCustomScrollView + Appbar, 同样不能嵌入 SliverToBoxAdapter
+    if (currentPage == _aboutPageIndex) {
+      return AboutSettings(onBack: () => setState(() => currentPage = -1));
+    }
+
     final Widget body = switch (currentPage) {
       -1 => const SizedBox(),
       0 => buildExploreSettings(context, false),
       1 => const SizedBox(),
       2 => const ReadingSettings(false),
-      4 => buildAppearanceSettings(),
-      5 => const LocalFavoritesSettings(),
-      6 => buildAppSettings(),
-      7 => const NetworkSettings(),
-      _aboutPageIndex => buildAbout(),
+      _imageEnhancePageIndex => const ImageEnhanceSettings(),
+      5 => buildAppearanceSettings(context),
+      6 => const LocalFavoritesSettings(),
+      7 => buildAppSettings(context),
+      8 => const NetworkSettings(),
       _appUpdaterHistoryIndex => const AppUpdaterHistoryPage(embedded: true),
       _debugPageIndex => const DebugPage(),
       _aiTranslationPageIndex =>
@@ -2915,6 +3105,99 @@ class _SettingsPageState extends State<SettingsPage> implements PopEntry {
       // 调用onPop回调
       widget.onPop?.call();
     }
+  }
+}
+
+class _BatteryOptimization {
+  static const _channel = MethodChannel('pica_comic/battery_optimization');
+
+  static Future<bool> isIgnoring() async {
+    if (!App.isAndroid) return true;
+    return await _invoke('isIgnoring') == true;
+  }
+
+  static Future<bool> request() async {
+    if (!App.isAndroid) return true;
+    return await _invoke('request') == true;
+  }
+
+  static Future<Object?> _invoke(String method) async {
+    try {
+      return await _channel.invokeMethod(method);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+}
+
+/// 电池优化豁免设置项（仅 Android）。回到前台时刷新状态。
+class _BatteryOptimizationSetting extends StatefulWidget {
+  const _BatteryOptimizationSetting();
+
+  @override
+  State<_BatteryOptimizationSetting> createState() =>
+      _BatteryOptimizationSettingState();
+}
+
+class _BatteryOptimizationSettingState
+    extends State<_BatteryOptimizationSetting> with WidgetsBindingObserver {
+  bool? _ignoring;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refresh();
+    }
+  }
+
+  Future<void> _refresh() async {
+    final ignoring = await _BatteryOptimization.isIgnoring();
+    if (mounted) {
+      setState(() => _ignoring = ignoring);
+    }
+  }
+
+  Future<void> _request() async {
+    await _BatteryOptimization.request();
+    await _refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ignoring = _ignoring;
+    final subtitle = ignoring == null
+        ? '检查中'.tl
+        : (ignoring ? '已关闭电池优化，后台任务可持续运行'.tl : '电池优化开启中，后台任务可能被系统冻结'.tl);
+    return ListTile(
+      title: Text('忽略电池优化'.tl),
+      subtitle: Text(subtitle),
+      isThreeLine: ignoring == false,
+      trailing: ignoring == true
+          ? Icon(Icons.check_circle, color: context.colorScheme.primary)
+          : SizedBox(
+              height: 28,
+              child: TextButton(
+                onPressed: _request,
+                child: Text('允许'.tl),
+              ),
+            ),
+      onTap: ignoring == true ? null : _request,
+    );
   }
 }
 

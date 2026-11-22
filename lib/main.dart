@@ -15,6 +15,7 @@ import 'package:pica_comic/components/window_frame.dart';
 import 'package:pica_comic/foundation/app.dart';
 import 'package:pica_comic/foundation/app_page_route.dart';
 import 'package:pica_comic/foundation/history.dart';
+import 'package:pica_comic/foundation/image_enhance_shader.dart';
 import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/foundation/platform_utils.dart';
 import 'package:pica_comic/init.dart';
@@ -40,6 +41,7 @@ void main(List<String> args) {
   }
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    await ImageEnhanceShader.instance.preload();
     await LiquidGlassWidgets.initialize();
     await init();
     FlutterError.onError = (details) {
@@ -493,12 +495,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                         final globalNavigator = App.navigatorKey.currentState;
                         if (globalNavigator != null &&
                             globalNavigator.canPop()) {
-                          App.globalBack();
+                          globalNavigator.maybePop();
                         } else {
                           final mainNavigator =
                               App.mainNavigatorKey?.currentState;
                           if (mainNavigator != null && mainNavigator.canPop()) {
-                            mainNavigator.pop();
+                            mainNavigator.maybePop();
                           }
                         }
                       },
@@ -590,12 +592,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     () {
                       final globalNavigator = App.navigatorKey.currentState;
                       if (globalNavigator != null && globalNavigator.canPop()) {
-                        App.globalBack();
+                        globalNavigator.maybePop();
                       } else {
                         final mainNavigator =
                             App.mainNavigatorKey?.currentState;
                         if (mainNavigator != null && mainNavigator.canPop()) {
-                          mainNavigator.pop();
+                          mainNavigator.maybePop();
                         }
                       }
                     },

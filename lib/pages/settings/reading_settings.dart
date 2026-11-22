@@ -282,9 +282,116 @@ class _ReadingSettingsState extends State<ReadingSettings> {
           settingsIndex: 81,
           icon: const Icon(Icons.dark_mode),
         ),
+        const ImageEnhanceSettings(showTitle: true),
         Padding(
             padding:
                 EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom))
+      ],
+    );
+  }
+}
+
+class ImageEnhanceSettings extends StatefulWidget {
+  const ImageEnhanceSettings({super.key, this.showTitle = false});
+
+  final bool showTitle;
+
+  @override
+  State<ImageEnhanceSettings> createState() => _ImageEnhanceSettingsState();
+}
+
+class _ImageEnhanceSettingsState extends State<ImageEnhanceSettings> {
+  Widget _slider(
+    String title,
+    int settingsIndex,
+    double max,
+    double fallback,
+  ) {
+    final value = (double.tryParse(appdata.settings[settingsIndex]) ?? fallback)
+        .clamp(0.0, max)
+        .toDouble();
+    return ListTile(
+      leading: const SizedBox(width: 40),
+      title: Text(title),
+      subtitle: Slider(
+        min: 0,
+        max: max,
+        divisions: (max * 10).round(),
+        value: value,
+        onChanged: (value) {
+          setState(() {
+            appdata.settings[settingsIndex] = value.toStringAsFixed(1);
+          });
+          appdata.updateSettings();
+        },
+      ),
+      trailing: SizedBox(
+        width: 36,
+        child: Text(value.toStringAsFixed(1)),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.showTitle) SettingsTitle("图片处理 / 增强".tl),
+        ListTile(
+          leading: const Icon(Icons.auto_fix_high),
+          title: Text("图像增强".tl),
+          subtitle: Text("锐化模糊图片，并在渲染时调整清晰度".tl),
+          trailing: AdaptiveSwitch(
+            value:
+                appdata.settings[ImageEnhanceShader.enabledSettingIndex] == "1",
+            onChanged: (value) {
+              setState(() {
+                appdata.settings[ImageEnhanceShader.enabledSettingIndex] =
+                    value ? "1" : "0";
+              });
+              appdata.updateSettings();
+            },
+          ),
+        ),
+        if (appdata.settings[ImageEnhanceShader.enabledSettingIndex] ==
+            "1") ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: ImageEnhancePreview(
+              settingsVersion: Object.hash(
+                appdata.settings[ImageEnhanceShader.strengthSettingIndex],
+                appdata.settings[ImageEnhanceShader.claritySettingIndex],
+                appdata.settings[ImageEnhanceShader.contrastSettingIndex],
+                appdata.settings[ImageEnhanceShader.vibranceSettingIndex],
+              ),
+            ),
+          ),
+          _slider(
+            "锐化强度".tl,
+            ImageEnhanceShader.strengthSettingIndex,
+            ImageEnhanceShader.maxStrength,
+            0.5,
+          ),
+          _slider(
+            "清晰度".tl,
+            ImageEnhanceShader.claritySettingIndex,
+            1.0,
+            0.0,
+          ),
+          _slider(
+            "对比度".tl,
+            ImageEnhanceShader.contrastSettingIndex,
+            1.0,
+            0.0,
+          ),
+          _slider(
+            "色彩鲜艳度".tl,
+            ImageEnhanceShader.vibranceSettingIndex,
+            1.0,
+            0.0,
+          ),
+        ],
       ],
     );
   }

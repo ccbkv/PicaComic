@@ -1,14 +1,4 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:pica_comic/foundation/app.dart';
-import 'package:pica_comic/utils/translations.dart';
-
-import '../../components/components.dart';
-import '../../foundation/js_engine.dart';
-import '../logs_page.dart';
-
 part of 'settings_page.dart';
-
 
 class DebugPage extends StatefulWidget {
   const DebugPage({super.key});
@@ -24,7 +14,6 @@ class DebugPageState extends State<DebugPage> {
 
   @override
   Widget build(BuildContext context) {
-
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -117,7 +106,8 @@ class _CallbackSetting extends StatelessWidget {
   final String actionTitle;
   final VoidCallback callback;
 
-  const _CallbackSetting({required this.title, required this.actionTitle, required this.callback});
+  const _CallbackSetting(
+      {required this.title, required this.actionTitle, required this.callback});
 
   @override
   Widget build(BuildContext context) {

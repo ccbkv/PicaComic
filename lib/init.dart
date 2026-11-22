@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pica_comic/foundation/comic_source/comic_source.dart';
 import 'package:pica_comic/foundation/cache_manager.dart';
 import 'package:pica_comic/foundation/history.dart';
+import 'package:pica_comic/foundation/image_translation/pre_translation_tasks.dart';
 import 'package:pica_comic/foundation/image_translation/translation_store.dart';
 import 'package:pica_comic/foundation/js_engine.dart';
 import 'package:pica_comic/foundation/local_favorites.dart';
@@ -65,10 +66,7 @@ Future<void> init() async {
     if (App.isIOS) {
       logFile = null;
     }
-    if (logFile?.existsSync() ?? false) {
-      await logFile?.delete();
-    }
-    LogManager.logFile = logFile;
+    LogManager.rotateLogFile(logFile);
     LogManager.addLog(LogLevel.info, "App Status", "Start initialization.");
 
     // 安全读取应用数据
@@ -90,6 +88,9 @@ Future<void> init() async {
             LogLevel.error, "Init", "Failed to reinitialize app data: $e2");
       }
     }
+    Log.syncVerboseNetwork(
+      appdata.settings.length > 112 && appdata.settings[112] == "1",
+    );
 
     SingleInstanceCookieJar("${App.dataPath}/cookies.db");
     HttpProxyServer.createConfigFile();
@@ -141,6 +142,7 @@ Future<void> init() async {
       OpenCC.init(),
     ]);
     CacheManager().setLimitSize(appdata.appSettings.cacheLimit);
+    PreTranslationTaskManager.instance.resumePendingTasks();
 
     FollowUpdatesService.initChecker();
   } catch (e, s) {

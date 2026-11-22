@@ -71,6 +71,8 @@ extension ImageExt on ComicReadingPage {
             width: imageWidth,
             height: imageWidth * 1.2,
             fit: BoxFit.cover,
+            onInit: (state) => logic.imageStates.add(state),
+            onDispose: (state) => logic.imageStates.remove(state),
           );
         },
       );
@@ -134,62 +136,66 @@ extension ImageExt on ComicReadingPage {
 
           logic.photoViewControllers[index] ??= PhotoViewController();
 
-          return PhotoViewGalleryPageOptions(
-            filterQuality: FilterQuality.medium,
-            imageProvider: imageProvider,
-            fit: getFit(),
+          return PhotoViewGalleryPageOptions.customChild(
             controller: logic.photoViewControllers[index],
-            errorBuilder: (_, error, s, retry) {
-              return Center(
-                child: SizedBox(
-                  height: 300,
-                  width: 400,
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            error.toString(),
-                            style: TextStyle(
-                                color: appdata.appSettings.useDarkBackground
-                                    ? Colors.white
-                                    : null),
-                            maxLines: 3,
+            heroAttributes:
+                PhotoViewHeroAttributes(tag: "$index/${logic.urls.length}"),
+            child: ComicImage(
+              filterQuality: FilterQuality.medium,
+              image: imageProvider,
+              fit: getFit(),
+              errorBuilder: (_, error, s, retry) {
+                return Center(
+                  child: SizedBox(
+                    height: 300,
+                    width: 400,
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              error.toString(),
+                              style: TextStyle(
+                                  color: appdata.appSettings.useDarkBackground
+                                      ? Colors.white
+                                      : null),
+                              maxLines: 3,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(
-                        height: 4,
-                      ),
-                      MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: Listener(
-                          onPointerDown: (details) {
-                            TapController.ignoreNextTap = true;
-                            retry();
-                          },
-                          child: const SizedBox(
-                            width: 84,
-                            height: 36,
-                            child: Center(
-                              child: Text(
-                                "Retry",
-                                style: TextStyle(color: Colors.blue),
+                        const SizedBox(
+                          height: 4,
+                        ),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: Listener(
+                            onPointerDown: (details) {
+                              TapController.ignoreNextTap = true;
+                              retry();
+                            },
+                            child: const SizedBox(
+                              width: 84,
+                              height: 36,
+                              child: Center(
+                                child: Text(
+                                  "Retry",
+                                  style: TextStyle(color: Colors.blue),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                    ],
+                        const SizedBox(
+                          height: 16,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-            heroAttributes:
-                PhotoViewHeroAttributes(tag: "$index/${logic.urls.length}"),
+                );
+              },
+              onInit: (state) => logic.imageStates.add(state),
+              onDispose: (state) => logic.imageStates.remove(state),
+            ),
           );
         },
         pageController: logic.pageController,
@@ -241,6 +247,8 @@ extension ImageExt on ComicReadingPage {
         image: createImageProvider(type, logic, imageIndex, target),
         fit: fit,
         alignment: alignment,
+        onInit: (state) => logic.imageStates.add(state),
+        onDispose: (state) => logic.imageStates.remove(state),
       );
     }
 

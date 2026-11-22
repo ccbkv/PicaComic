@@ -172,11 +172,21 @@ void openTranslatedChaptersPage(
   }
 
   Future<void> hydrateAndOpen() async {
+    var cached = ComicDetailsCache().find(comic.sourceKey, comic.comicId);
+    if (cached != null) {
+      await open(details: cached);
+      return;
+    }
     var source = ComicSource.find(comic.sourceKey);
     if (source?.loadComicInfo != null) {
       try {
         var res = await source!.loadComicInfo!(comic.comicId);
         if (!res.error) {
+          ComicDetailsCache().update(
+            comic.sourceKey,
+            comic.comicId,
+            res.data,
+          );
           await open(details: res.data);
           return;
         }
@@ -234,34 +244,98 @@ class _SelectPreTranslateChapter extends StatefulWidget {
       _SelectPreTranslateChapterState();
 }
 
+enum _TranslationFilter { all, pending, translating, stored, attention }
+
+enum _ChapterTranslationState {
+  pending,
+  stored,
+  complete,
+  failed,
+  paused,
+  running,
+  queued,
+}
+
+class _ChapterFilterStatus {
+  const _ChapterFilterStatus(
+    this.state,
+    this.saved,
+    this.total,
+    this.failed,
+    this.progress,
+    this.task,
+  );
+
+  final _ChapterTranslationState state;
+  final int saved;
+  final int total;
+  final int failed;
+  final double? progress;
+  final PreTranslationTask? task;
+
+  bool get stored => saved > 0;
+
+  bool get active =>
+      state == _ChapterTranslationState.running ||
+      state == _ChapterTranslationState.paused ||
+      state == _ChapterTranslationState.queued;
+}
+
 class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
     with TickerProviderStateMixin {
   List<int> selected = [];
   final Set<String> _removedChapterIds = {};
-  late final Set<String> _translatedChapterIds;
+  final _search = TextEditingController();
+  Map<String, int> _savedPages = {};
+  Map<String, int> _pageTotals = {};
+  var _fetchingPageCounts = false;
 
-  late final TabController? _statusTabController;
+  static const _availableFilters = [
+    _TranslationFilter.all,
+    _TranslationFilter.pending,
+    _TranslationFilter.translating,
+    _TranslationFilter.stored,
+    _TranslationFilter.attention,
+  ];
+
+  late final TabController _statusTabController;
+  final _tabStorage = PageStorageBucket();
   TabController? _groupTabController;
 
-  bool get _hasStatusTabs => widget.translatedView;
+  _TranslationFilter get _currentFilter =>
+      _availableFilters[_statusTabController.index];
 
-  bool get _showTranslated =>
-      !_hasStatusTabs || _statusTabController!.index == 0;
+  bool get _showTranslated => _currentFilter == _TranslationFilter.stored;
 
   /// Whether entry [index] is offered to the user at all: not deleted this
   /// session, not hidden as a duplicate, and matching the active status tab.
   bool _isVisible(int index) =>
       !_removedChapterIds.contains(widget.entries[index].$1) &&
+      _matchesQuery(index) &&
       _matchesStatus(index);
+
+  bool _matchesQuery(int index) {
+    final query = _search.text.replaceAll(RegExp(r'\s'), '').toLowerCase();
+    if (query.isEmpty) return true;
+    final entry = widget.entries[index];
+    final title = entry.$2.replaceAll(RegExp(r'\s'), '').toLowerCase();
+    return title.contains(query) ||
+        entry.$1.toLowerCase().contains(query) ||
+        '${index + 1}' == query;
+  }
 
   @override
   void initState() {
     super.initState();
-    _translatedChapterIds = {...widget.translatedChapterIds};
-    _statusTabController = _hasStatusTabs
-        ? (TabController(length: 2, vsync: this)
-          ..addListener(_onStatusTabChanged))
-        : null;
+    _loadStore();
+    final initialFilter = widget.translatedView
+        ? _TranslationFilter.stored
+        : _TranslationFilter.pending;
+    _statusTabController = TabController(
+      length: _availableFilters.length,
+      initialIndex: _availableFilters.indexOf(initialFilter),
+      vsync: this,
+    )..addListener(_onStatusTabChanged);
     _resetGroupTabController();
     PreTranslationTaskManager.instance.addListener(_onTaskUpdate);
     TranslationStore().addListener(_onStoreUpdate);
@@ -270,18 +344,54 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
   @override
   void dispose() {
     _statusTabController
-      ?..removeListener(_onStatusTabChanged)
+      ..removeListener(_onStatusTabChanged)
       ..dispose();
     _groupTabController
       ?..removeListener(_onGroupTabChanged)
       ..dispose();
     PreTranslationTaskManager.instance.removeListener(_onTaskUpdate);
     TranslationStore().removeListener(_onStoreUpdate);
+    _search.dispose();
     super.dispose();
   }
 
+  void _loadStore() {
+    final config = TranslationConfig.of(widget.cid, widget.sourceKey);
+    _savedPages = {
+      for (final chapter in TranslationStore().chaptersFor(
+        widget.sourceKey,
+        widget.cid,
+        sourceLang: config.sourceLang,
+        targetLang: config.targetLang,
+      ))
+        chapter.identity.chapterId: chapter.pageCount,
+    };
+    for (final entry in widget.entries) {
+      final eid = entry.$1;
+      if ((_savedPages[eid] ?? 0) > 0) continue;
+      final pages = ImageTranslationService.storedPageCount(
+        widget.cid,
+        widget.sourceKey,
+        eid,
+        comicTitle: widget.title,
+        comicCover: widget.cover,
+        chapterTitle: entry.$2,
+      );
+      if (pages > 0) _savedPages[eid] = pages;
+    }
+    _pageTotals = TranslationStore().chapterPageCounts(
+      widget.sourceKey,
+      widget.cid,
+    );
+  }
+
+  void _onSearchChanged(String _) {
+    _resetGroupTabController();
+    setState(selected.clear);
+  }
+
   void _onStatusTabChanged() {
-    if (!mounted || _statusTabController!.indexIsChanging) return;
+    if (!mounted || _statusTabController.indexIsChanging) return;
     // A selection belongs to one status action. Do not accidentally re-run a
     // translated chapter that was selected before switching to pending.
     _resetGroupTabController();
@@ -336,12 +446,134 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
             if (_isVisible(i)) i,
         ];
 
-  bool _matchesStatus(int index) {
-    if (!_hasStatusTabs) return true;
-    final isTranslated = _translatedChapterIds.contains(
-      widget.entries[index].$1,
+  _ChapterFilterStatus _filterStatus(int index) {
+    final eid = widget.entries[index].$1;
+    final manager = PreTranslationTaskManager.instance;
+    final chapter = manager.chapterProgressFor(
+      widget.cid,
+      widget.sourceKey,
+      eid,
     );
-    return isTranslated == _showTranslated;
+    final stored = _savedPages[eid] ?? 0;
+    final total = _pageTotals[eid] ?? chapter?.total ?? 0;
+    if (chapter == null) {
+      return _ChapterFilterStatus(
+        stored > 0
+            ? _ChapterTranslationState.stored
+            : _ChapterTranslationState.pending,
+        stored,
+        total,
+        0,
+        null,
+        null,
+      );
+    }
+
+    final task = _taskForChapter(chapter);
+    final active = task != null && manager.currentTasks.contains(task);
+    final activity = active ? manager.activityOf(task.id) : null;
+    final live = manager.livePagesOf(widget.cid, widget.sourceKey, chapter);
+    final failures = math.max(0, live.processed - live.done);
+    final complete = total > 0 && live.processed >= total;
+    final taskComplete = chapter.total > 0 && live.processed >= chapter.total;
+    final processing = active &&
+        (!taskComplete || (failures > 0 && activity?.chapterEid == eid));
+    final state = processing
+        ? chapter.paused || task.status == PreTranslationTaskStatus.paused
+            ? _ChapterTranslationState.paused
+            : activity?.chapterEid == eid
+                ? _ChapterTranslationState.running
+                : _ChapterTranslationState.queued
+        : complete
+            ? failures > 0
+                ? _ChapterTranslationState.failed
+                : _ChapterTranslationState.complete
+            : failures > 0
+                ? _ChapterTranslationState.failed
+                : stored > 0
+                    ? _ChapterTranslationState.stored
+                    : _ChapterTranslationState.pending;
+    final uncommitted =
+        activity?.chapterEid == eid ? activity!.uncommittedPages : 0.0;
+    return _ChapterFilterStatus(
+      state,
+      math.max(stored, live.done),
+      total,
+      failures,
+      total > 0
+          ? (math.max(
+                    stored,
+                    chapter.done + chapter.failed + uncommitted,
+                  ) /
+                  total)
+              .clamp(0.0, 1.0)
+          : null,
+      task,
+    );
+  }
+
+  PreTranslationTask? _taskForChapter(PreTranslationChapter chapter) {
+    final manager = PreTranslationTaskManager.instance;
+    for (final task in [...manager.currentTasks, ...manager.historyTasks]) {
+      if (task.chapters.contains(chapter)) return task;
+    }
+    return null;
+  }
+
+  Future<void> _fetchPageCounts(List<int> indices) async {
+    if (_fetchingPageCounts || indices.isEmpty) return;
+    setState(() => _fetchingPageCounts = true);
+    var failures = 0;
+    for (final index in indices) {
+      if (!mounted) break;
+      final eid = widget.entries[index].$1;
+      try {
+        final source = ComicSource.find(widget.sourceKey);
+        if (source?.loadComicPages == null) {
+          throw StateError('Missing comic source');
+        }
+        final result = await source!.loadComicPages!
+                (widget.cid, eid == '0' ? null : eid)
+            .timeout(const Duration(seconds: 30));
+        if (result.error || result.data.isEmpty) {
+          throw StateError('No pages');
+        }
+        TranslationStore().recordChapterPageCount(
+          widget.sourceKey,
+          widget.cid,
+          eid,
+          result.data.length,
+        );
+        if (!mounted) break;
+        setState(_loadStore);
+        if ((_pageTotals[eid] ?? 0) <= 0) failures++;
+      } catch (e, s) {
+        failures++;
+        Log.error('Chapter page count', '$e\n$s');
+      }
+    }
+    if (!mounted) return;
+    setState(() => _fetchingPageCounts = false);
+    if (failures > 0) {
+      context.showMessage(
+        message: '@count 个章节的页数获取失败'.tlParams({
+          'count': failures.toString(),
+        }),
+      );
+    }
+  }
+
+  bool _matchesStatus(int index) {
+    final status = _filterStatus(index);
+    return switch (_currentFilter) {
+      _TranslationFilter.all => true,
+      _TranslationFilter.pending =>
+        status.state == _ChapterTranslationState.pending,
+      _TranslationFilter.translating => status.active,
+      _TranslationFilter.stored => status.stored,
+      _TranslationFilter.attention =>
+        status.failed > 0 || status.state == _ChapterTranslationState.paused,
+    };
   }
 
   bool get _allVisibleSelected {
@@ -365,25 +597,17 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
   }
 
   void _onTaskUpdate() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {
+      selected.removeWhere((index) => !_matchesStatus(index));
+    });
+    _resetGroupTabController();
   }
 
   void _onStoreUpdate() {
     if (!mounted) return;
-    final config = TranslationConfig.of(widget.cid, widget.sourceKey);
-    final current = TranslationStore()
-        .chaptersFor(
-          widget.sourceKey,
-          widget.cid,
-          sourceLang: config.sourceLang,
-          targetLang: config.targetLang,
-        )
-        .map((chapter) => chapter.identity.chapterId)
-        .toSet();
     setState(() {
-      _translatedChapterIds
-        ..clear()
-        ..addAll(current);
+      _loadStore();
       selected.removeWhere((index) => !_matchesStatus(index));
     });
     _resetGroupTabController();
@@ -406,17 +630,15 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
       widget.cid,
       widget.sourceKey,
     )) {
-      App.globalContext!
-          .showMessage(message: '请先配置 AI 翻译'.tl);
+      App.globalContext!.showMessage(message: '请先配置 AI 翻译'.tl);
       return;
     }
     var picked = List<int>.from(selected)..sort();
     showConfirmDialog(
       context: context,
       title: "重新翻译所选章节？".tl,
-      content:
-          "将清除所选 @count 个章节的翻译，然后重新翻译。"
-              .tlParams({'count': picked.length.toString()}),
+      content: "将清除所选 @count 个章节的翻译，然后重新翻译。"
+          .tlParams({'count': picked.length.toString()}),
       onConfirm: () async {
         var service = ImageTranslationService.instance;
         var eids = <String>{};
@@ -438,113 +660,82 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
     );
   }
 
-  /// The trailing status widget for chapter [index]: nothing when idle, a
-  /// "waiting" chip when queued but not started, a live progress bar while
-  /// translating, or a "translated" tick when done. Distinguishes an active
-  /// (running-job) chapter from one merely finished in history.
-  Widget? _buildChapterStatus(int index) {
-    var eid = widget.entries[index].$1;
-    var manager = PreTranslationTaskManager.instance;
-    var chapter = manager.chapterProgressFor(widget.cid, widget.sourceKey, eid);
+  String _status(_ChapterFilterStatus row) {
+    final counts = {
+      'done': row.saved.toString(),
+      'total': row.total.toString(),
+      'failed': row.failed.toString(),
+    };
+    return switch (row.state) {
+      _ChapterTranslationState.pending =>
+        '${'待翻译'.tl}${row.total > 0 ? ' · ${'@count 页'.tlParams({
+                'count': row.total.toString()
+              })}' : ''}',
+      _ChapterTranslationState.stored => row.total > 0
+          ? '已保存 @done/@total 页'.tlParams(counts)
+          : '已保存 @count 页 · 总页数未知'.tlParams({
+              'count': row.saved.toString(),
+            }),
+      _ChapterTranslationState.complete => '已完成 · @done/@total 页'.tlParams(
+          counts,
+        ),
+      _ChapterTranslationState.failed => (row.total > 0
+              ? '已翻译 @done/@total 页 · @failed 页失败'
+              : '已保存 @done 页 · 总页数未知 · @failed 页失败')
+          .tlParams(counts),
+      _ChapterTranslationState.queued =>
+        '${'排队中'.tl}${row.total > 0 ? ' · ${'@count 页'.tlParams({
+                'count': row.total.toString()
+              })}' : ''}',
+      _ =>
+        '${(row.state == _ChapterTranslationState.paused ? '已暂停' : '翻译中').tl} · '
+            '${row.total > 0 ? '@done/@total 页'.tlParams(counts) : '已保存 @count 页 · 总页数未知'.tlParams({
+                    'count': row.saved.toString()
+                  })}'
+            '${row.progress == null ? '' : ' · ${(row.progress! * 100).round()}%'}',
+    };
+  }
 
-    // No task record for this chapter on THIS device — but its translations may
-    // have arrived from another device over WebDAV. Task records are per-device
-    // and deliberately not synced (#106), so fall back to the durable, synced
-    // translation store: any stored page means the chapter was translated
-    // somewhere. Show a "translated" tick with the page count so the user sees
-    // it needn't be re-run. Total page count is not stored, so this reports how
-    // many pages carry a result rather than a percentage.
-    if (chapter == null) {
-      var stored = ImageTranslationService.storedPageCount(
-        widget.cid,
-        widget.sourceKey,
-        eid,
-        comicTitle: widget.title,
-        comicCover: widget.cover,
-        chapterTitle: widget.entries[index].$2,
-      );
-      if (stored <= 0) return null;
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 16,
-            color: context.colorScheme.primary,
+  Widget _buildChapterStatus(int index) {
+    final row = _filterStatus(index);
+    final color = switch (row.state) {
+      _ChapterTranslationState.failed => context.colorScheme.error,
+      _ChapterTranslationState.pending ||
+      _ChapterTranslationState.queued =>
+        context.colorScheme.onSurfaceVariant,
+      _ => context.colorScheme.primary,
+    };
+    final icon = switch (row.state) {
+      _ChapterTranslationState.pending => Icons.schedule_outlined,
+      _ChapterTranslationState.stored => Icons.check_circle_outline,
+      _ChapterTranslationState.complete => Icons.check_circle,
+      _ChapterTranslationState.failed => Icons.error_outline,
+      _ChapterTranslationState.paused => Icons.pause_circle_outline,
+      _ChapterTranslationState.running => Icons.translate_rounded,
+      _ChapterTranslationState.queued => Icons.queue_outlined,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                _status(row),
+                style: ts.s12.withColor(color),
+              ),
+            ),
+          ],
+        ),
+        if (row.active && row.progress != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: LinearProgressIndicator(value: row.progress),
           ),
-          const SizedBox(width: 4),
-          Text(
-            "@count 页".tlParams({'count': stored.toString()}),
-            style: ts.s12.withColor(context.colorScheme.primary),
-          ),
-        ],
-      );
-    }
-
-    var active = manager.isChapterActive(widget.cid, widget.sourceKey, eid);
-    // Live counts: committed pages plus the running job's finished-but-buffered
-    // groups, so the bar tracks work actually done instead of the deliberately
-    // conservative resume cursor. Processed (success + failed) keeps the number
-    // in step with the bar when a page fails.
-    var processed =
-        manager.livePagesOf(widget.cid, widget.sourceKey, chapter).processed;
-    var isCompleted = chapter.total > 0 && processed >= chapter.total;
-
-    if (isCompleted) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 16,
-            color: context.colorScheme.primary,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            "已翻译".tl,
-            style: ts.s12.withColor(context.colorScheme.primary),
-          ),
-        ],
-      );
-    }
-
-    if (!active) return null;
-
-    // Active but nothing processed yet (page count unknown or not started):
-    // show a "waiting" state so the user knows it is queued.
-    if (chapter.total == 0 || processed == 0) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            "等待中".tl,
-            style: ts.s12.withColor(context.colorScheme.onSurfaceVariant),
-          ),
-        ],
-      );
-    }
-
-    var pct = (processed / chapter.total).clamp(0.0, 1.0);
-    return SizedBox(
-      width: 120,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$processed/${chapter.total}',
-            style: ts.s12.withColor(context.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 2),
-          LinearProgressIndicator(value: pct),
-        ],
-      ),
+      ],
     );
   }
 
@@ -572,26 +763,39 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
     );
   }
 
-  /// Whether chapter [index] has translation content the user could delete or
-  /// re-run, and is NOT currently being translated. Any stored page (including
-  /// an empty "no text" result) counts as translated content — this catches
-  /// both fully translated and partially translated chapters, while excluding
-  /// an active chapter so a per-chapter action can't collide with a live job.
-  bool _chapterHasIdleTranslation(int index) {
-    var eid = widget.entries[index].$1;
-    var manager = PreTranslationTaskManager.instance;
-    if (manager.isChapterActive(widget.cid, widget.sourceKey, eid)) {
-      return false;
+  bool _isChapterActive(int index) =>
+      PreTranslationTaskManager.instance.isChapterActive(
+        widget.cid,
+        widget.sourceKey,
+        widget.entries[index].$1,
+      );
+
+  void _startChapter(int index) {
+    if (!ImageTranslationService.isReadyForComic(
+      widget.cid,
+      widget.sourceKey,
+    )) {
+      context.showMessage(message: '请先配置 AI 翻译'.tl);
+      return;
     }
-    return ImageTranslationService.storedPageCount(
-          widget.cid,
-          widget.sourceKey,
-          eid,
-          comicTitle: widget.title,
-          comicCover: widget.cover,
-          chapterTitle: widget.entries[index].$2,
-        ) >
-        0;
+    if (_isChapterActive(index)) {
+      context.showMessage(message: '该章节的预翻译任务已在进行中'.tl);
+      return;
+    }
+    showConfirmDialog(
+      context: context,
+      title: '开始预翻译？'.tl,
+      content: '即将翻译「@title」。若你配置的 LLM 端点是付费的，可能产生费用。'
+          .tlParams({'title': widget.entries[index].$2}),
+      onConfirm: () {
+        if (_isChapterActive(index)) {
+          context.showMessage(message: '该章节的预翻译任务已在进行中'.tl);
+          return;
+        }
+        widget.finishSelect([index]);
+        if (mounted) setState(() => selected.remove(index));
+      },
+    );
   }
 
   /// Clears just this chapter's stored text + rendered pages (the comic's
@@ -604,9 +808,7 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
     showConfirmDialog(
       context: context,
       title: "删除该章节的翻译？".tl,
-      content:
-          "将删除「@title」已存的翻译和嵌字页面，原图不受影响。"
-              .tlParams({'title': title}),
+      content: "将删除「@title」已存的翻译和嵌字页面，原图不受影响。".tlParams({'title': title}),
       onConfirm: () async {
         await ImageTranslationService.instance.retranslate(
           widget.cid,
@@ -644,8 +846,7 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
       widget.cid,
       widget.sourceKey,
     )) {
-      App.globalContext!
-          .showMessage(message: '请先配置 AI 翻译'.tl);
+      App.globalContext!.showMessage(message: '请先配置 AI 翻译'.tl);
       return;
     }
     var eid = widget.entries[index].$1;
@@ -653,9 +854,7 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
     showConfirmDialog(
       context: context,
       title: "重新翻译该章节？".tl,
-      content:
-          "将清除「@title」的翻译，然后重新翻译。"
-              .tlParams({'title': title}),
+      content: "将清除「@title」的翻译，然后重新翻译。".tlParams({'title': title}),
       onConfirm: () async {
         await ImageTranslationService.instance.retranslate(
           widget.cid,
@@ -673,20 +872,444 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
     );
   }
 
+  PreTranslationTask? _currentTaskFor(String eid) {
+    final comicKey = '${widget.cid}@${widget.sourceKey}';
+    for (final task in PreTranslationTaskManager.instance.currentTasks) {
+      if (task.comicKey != comicKey) continue;
+      if (task.chapters
+          .any((chapter) => chapter.eid == eid && !chapter.canceled)) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  void _pauseOrResumeChapter(int index) {
+    final eid = widget.entries[index].$1;
+    final task = _currentTaskFor(eid);
+    final chapter = task?.chapters
+        .where((chapter) => chapter.eid == eid && !chapter.canceled)
+        .firstOrNull;
+    if (task == null || chapter == null) return;
+    final manager = PreTranslationTaskManager.instance;
+    if (chapter.paused) {
+      manager.resumeChapter(task.id, eid);
+    } else {
+      manager.pauseChapter(task.id, eid);
+    }
+  }
+
+  void _retryChapter(int index) {
+    if (!ImageTranslationService.isReadyForComic(
+      widget.cid,
+      widget.sourceKey,
+    )) {
+      context.showMessage(message: '请先配置 AI 翻译'.tl);
+      return;
+    }
+    final row = _filterStatus(index);
+    final manager = PreTranslationTaskManager.instance;
+    final chapter = manager.chapterProgressFor(
+      widget.cid,
+      widget.sourceKey,
+      widget.entries[index].$1,
+    );
+    if (chapter == null || row.failed == 0) return;
+    showConfirmDialog(
+      context: context,
+      title: '重试失败页面'.tl,
+      content: '将重试 @count 个失败页面，已完成页面会保留。付费服务可能产生费用。'
+          .tlParams({'count': row.failed.toString()}),
+      onConfirm: () {
+        final current = row.task;
+        if (current != null && manager.currentTasks.contains(current)) {
+          manager.retryChapter(current.id, chapter.eid);
+          return;
+        }
+        final task = manager.start(
+          cid: widget.cid,
+          sourceKey: widget.sourceKey,
+          comicType: widget.comicType,
+          title: widget.title,
+          cover: widget.cover,
+          chapters: [
+            PreTranslationChapter.fromJson(chapter.toJson())
+              ..paused = false
+              ..canceled = false,
+          ],
+        );
+        if (task == null) {
+          context.showMessage(message: '无法开始重试，请检查 AI 翻译配置'.tl);
+        }
+      },
+    );
+  }
+
   /// Cancels just this chapter's slice of a running pre-translation job,
   /// leaving the rest of the job going. Only meaningful while the chapter is
   /// active (queued or translating).
   void _cancelChapter(int index) {
     var eid = widget.entries[index].$1;
     var manager = PreTranslationTaskManager.instance;
-    var task = manager.runningTaskFor(widget.cid, widget.sourceKey);
+    var task = _currentTaskFor(eid);
     if (task == null) return;
     manager.cancelChapter(task.id, eid);
     if (mounted) {
       setState(() {});
-      App.globalContext!
-          .showMessage(message: "已取消该章节翻译".tl);
+      App.globalContext!.showMessage(message: "已取消该章节翻译".tl);
     }
+  }
+
+  void _readChapter(int index) {
+    final entries = widget.entries;
+    final chapters = widget.groups == null
+        ? ComicChapters({for (final entry in entries) entry.$1: entry.$2})
+        : ComicChapters.grouped({
+            for (final group in widget.groups!)
+              group.$1: {
+                for (final i in group.$2) entries[i].$1: entries[i].$2,
+              },
+          });
+    final eid = entries[index].$1;
+    final initialEp = chapters.allChapters.keys.toList().indexOf(eid) + 1;
+    App.globalTo(
+      () => ComicReadingPage(
+        CustomReadingData(
+          widget.cid,
+          widget.title,
+          ComicSource.find(widget.sourceKey),
+          chapters,
+          historyCover: widget.cover,
+          sourceKey: widget.sourceKey,
+        ),
+        0,
+        initialEp,
+      ),
+    );
+  }
+
+  String _edition(int index) =>
+      widget.groups
+          ?.where((group) => group.$2.contains(index))
+          .firstOrNull
+          ?.$1 ??
+      '';
+
+  void _showChapterDetails(int index) {
+    final edition = _edition(index);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => ContentDialog(
+        title: widget.entries[index].$2,
+        content: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            [
+              if (edition.isNotEmpty) edition,
+              _status(_filterStatus(index)),
+            ].join('\n'),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('关闭'.tl),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showChapterEdition(int index) {
+    _statusTabController.index = 0;
+    _search.clear();
+    selected.clear();
+    _resetGroupTabController();
+    final group = _displayGroups.indexWhere(
+      (group) => group.$2.contains(index),
+    );
+    if (group >= 0) _groupTabController?.index = group;
+    setState(() {});
+  }
+
+  void _chapterMenu(int index, Offset offset) {
+    final row = _filterStatus(index);
+    final task = row.task;
+    final edition = _edition(index);
+    showMenuX(
+      context,
+      offset,
+      [
+        if (row.saved > 0)
+          MenuEntry(
+            icon: Icons.menu_book_outlined,
+            text: '阅读章节（已保存 @count 页）'.tlParams({
+              'count': row.saved.toString(),
+            }),
+            onClick: () => _readChapter(index),
+          ),
+        if (row.active)
+          MenuEntry(
+            icon: row.state == _ChapterTranslationState.paused
+                ? Icons.play_arrow
+                : Icons.pause,
+            text: row.state == _ChapterTranslationState.paused
+                ? '继续本章节'.tl
+                : '暂停本章节'.tl,
+            onClick: () => _pauseOrResumeChapter(index),
+          )
+        else if (row.failed > 0)
+          MenuEntry(
+            icon: Icons.refresh_rounded,
+            text: '重试失败页面'.tl,
+            onClick: () => _retryChapter(index),
+          )
+        else
+          MenuEntry(
+            icon: Icons.info_outline,
+            text: '章节进度'.tl,
+            onClick: () => _showChapterDetails(index),
+          ),
+        MenuEntry(
+          icon: Icons.schedule,
+          text: row.state == _ChapterTranslationState.pending
+              ? '预翻译本章节'.tl
+              : '查看任务'.tl,
+          onClick: () => row.state == _ChapterTranslationState.pending
+              ? _startChapter(index)
+              : _openTasks(task?.id),
+        ),
+        MenuEntry(
+          icon: Icons.info_outline,
+          text: '章节详情'.tl,
+          onClick: () => _showChapterDetails(index),
+        ),
+        if (!_fetchingPageCounts)
+          MenuEntry(
+            icon: Icons.format_list_numbered,
+            text: row.total > 0 ? '刷新页数'.tl : '获取页数'.tl,
+            onClick: () => _fetchPageCounts([index]),
+          ),
+        if (!_isChapterActive(index))
+          MenuEntry(
+            icon: Icons.refresh_rounded,
+            text: '重新翻译本章节'.tl,
+            onClick: () => _reTranslateChapter(index),
+          ),
+        MenuEntry(
+          icon: Icons.library_books_outlined,
+          text: '查看该版本的章节'.tl,
+          onClick: () => _showChapterEdition(index),
+        ),
+        if (_isChapterActive(index) && task != null)
+          MenuEntry(
+            icon: Icons.close,
+            text: '取消翻译'.tl,
+            color: context.colorScheme.error,
+            onClick: () => _cancelChapter(index),
+          ),
+        if (row.saved > 0 && !_isChapterActive(index))
+          MenuEntry(
+            icon: Icons.delete_outline,
+            text: '删除本章节翻译'.tl,
+            color: context.colorScheme.error,
+            onClick: () => _deleteChapterTranslation(index),
+          ),
+      ],
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.entries[index].$2,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            [widget.title, edition]
+                .where((text) => text.isNotEmpty)
+                .join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ts.s12.withColor(context.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _taskStatus(PreTranslationTaskStatus status) => switch (status) {
+        PreTranslationTaskStatus.running => '翻译中'.tl,
+        PreTranslationTaskStatus.paused => '已暂停'.tl,
+        PreTranslationTaskStatus.completed => '已完成'.tl,
+        PreTranslationTaskStatus.canceled => '已取消'.tl,
+        PreTranslationTaskStatus.failed => '失败'.tl,
+      };
+
+  void _openTasks([String? taskId]) {
+    final manager = PreTranslationTaskManager.instance;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => ContentDialog(
+        title: '预翻译任务'.tl,
+        content: SizedBox(
+          width: 560,
+          height: math.min(520, context.height * 0.65),
+          child: AnimatedBuilder(
+            animation: manager,
+            builder: (context, _) {
+              final tasks = [
+                ...manager.currentTasks,
+                ...manager.historyTasks,
+              ]
+                  .where(
+                    (task) =>
+                        task.comicKey == '${widget.cid}@${widget.sourceKey}',
+                  )
+                  .toList();
+              if (taskId != null) {
+                tasks.sort((a, b) {
+                  if (a.id == taskId) return -1;
+                  if (b.id == taskId) return 1;
+                  return 0;
+                });
+              }
+              if (tasks.isEmpty) {
+                return Center(child: Text('暂无预翻译任务'.tl));
+              }
+              return ListView(
+                children: [
+                  for (final task in tasks)
+                    ExpansionTile(
+                      initiallyExpanded: task.id == taskId || tasks.length == 1,
+                      title: Text(
+                        task.title.isEmpty ? widget.title : task.title,
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_taskStatus(task.status)} · ${task.done + task.failed}/${task.total} · '
+                            '${'@count 页失败'.tlParams({
+                                  'count': task.failed.toString()
+                                })}',
+                          ),
+                          if (manager.currentTasks.contains(task))
+                            LinearProgressIndicator(
+                              value: manager.activityOf(task.id)?.liveProgress(
+                                        task,
+                                      ) ??
+                                  task.progress,
+                            ),
+                        ],
+                      ),
+                      children: [
+                        for (final chapter in task.chapters)
+                          Builder(
+                            builder: (context) {
+                              final index = widget.entries.indexWhere(
+                                (entry) => entry.$1 == chapter.eid,
+                              );
+                              final active = manager.currentTasks.contains(
+                                    task,
+                                  ) &&
+                                  !chapter.canceled;
+                              return ListTile(
+                                dense: true,
+                                title: Text(chapter.title),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${chapter.canceled ? '${'已取消'.tl} · ' : chapter.paused ? '${'已暂停'.tl} · ' : ''}'
+                                      '${chapter.done + chapter.failed}/${chapter.total} · '
+                                      '${'@count 页失败'.tlParams({
+                                            'count': chapter.failed.toString()
+                                          })}',
+                                    ),
+                                    if (active ||
+                                        (chapter.failed > 0 && index >= 0))
+                                      Wrap(
+                                        spacing: 8,
+                                        children: [
+                                          if (active)
+                                            TextButton(
+                                              onPressed: () => chapter.paused
+                                                  ? manager.resumeChapter(
+                                                      task.id,
+                                                      chapter.eid,
+                                                    )
+                                                  : manager.pauseChapter(
+                                                      task.id,
+                                                      chapter.eid,
+                                                    ),
+                                              child: Text(
+                                                chapter.paused
+                                                    ? '继续'.tl
+                                                    : '暂停'.tl,
+                                              ),
+                                            ),
+                                          if (chapter.failed > 0 && index >= 0)
+                                            TextButton(
+                                              onPressed: () =>
+                                                  _retryChapter(index),
+                                              child: Text('重试失败页面'.tl),
+                                            ),
+                                          if (active)
+                                            TextButton(
+                                              onPressed: () =>
+                                                  manager.cancelChapter(
+                                                task.id,
+                                                chapter.eid,
+                                              ),
+                                              child: Text('取消'.tl),
+                                            ),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        if (manager.currentTasks.contains(task))
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => manager.cancel(task.id),
+                              child: Text(
+                                '取消整个任务'.tl,
+                                style: TextStyle(
+                                  color: context.colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('关闭'.tl),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openGlossary() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => _GlossaryDialog(
+        cid: widget.cid,
+        sourceKey: widget.sourceKey,
+        title: widget.title,
+      ),
+    );
   }
 
   /// Clears every stored translation and rendered page of this whole comic
@@ -696,9 +1319,7 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
     showConfirmDialog(
       context: context,
       title: "删除本漫画的全部翻译？".tl,
-      content:
-          "将删除本漫画所有已存的翻译和嵌字页面，原图不受影响。"
-              .tl,
+      content: "将删除本漫画所有已存的翻译和嵌字页面，原图不受影响。".tl,
       onConfirm: () async {
         // Stop any running job for this comic first, so it doesn't keep
         // repopulating the cache we're about to clear.
@@ -731,58 +1352,77 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
     );
   }
 
+  Offset _menuAnchor(BuildContext target) {
+    final box = target.findRenderObject() as RenderBox?;
+    return box?.localToGlobal(Offset(box.size.width, box.size.height)) ??
+        Offset.zero;
+  }
+
   /// One checkbox row for the flat chapter index [i].
   Widget _buildChapterTile(int i) {
-    var title = widget.entries[i].$2;
-    var eid = widget.entries[i].$1;
-    var progress = _buildChapterStatus(i);
-    var isActive = PreTranslationTaskManager.instance.isChapterActive(
-      widget.cid,
-      widget.sourceKey,
-      eid,
-    );
-    var hasIdleTranslation = _chapterHasIdleTranslation(i);
-    return CheckboxListTile(
-      title: Row(
-        children: [
-          Expanded(child: Text(title)),
-          if (progress != null) ...[const SizedBox(width: 8), progress],
-          if (isActive)
-            IconButton(
-              icon: const Icon(Icons.close_rounded),
-              iconSize: 20,
-              tooltip: "取消翻译".tl,
-              color: context.colorScheme.error,
-              onPressed: () => _cancelChapter(i),
-            )
-          else if (hasIdleTranslation)
-            MenuButton(
-              entries: [
-                MenuEntry(
-                  icon: Icons.refresh_rounded,
-                  text: "重新翻译".tl,
-                  onClick: () => _reTranslateChapter(i),
+    final title = widget.entries[i].$2;
+    final eid = widget.entries[i].$1;
+    final isActive = _isChapterActive(i);
+    final activeChapter = _currentTaskFor(eid)
+        ?.chapters
+        .where((chapter) => chapter.eid == eid && !chapter.canceled)
+        .firstOrNull;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPressStart: (details) => _chapterMenu(i, details.globalPosition),
+      onSecondaryTapUp: (details) => _chapterMenu(i, details.globalPosition),
+      child: CheckboxListTile(
+        title: Row(
+          children: [
+            Expanded(child: Text(title)),
+            if (activeChapter != null)
+              IconButton(
+                icon: Icon(
+                  activeChapter.paused
+                      ? Icons.play_arrow_rounded
+                      : Icons.pause_rounded,
                 ),
-                MenuEntry(
-                  icon: Icons.delete_outline_rounded,
-                  text: "删除翻译".tl,
-                  color: context.colorScheme.error,
-                  onClick: () => _deleteChapterTranslation(i),
-                ),
-              ],
+                iconSize: 20,
+                tooltip: activeChapter.paused ? '继续翻译'.tl : '暂停翻译'.tl,
+                onPressed: () => _pauseOrResumeChapter(i),
+              ),
+            if (activeChapter != null && activeChapter.failed > 0)
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                iconSize: 20,
+                tooltip: '重试失败页面'.tl,
+                onPressed: () => _retryChapter(i),
+              ),
+            if (isActive)
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                iconSize: 20,
+                tooltip: '取消翻译'.tl,
+                color: context.colorScheme.error,
+                onPressed: () => _cancelChapter(i),
+              ),
+            Builder(
+              builder: (menuContext) => IconButton(
+                icon: const Icon(Icons.more_horiz),
+                iconSize: 20,
+                tooltip: '章节操作'.tl,
+                onPressed: () => _chapterMenu(i, _menuAnchor(menuContext)),
+              ),
             ),
-        ],
+          ],
+        ),
+        subtitle: _buildChapterStatus(i),
+        value: selected.contains(i),
+        onChanged: (v) {
+          setState(() {
+            if (selected.contains(i)) {
+              selected.remove(i);
+            } else {
+              selected.add(i);
+            }
+          });
+        },
       ),
-      value: selected.contains(i),
-      onChanged: (v) {
-        setState(() {
-          if (selected.contains(i)) {
-            selected.remove(i);
-          } else {
-            selected.add(i);
-          }
-        });
-      },
     );
   }
 
@@ -836,46 +1476,125 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
   }
 
   Widget _emptyChapterMessage() {
+    if (_search.text.trim().isNotEmpty) {
+      return Center(child: Text('未找到匹配章节'.tl, style: ts.s16));
+    }
+    final message = switch (_currentFilter) {
+      _TranslationFilter.all => '暂无章节'.tl,
+      _TranslationFilter.pending => '暂无待翻译章节'.tl,
+      _TranslationFilter.translating => '暂无翻译中章节'.tl,
+      _TranslationFilter.stored => '暂无已翻译章节'.tl,
+      _TranslationFilter.attention => '暂无需处理的章节'.tl,
+    };
     return Center(
-      child: Text(
-        _showTranslated
-            ? '暂无已翻译章节'.tl
-            : '暂无待翻译章节'.tl,
-        style: ts.s16,
-      ),
+      child: Text(message, style: ts.s16),
     );
   }
 
+  Widget _searchField() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _search,
+          builder: (context, value, _) => TextField(
+            key: const ValueKey('translation-search'),
+            controller: _search,
+            onChanged: _onSearchChanged,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: '搜索章节名称或编号'.tl,
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: value.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: '清除搜索'.tl,
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _search.clear();
+                        _onSearchChanged('');
+                      },
+                    ),
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ),
+      );
+
   Widget _buildStatusTabs() {
-    if (!_hasStatusTabs) return const SizedBox.shrink();
     return Material(
       color: context.colorScheme.surfaceContainerLow,
-      child: AppTabBar(
-        controller: _statusTabController,
-        tabs: [
-          Tab(text: '已翻译'.tl),
-          Tab(text: '待翻译'.tl),
-        ],
+      child: PageStorage(
+        bucket: _tabStorage,
+        child: AppTabBar(
+          key: const ValueKey('translation-filters'),
+          controller: _statusTabController,
+          tabs: [
+            for (final filter in _availableFilters)
+              Tab(
+                key: ValueKey('translation-filter-${filter.name}'),
+                text: switch (filter) {
+                  _TranslationFilter.all => '全部'.tl,
+                  _TranslationFilter.pending => '待翻译'.tl,
+                  _TranslationFilter.translating => '翻译中'.tl,
+                  _TranslationFilter.stored => '已翻译'.tl,
+                  _TranslationFilter.attention => '需处理'.tl,
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
 
   List<MenuEntry> _menuEntries() {
     return [
+      if (selected.isNotEmpty)
+        MenuEntry(
+          icon: _showTranslated
+              ? Icons.refresh_rounded
+              : Icons.play_arrow_rounded,
+          text: _showTranslated ? '重新翻译所选'.tl : '开始'.tl,
+          onClick: _showTranslated ? _reTranslate : _confirmAndStart,
+        ),
+      if (!_fetchingPageCounts)
+        MenuEntry(
+          icon: Icons.format_list_numbered,
+          text: '补齐缺失页数'.tl,
+          onClick: () => _fetchPageCounts(
+            _visibleIndices
+                .where((index) => _filterStatus(index).total <= 0)
+                .toList(),
+          ),
+        ),
       MenuEntry(
-        icon:
-            _showTranslated ? Icons.refresh_rounded : Icons.play_arrow_rounded,
-        text: _showTranslated ? "重新翻译所选".tl : "开始".tl,
-        onClick: _showTranslated ? _reTranslate : _confirmAndStart,
+        icon: Icons.info_outline,
+        text: '打开漫画详情'.tl,
+        onClick: _openComicInfoData,
+      ),
+      MenuEntry(
+        icon: Icons.menu_book_outlined,
+        text: '词汇表'.tl,
+        onClick: _openGlossary,
       ),
       MenuEntry(
         icon: Icons.delete_outline_rounded,
-        text: "删除本漫画翻译".tl,
+        text: '删除全部翻译'.tl,
         color: context.colorScheme.error,
         onClick: _deleteComicTranslation,
       ),
     ];
   }
+
+  void _pageMenu(Offset offset) => showMenuX(
+        context,
+        offset,
+        _menuEntries(),
+        title: Text(
+          widget.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
 
   void _openComicInfoData() {
     context.to(
@@ -903,13 +1622,22 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
             tooltip: '打开漫画详情'.tl,
             onPressed: _openComicInfoData,
           ),
-          MenuButton(entries: _menuEntries()),
+          Builder(
+            builder: (menuContext) => IconButton(
+              icon: const Icon(Icons.more_horiz),
+              tooltip: '更多'.tl,
+              onPressed: () => _pageMenu(_menuAnchor(menuContext)),
+            ),
+          ),
         ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _searchField(),
           _buildStatusTabs(),
+          if (_fetchingPageCounts)
+            LinearProgressIndicator(semanticsLabel: '正在获取页数'.tl),
           Expanded(child: _buildChapterList()),
           Container(
             height: 50,
@@ -947,6 +1675,256 @@ class _SelectPreTranslateChapterState extends State<_SelectPreTranslateChapter>
           SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
+    );
+  }
+}
+
+class _GlossaryDialog extends StatefulWidget {
+  const _GlossaryDialog({
+    required this.cid,
+    required this.sourceKey,
+    required this.title,
+  });
+
+  final String cid;
+  final String sourceKey;
+  final String title;
+
+  @override
+  State<_GlossaryDialog> createState() => _GlossaryDialogState();
+}
+
+class _GlossaryDialogState extends State<_GlossaryDialog> {
+  late List<MapEntry<String, String>> _entries;
+  late List<String> _blocked;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    final service = ImageTranslationService.instance;
+    _entries =
+        service.glossaryOf(widget.cid, widget.sourceKey).entries.toList();
+    _blocked = service.blockedTermsOf(widget.cid, widget.sourceKey);
+  }
+
+  Future<void> _editEntry({String? source, String? translation}) async {
+    final sourceController = TextEditingController(text: source ?? '');
+    final translationController =
+        TextEditingController(text: translation ?? '');
+    final isNew = source == null;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => ContentDialog(
+        title: isNew ? '添加词汇'.tl : '编辑词汇'.tl,
+        content: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: sourceController,
+                enabled: isNew,
+                decoration: InputDecoration(
+                  labelText: '原文'.tl,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: translationController,
+                decoration: InputDecoration(
+                  labelText: '译文'.tl,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () {
+              final src = sourceController.text.trim();
+              final dst = translationController.text.trim();
+              if (src.isEmpty || dst.isEmpty) {
+                dialogContext.showMessage(message: '原文和译文均不能为空'.tl);
+                return;
+              }
+              final ok = ImageTranslationService.instance.setGlossaryEntry(
+                widget.cid,
+                widget.sourceKey,
+                src,
+                dst,
+              );
+              if (!ok) {
+                dialogContext.showMessage(
+                  message: '词汇无效：内容过长，或词汇表已满'.tl,
+                );
+                return;
+              }
+              dialogContext.pop();
+              if (mounted) setState(_reload);
+            },
+            child: Text('保存'.tl),
+          ),
+        ],
+      ),
+    );
+    sourceController.dispose();
+    translationController.dispose();
+  }
+
+  void _removeEntry(String source, {bool block = false}) {
+    ImageTranslationService.instance.removeGlossaryEntry(
+      widget.cid,
+      widget.sourceKey,
+      source,
+      block: block,
+    );
+    if (mounted) setState(_reload);
+  }
+
+  Future<void> _confirmRemove(String source) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => ContentDialog(
+        title: '移除词汇'.tl,
+        content: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text('仅删除，还是屏蔽并阻止以后再次添加？'.tl),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              dialogContext.pop();
+              _removeEntry(source);
+            },
+            child: Text('仅删除'.tl),
+          ),
+          FilledButton(
+            onPressed: () {
+              dialogContext.pop();
+              _removeEntry(source, block: true);
+            },
+            child: Text('屏蔽'.tl),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _unblock(String source) {
+    ImageTranslationService.instance.unblockTerm(
+      widget.cid,
+      widget.sourceKey,
+      source,
+    );
+    if (mounted) setState(_reload);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = _entries.isEmpty && _blocked.isEmpty;
+    final publicFreeHint = 'Google Translate 不使用词汇表。切换到 AI 模型可保持名称翻译一致。'.tl;
+    return ContentDialog(
+      title: '${'词汇表'.tl} · ${widget.title}',
+      content: SizedBox(
+        width: 560,
+        height: math.min(520, context.height * 0.65),
+        child: Column(
+          children: [
+            if (LlmTranslator.activeIsPublicFree)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Text(
+                  publicFreeHint,
+                  style: ts.s14.withColor(context.colorScheme.outline),
+                ),
+              ),
+            Expanded(
+              child: empty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          LlmTranslator.activeIsPublicFree
+                              ? publicFreeHint
+                              : '暂无词汇'.tl,
+                          style: ts.s16.withColor(context.colorScheme.outline),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : ListView(
+                      children: [
+                        for (final entry in _entries)
+                          ListTile(
+                            title: Text(entry.key),
+                            subtitle: Text(entry.value),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: '编辑'.tl,
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: () => _editEntry(
+                                    source: entry.key,
+                                    translation: entry.value,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: '删除或屏蔽'.tl,
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => _confirmRemove(entry.key),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (_blocked.isNotEmpty) ...[
+                          const Divider(),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                            child: Text(
+                              '已屏蔽词汇'.tl,
+                              style: ts.s14.withColor(
+                                context.colorScheme.outline,
+                              ),
+                            ),
+                          ),
+                          for (final term in _blocked)
+                            ListTile(
+                              leading: Icon(
+                                Icons.block,
+                                size: 20,
+                                color: context.colorScheme.outline,
+                              ),
+                              title: Text(term),
+                              trailing: TextButton(
+                                onPressed: () => _unblock(term),
+                                child: Text('解除屏蔽'.tl),
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton.icon(
+          onPressed: _editEntry,
+          icon: const Icon(Icons.add),
+          label: Text('添加词汇'.tl),
+        ),
+        TextButton(
+          onPressed: context.pop,
+          child: Text('关闭'.tl),
+        ),
+      ],
     );
   }
 }

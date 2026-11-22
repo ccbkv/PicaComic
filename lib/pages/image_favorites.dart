@@ -874,9 +874,10 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                                       child: Image(
                                         image: _ImageProvider(image),
                                         errorBuilder: (context, error, stack) =>
-                                            Center(child: Text(error.toString(),
-                                                textAlign: TextAlign.center,
-                                                maxLines: 3)),
+                                            Center(
+                                                child: Text(error.toString(),
+                                                    textAlign: TextAlign.center,
+                                                    maxLines: 3)),
                                         fit: BoxFit.cover,
                                         width: itemWidth,
                                         height: itemHeight,
@@ -1104,9 +1105,10 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
                                 child: Image(
                                   image: _ImageProvider(image),
                                   errorBuilder: (context, error, stack) =>
-                                      Center(child: Text(error.toString(),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 3)),
+                                      Center(
+                                          child: Text(error.toString(),
+                                              textAlign: TextAlign.center,
+                                              maxLines: 3)),
                                   fit: BoxFit.cover,
                                   width: itemWidth,
                                   height: itemHeight,
@@ -1190,12 +1192,11 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
         final key = type == 'htManga' ? 'htmanga' : type;
         final source = ComicSource.find(key);
         if (source != null && !source.isBuiltIn) {
-          Navigator.of(context).push(MaterialPageRoute(
-              builder: (context) => ComicPage(
-                    sourceKey: key,
-                    id: id,
-                    cover: otherInfo["cover"],
-                  )));
+          context.to(() => ComicPage(
+                sourceKey: key,
+                id: id,
+                cover: otherInfo["cover"],
+              ));
         } else {
           showToast(message: "${'请先添加对应漫画源'.tl}: $key");
         }
@@ -1284,12 +1285,13 @@ class _ImageFavoritesComicTileState extends State<_ImageFavoritesComicTile> {
           }
           dialog.close();
           App.globalTo(() => ComicReadingPage(
-            CustomReadingData(target, res.data.title, source, res.data.chapters,
-                historySubTitle: res.data.subTitle ?? '',
-                historyCover: res.data.cover),
-            page > 0 ? page : 1,
-            ep > 0 ? ep : 1,
-          ));
+                CustomReadingData(
+                    target, res.data.title, source, res.data.chapters,
+                    historySubTitle: res.data.subTitle ?? '',
+                    historyCover: res.data.cover),
+                page > 0 ? page : 1,
+                ep > 0 ? ep : 1,
+              ));
         } catch (e) {
           if (!cancelled) showToast(message: e.toString());
         } finally {
@@ -1352,8 +1354,8 @@ class FavoriteImageTile extends StatelessWidget {
                   children: [
                     Image(
                       image: _ImageProvider(image),
-                      errorBuilder: (context, error, stack) =>
-                          Center(child: Text(error.toString(),
+                      errorBuilder: (context, error, stack) => Center(
+                          child: Text(error.toString(),
                               textAlign: TextAlign.center, maxLines: 3)),
                       fit: BoxFit.cover, // 保持图片比例
                       width: 120,
@@ -1460,12 +1462,13 @@ class FavoriteImageTile extends StatelessWidget {
           }
           dialog.close();
           App.globalTo(() => ComicReadingPage(
-            CustomReadingData(target, res.data.title, source, res.data.chapters,
-                historySubTitle: res.data.subTitle ?? '',
-                historyCover: res.data.cover),
-            page > 0 ? page : 1,
-            ep > 0 ? ep : 1,
-          ));
+                CustomReadingData(
+                    target, res.data.title, source, res.data.chapters,
+                    historySubTitle: res.data.subTitle ?? '',
+                    historyCover: res.data.cover),
+                page > 0 ? page : 1,
+                ep > 0 ? ep : 1,
+              ));
         } catch (e) {
           if (!cancelled) showToast(message: e.toString());
         } finally {
@@ -1544,8 +1547,8 @@ class _ImageProvider extends BaseImageProvider<_ImageProvider> {
           if (!identical(source, ComicSource.find(sourceKey))) {
             throw '请先添加对应漫画源'.tl;
           }
-          stream = ImageManager().getCustomImage(
-              url, comicId, epId ?? comicId, sourceKey);
+          stream = ImageManager()
+              .getCustomImage(url, comicId, epId ?? comicId, sourceKey);
       }
       DownloadProgress? finishProgress;
       await for (var progress in stream) {
@@ -1557,8 +1560,8 @@ class _ImageProvider extends BaseImageProvider<_ImageProvider> {
             expectedTotalBytes: progress.expectedBytes));
       }
       if (finishProgress == null) throw '图片加载未完成'.tl;
-      var data = finishProgress.data ??
-          await finishProgress.getFile().readAsBytes();
+      var data =
+          finishProgress.data ?? await finishProgress.getFile().readAsBytes();
       var file2 = File("${App.dataPath}/images/${image.imagePath}");
       if (!file2.existsSync()) {
         await file2.create(recursive: true);

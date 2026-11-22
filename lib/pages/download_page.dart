@@ -245,90 +245,16 @@ class DownloadPageLogic extends StateController {
   }
 
   void searchByTag() {
-    // 添加调试日志
-    print('开始执行标签搜索: tagKeyword = $tagKeyword');
-    print('搜索前漫画总数: ${baseComics.length}');
-
-    List<DownloadedItem> filteredComics;
-    if (tagKeyword.isEmpty) {
-      print('标签关键词为空，显示所有漫画');
-      filteredComics = List.from(baseComics);
-    } else {
-      filteredComics = baseComics
-          .where((comic) => comic.tags.any((t) =>
-              t.toLowerCase().contains(tagKeyword.toLowerCase()) ||
-              t.translateTagsToCN
-                  .toLowerCase()
-                  .contains(tagKeyword.toLowerCase()))) // 支持中英文标签搜索
-          .toList();
-      print('找到 ${filteredComics.length} 个匹配的漫画');
-    }
-
-    // 处理分页
-    if (isPaginationMode) {
-      if (tagKeyword != _lastTagKeyword) {
-        resetPagination();
-        _lastTagKeyword = tagKeyword;
-      }
-      maxPage = (filteredComics.length / pageSize).ceil();
-      int startIndex = (currentPage - 1) * pageSize;
-      int endIndex = startIndex + pageSize;
-      if (endIndex > filteredComics.length) {
-        endIndex = filteredComics.length;
-      }
-      comics = filteredComics.sublist(startIndex, endIndex);
-    } else {
-      comics = filteredComics;
-    }
-
-    // 同步selected数组长度
-    resetSelected(comics.length);
-
-    print('重置分页，更新UI');
+    final keywordChanged = tagKeyword != _lastTagKeyword;
+    _lastTagKeyword = tagKeyword;
+    applyFilters(resetPage: keywordChanged);
     update();
   }
 
   void searchByCategory() {
-    // 添加调试日志
-    print('开始执行分类搜索: categoryKeyword = $categoryKeyword');
-    print('搜索前漫画总数: ${baseComics.length}');
-
-    List<DownloadedItem> filteredComics;
-    if (categoryKeyword.isEmpty) {
-      print('分类关键词为空，显示所有漫画');
-      filteredComics = List.from(baseComics);
-    } else {
-      filteredComics = baseComics.where((comic) {
-        return comic._displayCategories.any((c) =>
-            c.toLowerCase().contains(categoryKeyword.toLowerCase()) ||
-            c.translateTagsToCN
-                .toLowerCase()
-                .contains(categoryKeyword.toLowerCase()));
-      }).toList();
-      print('找到 ${filteredComics.length} 个匹配的漫画');
-    }
-
-    // 处理分页
-    if (isPaginationMode) {
-      if (categoryKeyword != _lastCategoryKeyword) {
-        resetPagination();
-        _lastCategoryKeyword = categoryKeyword;
-      }
-      maxPage = (filteredComics.length / pageSize).ceil();
-      int startIndex = (currentPage - 1) * pageSize;
-      int endIndex = startIndex + pageSize;
-      if (endIndex > filteredComics.length) {
-        endIndex = filteredComics.length;
-      }
-      comics = filteredComics.sublist(startIndex, endIndex);
-    } else {
-      comics = filteredComics;
-    }
-
-    // 同步selected数组长度
-    resetSelected(comics.length);
-
-    print('重置分页，更新UI');
+    final keywordChanged = categoryKeyword != _lastCategoryKeyword;
+    _lastCategoryKeyword = categoryKeyword;
+    applyFilters(resetPage: keywordChanged);
     update();
   }
 
@@ -374,50 +300,11 @@ class DownloadPageLogic extends StateController {
   }
 
   void find() {
-    // 只有在搜索模式下才执行查找
     if (!searchMode) return;
 
-    // 保存旧关键词用于比较
-    String oldKeyword = keyword_;
-
-    if (keyword == keyword_) {
-      return;
-    }
+    final keywordChanged = keyword != keyword_;
     keyword_ = keyword;
-    comics.clear();
-    List<DownloadedItem> filteredComics;
-
-    if (keyword == "") {
-      filteredComics = baseComics;
-    } else {
-      filteredComics = [];
-      for (var element in baseComics) {
-        if (element.name.toLowerCase().contains(keyword) ||
-            element.subTitle.toLowerCase().contains(keyword)) {
-          filteredComics.add(element);
-        }
-      }
-    }
-
-    // 处理分页
-    if (isPaginationMode) {
-      if (keyword != oldKeyword) {
-        resetPagination();
-      }
-      maxPage = (filteredComics.length / pageSize).ceil();
-      int startIndex = (currentPage - 1) * pageSize;
-      int endIndex = startIndex + pageSize;
-      if (endIndex > filteredComics.length) {
-        endIndex = filteredComics.length;
-      }
-      comics = filteredComics.sublist(startIndex, endIndex);
-    } else {
-      comics = filteredComics;
-    }
-
-    resetSelected(comics.length);
-
-    // 更新UI
+    applyFilters(resetPage: keywordChanged);
     update();
   }
 
@@ -440,49 +327,59 @@ class DownloadPageLogic extends StateController {
     selectedNum = 0;
   }
 
-  /// 更新下载类型筛选
+  /// 更新下载类型筛选，保留当前搜索模式和关键词。
   void updateDownloadTypeFilter(DownloadType? type) {
     downloadTypeFilter = type;
-
-    // 重置所有搜索状态
-    searchMode = false;
-    tagSearchMode = false;
-    categorySearchMode = false;
-    searchInit = false;
-
-    // 清空搜索输入框
-    searchController?.clear();
-    keyword = "";
-    tagKeyword = "";
-    categoryKeyword = "";
-
-    // 重置分页
-    resetPagination();
-
-    // 重新应用筛选
-    applyTypeFilter();
+    applyFilters(resetPage: true);
     update();
   }
 
-  /// 应用类型筛选
-  void applyTypeFilter() {
-    List<DownloadedItem> filteredComics = baseComics;
-
-    // 应用类型筛选
-    if (downloadTypeFilter != null) {
-      filteredComics = filteredComics
-          .where((comic) => comic._displayType == downloadTypeFilter)
-          .toList();
+  /// 先应用漫画源筛选，再应用当前搜索条件。
+  void applyFilters({bool resetPage = false}) {
+    if (resetPage) {
+      resetPagination();
     }
 
-    // 处理分页
+    Iterable<DownloadedItem> filtered = baseComics;
+    if (downloadTypeFilter != null) {
+      filtered =
+          filtered.where((comic) => comic._displayType == downloadTypeFilter);
+    }
+
+    if (tagSearchMode) {
+      final query = tagKeyword.toLowerCase();
+      if (query.isNotEmpty) {
+        filtered = filtered.where((comic) => comic.tags.any((tag) =>
+            tag.toLowerCase().contains(query) ||
+            tag.translateTagsToCN.toLowerCase().contains(query)));
+      }
+    } else if (categorySearchMode) {
+      final query = categoryKeyword.toLowerCase();
+      if (query.isNotEmpty) {
+        filtered = filtered.where((comic) => comic._displayCategories.any(
+            (category) =>
+                category.toLowerCase().contains(query) ||
+                category.translateTagsToCN.toLowerCase().contains(query)));
+      }
+    } else if (searchMode) {
+      final query = keyword.toLowerCase();
+      if (query.isNotEmpty) {
+        filtered = filtered.where((comic) =>
+            comic.name.toLowerCase().contains(query) ||
+            comic.subTitle.toLowerCase().contains(query));
+      }
+    }
+
+    final filteredComics = filtered.toList();
     if (isPaginationMode) {
       maxPage = (filteredComics.length / pageSize).ceil();
-      int startIndex = (currentPage - 1) * pageSize;
-      int endIndex = startIndex + pageSize;
-      if (endIndex > filteredComics.length) {
-        endIndex = filteredComics.length;
+      if (currentPage > maxPage) {
+        currentPage = maxPage > 0 ? maxPage : 1;
       }
+      final startIndex = (currentPage - 1) * pageSize;
+      final endIndex = startIndex + pageSize > filteredComics.length
+          ? filteredComics.length
+          : startIndex + pageSize;
       comics = filteredComics.sublist(startIndex, endIndex);
     } else {
       comics = filteredComics;
@@ -579,6 +476,7 @@ class _DownloadPageState extends State<DownloadPage> {
   void initState() {
     super.initState();
     logic = DownloadPageLogic();
+    logic.downloadTypeFilter = null;
     logic.initSearchController();
   }
 
@@ -1075,6 +973,7 @@ class _DownloadPageState extends State<DownloadPage> {
               logic.searchInit = false;
               logic.searchController?.clear();
               logic.keyword = '';
+              logic.applyFilters();
               logic.update();
             } else {
               logic.searchMode = true;
@@ -1095,6 +994,7 @@ class _DownloadPageState extends State<DownloadPage> {
             if (!logic.tagSearchMode) {
               logic.tagSearchMode = true;
               logic.searchMode = false;
+              logic.categorySearchMode = false;
               logic.searchInit = true;
               logic.searchController?.text = logic.tagKeyword;
               logic.searchController?.selection = TextSelection.fromPosition(
@@ -1108,6 +1008,7 @@ class _DownloadPageState extends State<DownloadPage> {
                   List.generate(logic.comics.length, (index) => false);
               logic.selectedNum = 0;
               logic.searchController?.text = '';
+              logic.applyFilters();
               logic.update();
             }
           },
@@ -1134,6 +1035,7 @@ class _DownloadPageState extends State<DownloadPage> {
                   List.generate(logic.comics.length, (index) => false);
               logic.selectedNum = 0;
               logic.searchController?.text = '';
+              logic.applyFilters();
               logic.update();
             }
           },
@@ -1235,7 +1137,6 @@ class _DownloadPageState extends State<DownloadPage> {
   }
 
   Widget buildComicsSliver(BuildContext context, DownloadPageLogic logic) {
-    logic.find();
     final comics = logic.comics;
 
     return SliverGrid(
@@ -1268,135 +1169,7 @@ class _DownloadPageState extends State<DownloadPage> {
     }
     logic.baseComics = DownloadManager().getAll(order, direction);
 
-    // 处理分页
-    if (logic.isPaginationMode) {
-      // 使用完整的搜索结果计算分页
-      List<DownloadedItem> fullResultComics;
-      if (logic.tagSearchMode) {
-        // 标签搜索模式下使用标签搜索结果
-        if (logic.tagKeyword.isEmpty) {
-          fullResultComics = logic.baseComics;
-        } else {
-          fullResultComics = logic.baseComics
-              .where((comic) => comic.tags.any((t) =>
-                  t.toLowerCase().contains(logic.tagKeyword.toLowerCase()) ||
-                  t.translateTagsToCN
-                      .toLowerCase()
-                      .contains(logic.tagKeyword.toLowerCase()))) // 支持中英文标签搜索
-              .toList();
-        }
-      } else if (logic.categorySearchMode) {
-        // 分类搜索模式下使用分类搜索结果
-        if (logic.categoryKeyword.isEmpty) {
-          fullResultComics = logic.baseComics;
-        } else {
-          fullResultComics = logic.baseComics.where((comic) {
-            return comic._displayCategories.any((c) =>
-                c.toLowerCase().contains(logic.categoryKeyword.toLowerCase()) ||
-                c.translateTagsToCN
-                    .toLowerCase()
-                    .contains(logic.categoryKeyword.toLowerCase()));
-          }).toList();
-        }
-      } else if (logic.searchMode) {
-        // 普通搜索模式下使用普通搜索结果
-        if (logic.keyword.isEmpty) {
-          fullResultComics = logic.baseComics;
-        } else {
-          fullResultComics = logic.baseComics
-              .where((comic) =>
-                  comic.name
-                      .toLowerCase()
-                      .contains(logic.keyword.toLowerCase()) ||
-                  comic.subTitle
-                      .toLowerCase()
-                      .contains(logic.keyword.toLowerCase()))
-              .toList();
-        }
-      } else {
-        // 默认使用所有漫画
-        if (logic.downloadTypeFilter != null) {
-          fullResultComics = logic.baseComics
-              .where(
-                  (element) => element._displayType == logic.downloadTypeFilter)
-              .toList();
-        } else {
-          fullResultComics = logic.baseComics;
-        }
-      }
-
-      // 计算最大页数
-      logic.maxPage = (fullResultComics.length / logic.pageSize).ceil();
-
-      // 确保当前页码不超出范围
-      if (logic.currentPage > logic.maxPage) {
-        logic.currentPage = logic.maxPage > 0 ? logic.maxPage : 1;
-      }
-
-      // 计算当前页数据范围
-      int startIndex = (logic.currentPage - 1) * logic.pageSize;
-      int endIndex = startIndex + logic.pageSize;
-      if (endIndex > fullResultComics.length) {
-        endIndex = fullResultComics.length;
-      }
-
-      // 更新当前页数据
-      logic.comics = fullResultComics.sublist(startIndex, endIndex);
-    } else {
-      // 非分页模式下的搜索处理
-      if (logic.tagSearchMode) {
-        // 标签搜索模式下使用标签搜索结果
-        if (logic.tagKeyword.isEmpty) {
-          logic.comics = logic.baseComics.toList();
-        } else {
-          logic.comics = logic.baseComics
-              .where((comic) => comic.tags.any((t) =>
-                  t.toLowerCase().contains(logic.tagKeyword.toLowerCase()) ||
-                  t.translateTagsToCN
-                      .toLowerCase()
-                      .contains(logic.tagKeyword.toLowerCase()))) // 支持中英文标签搜索
-              .toList();
-        }
-      } else if (logic.categorySearchMode) {
-        // 分类搜索模式下使用分类搜索结果
-        if (logic.categoryKeyword.isEmpty) {
-          logic.comics = logic.baseComics.toList();
-        } else {
-          logic.comics = logic.baseComics.where((comic) {
-            return comic._displayCategories.any((c) =>
-                c.toLowerCase().contains(logic.categoryKeyword.toLowerCase()) ||
-                c.translateTagsToCN
-                    .toLowerCase()
-                    .contains(logic.categoryKeyword.toLowerCase()));
-          }).toList();
-        }
-      } else if (logic.searchMode) {
-        // 普通搜索模式下使用普通搜索结果
-        if (logic.keyword.isEmpty) {
-          logic.comics = logic.baseComics.toList();
-        } else {
-          logic.comics = logic.baseComics
-              .where((comic) =>
-                  comic.name
-                      .toLowerCase()
-                      .contains(logic.keyword.toLowerCase()) ||
-                  comic.subTitle
-                      .toLowerCase()
-                      .contains(logic.keyword.toLowerCase()))
-              .toList();
-        }
-      } else {
-        // 默认使用所有漫画
-        logic.comics = logic.baseComics
-            .where((comic) =>
-                logic.downloadTypeFilter == null ||
-                comic._displayType == logic.downloadTypeFilter)
-            .toList();
-      }
-    }
-
-    // 重新初始化selected数组，确保其长度与当前显示的comics数组长度一致
-    logic.resetSelected(logic.comics.length);
+    logic.applyFilters();
   }
 
   Future<void> export(DownloadPageLogic logic) async {
@@ -2096,7 +1869,7 @@ class _DownloadPageState extends State<DownloadPage> {
     }
 
     // 添加漫画源筛选按钮
-    if (!logic.selecting && !logic.searchMode) {
+    if (!logic.selecting) {
       actions.add(
         Builder(
           builder: (buttonContext) => Tooltip(
@@ -2137,6 +1910,7 @@ class _DownloadPageState extends State<DownloadPage> {
                 // 切换到标签搜索模式
                 logic.tagSearchMode = true;
                 logic.searchMode = false;
+                logic.categorySearchMode = false;
                 logic.searchInit = true;
                 // 同步标签关键词到搜索控制器
                 logic.searchController?.text = logic.tagKeyword;
@@ -2155,6 +1929,7 @@ class _DownloadPageState extends State<DownloadPage> {
                     List.generate(logic.comics.length, (index) => false);
                 logic.selectedNum = 0;
                 logic.searchController?.text = '';
+                logic.applyFilters();
                 // 退出搜索模式时保留当前页面，不调用会重置分页的refresh()
                 // 只更新UI而不重置分页信息
                 logic.update();
@@ -2190,6 +1965,7 @@ class _DownloadPageState extends State<DownloadPage> {
                     List.generate(logic.comics.length, (index) => false);
                 logic.selectedNum = 0;
                 logic.searchController?.text = '';
+                logic.applyFilters();
                 // 退出搜索模式时保留当前页面，不调用会重置分页的refresh()
                 // 只更新UI而不重置分页信息
                 logic.update();
@@ -2241,6 +2017,7 @@ class _DownloadPageState extends State<DownloadPage> {
                 logic.searchController?.clear();
                 // 重置搜索关键词
                 logic.keyword = '';
+                logic.applyFilters();
                 // 退出搜索模式时保留当前页面，不调用会重置分页的refresh()
                 // 只更新UI而不重置分页信息
                 logic.update();

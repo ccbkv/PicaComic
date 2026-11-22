@@ -54,6 +54,7 @@ abstract class ReadingData {
       downloadedEps =
           (await DownloadManager().getComicOrNull(downloadId))!.downloadedEps;
     }
+    late final Res<List<String>> result;
     if (downloaded && checkEpDownloaded(ep)) {
       int length;
       if (hasEp) {
@@ -61,10 +62,13 @@ abstract class ReadingData {
       } else {
         length = await DownloadManager().getComicLength(downloadId);
       }
-      return Res(List.filled(length, ""));
+      result = Res(List.filled(length, ""));
+      final eid = hasEp ? eps?.keys.elementAtOrNull(ep - 1) ?? '0' : '0';
+      TranslationStore().recordChapterPageCount(sourceKey, id, eid, length);
     } else {
-      return await loadEpNetwork(ep);
+      result = await loadEpNetwork(ep);
     }
+    return result;
   }
 
   /// Load image from local or network
@@ -99,6 +103,8 @@ abstract class ReadingData {
         config,
         ImageTranslationService.instance
             .isTranslated(translationKey, config.mode),
+        translationRevision:
+            ImageTranslationService.instance.revisionOf(translationKey),
         comicTitle: title,
         comicCover: historyCover,
         chapterTitle:

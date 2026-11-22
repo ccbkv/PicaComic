@@ -683,8 +683,84 @@ extension ToolBar on ComicReadingPage {
           ),
         );
       }
+      final retranslateKey = targets.cacheKeys
+          .where((key) => statusOf(key) == PageTranslationStatus.translated)
+          .firstOrNull;
+      if (retranslateKey != null) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
+            child: _buildToolIconButton(
+              context: context,
+              tooltip: 'Re-translate this page'.tl,
+              icon: Icons.g_translate_rounded,
+              onPressed: () => showConfirmDialog(
+                context: context,
+                title: 'Re-translate this page'.tl,
+                content:
+                    'Translate this page again? A paid service may charge for this request.'
+                        .tl,
+                onConfirm: () => _retranslateTranslation(logic, retranslateKey),
+              ),
+            ),
+          ),
+        );
+      }
     }
     return widgets;
+  }
+
+  Future<void> _retranslateTranslation(
+    ComicReadingPageLogic logic,
+    String cacheKey,
+  ) async {
+    final data = logic.data;
+    final eid = data.hasEp
+        ? data.eps?.keys.elementAtOrNull(logic.order - 1) ?? '0'
+        : '0';
+    var page = 0;
+    for (var i = 1; i <= logic.urls.length; i++) {
+      if (ImageTranslationService.cacheKeyFor(
+              data.sourceKey, data.id, eid, i) ==
+          cacheKey) {
+        page = i;
+        break;
+      }
+    }
+    if (page == 0) return;
+    final provider = data.createImageProvider(
+      logic.order,
+      page - 1,
+      logic.urls[page - 1],
+    );
+    if (provider is! TranslatedImageProvider) return;
+    final service = ImageTranslationService.instance;
+    try {
+      final bytes = await provider.loadOriginal();
+      final replaced = await service.retranslatePage(
+        cacheKey,
+        '${data.id}@${data.sourceKey}',
+        bytes,
+        provider.translationConfig,
+        chapter: ImageTranslationService.chapterIdentity(
+          cid: data.id,
+          sourceKey: data.sourceKey,
+          eid: eid,
+          config: provider.translationConfig,
+          comicTitle: data.title,
+          comicCover: data.historyCover,
+          chapterTitle: data.hasEp
+              ? data.eps?.values.elementAtOrNull(logic.order - 1) ?? data.title
+              : data.title,
+        ),
+        legacyCacheKey: provider.legacyTranslationKey,
+      );
+      if (!replaced) {
+        showToast(message: 'No translatable text found on this page'.tl);
+      }
+    } catch (e) {
+      showToast(message: '${'Translation failed'.tl}: $e');
+    }
   }
 
   void _retryTranslation(
